@@ -719,7 +719,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .metrics-row {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: var(--space-md);
 }
 
@@ -877,6 +877,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
   font-weight: 800;
   font-family: var(--font-mono);
   margin: var(--space-md) 0;
+  padding: var(--space-sm) 0;
+  background: rgba(45,138,110,0.04);
+  border-radius: var(--radius-sm);
 }
 
 .compare-card .compare-metrics {
@@ -1044,6 +1047,18 @@ input[type="range"]::-webkit-slider-thumb:hover {
   color: var(--color-text-secondary);
   text-align: center;
   margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+}
+
+.mini-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
 }
 
 .mini-bar-chart {
@@ -1288,7 +1303,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   }
 
   .metrics-row {
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .final-grid {
