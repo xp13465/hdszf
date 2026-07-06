@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+generate_data.py
+
+# System
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Temp
+*.tmp
+*.swp
+*.swo

@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>恒市值法智能理财助手 — 资产配置优化平台</title>
+  <meta name="description" content="基于11年历史回测的恒市值法资产配置优化工具，交互式参数调节，科学配置你的投资组合">
+  <!-- 默认商务风主题，JS 动态切换 -->
+  <link rel="stylesheet" href="css/style.css?v=14" id="theme-style">
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+</head>
+<body>
+
+  <!-- ===== 主题切换器 ===== -->
+  <div class="theme-switcher" id="theme-switcher">
+    <button class="theme-btn active" data-theme="business" title="简约商务风 — 适合保守投资者">🏦</button>
+    <button class="theme-btn" data-theme="modern" title="清新现代风 — 适合宝妈/白领">🌸</button>
+    <button class="theme-btn" data-theme="tech" title="深色科技风 — 适合技术玩家">🚀</button>
+  </div>
+
+  <!-- ===== 导航栏 ===== -->
+  <nav class="nav">
+    <div class="nav-inner">
+      <a href="#hero" class="nav-logo">
+        <div class="nav-logo-icon">📊</div>
+        <span>恒市值助手</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#methodology">方法论</a></li>
+        <li><a href="#data-selection">数据选型</a></li>
+        <li><a href="#backtest">回测分析</a></li>
+        <li><a href="#comparison">方案对比</a></li>
+        <li><a href="#final-solution">最终方案</a></li>
+      </ul>
+      <button class="nav-toggle" aria-label="菜单">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ===== 板块1: Hero ===== -->
+  <section id="hero" class="section">
+    <div class="container">
+      <div class="hero-grid">
+        <div class="hero-content fade-in">
+          <div class="hero-badge">
+            <span class="hero-badge-dot"></span>
+            基于11年真实市场数据回测
+          </div>
+          <h1 class="hero-title">
+            恒市值法<br><span>智能资产配置</span>
+          </h1>
+          <p class="hero-desc">
+            通过恒定市值策略与分批建仓机制，在A股、美股、黄金、现金之间科学分配资金。
+            历经53,000+组参数组合扫描与11年真实数据验证，三档方案覆盖保守到进取，找到收益与回撤的最优平衡点。
+          </p>
+          <div class="hero-actions">
+            <a href="/workspace/恒市值法理财操作表（稳健型）.xlsx" class="btn btn-primary" download>📥 下载稳健型操作表</a>
+            <button id="btn-explore" class="btn btn-outline">🔍 开始探索</button>
+          </div>
+        </div>
+
+        <div class="hero-stats fade-in delay-2">
+          <div class="stat-card primary">
+            <div class="stat-label">预期年化收益</div>
+            <div class="stat-value green">~7.6%</div>
+            <div class="stat-sub">2015-2026真实回测</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">最大回撤控制</div>
+            <div class="stat-value red">-6.1%</div>
+            <div class="stat-sub">月度再平衡·5%阈值</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Sharpe 比率</div>
+            <div class="stat-value blue">1.25</div>
+            <div class="stat-sub">风险调整后收益</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">初始资金规模</div>
+            <div class="stat-value gold">¥50万</div>
+            <div class="stat-sub">6类资产分散配置</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 板块2: 方法论 ===== -->
+  <section id="methodology" class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-tag">方法论</div>
+        <h2 class="section-title">恒市值法的核心逻辑</h2>
+        <p class="section-subtitle">一种纪律严明的资产配置策略，通过定期再平衡实现被动择时</p>
+      </div>
+
+      <div class="method-cards">
+        <div class="method-card fade-in delay-1">
+          <div class="method-icon blue">⚖️</div>
+          <h3>恒定目标市值</h3>
+          <p>设定每类资产的<strong>目标市值</strong>（而非目标比例），每月检查偏离度。当某类资产上涨超出阈值，自动卖出获利部分；下跌时则补仓买入，实现"低买高卖"的纪律性操作。</p>
+        </div>
+        <div class="method-card fade-in delay-2">
+          <div class="method-icon gold">🏗️</div>
+          <h3>分批建仓机制</h3>
+          <p>初始资金不一次性投入，而是按<strong>月度等额</strong>逐步建仓（默认12个月）。避免在极端高点全仓买入，降低择时风险，让成本均匀分布在市场周期中。</p>
+        </div>
+        <div class="method-card fade-in delay-3">
+          <div class="method-icon green">🎯</div>
+          <h3>再平衡阈值</h3>
+          <p>设置<strong>±5%偏离阈值</strong>，只有当实际比例与目标比例偏差超过阈值时才触发交易。避免频繁小额调仓，降低交易成本，同时保留足够的灵活性应对市场变化。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 板块3: 数据选型 ===== -->
+  <section id="data-selection" class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-tag">数据选型</div>
+        <h2 class="section-title">基金筛选与数据源</h2>
+        <p class="section-subtitle">覆盖6大资产类别、15只候选基金、11年历史净值数据</p>
+      </div>
+
+      <div class="fund-table-wrap fade-in">
+        <table class="fund-table">
+          <thead>
+            <tr>
+              <th>基金代码</th>
+              <th>基金名称</th>
+              <th>资产类型</th>
+              <th>数据起始</th>
+              <th>数据截止</th>
+              <th>记录数</th>
+            </tr>
+          </thead>
+          <tbody id="fund-table-body">
+            <!-- JS 动态填充 -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="data-source-card fade-in delay-1">
+        <div class="data-source-icon">📡</div>
+        <div>
+          <p><strong>数据来源：</strong>天天基金网（eastmoney）净值API + 新浪财经（Sina Finance）前复权K线数据</p>
+          <p style="margin-top:4px;"><strong>时间跨度：</strong>2015年8月 — 2026年7月，共11年完整市场周期，覆盖2015年股灾、2018年熊市、2020年疫情、2022年回调等重大事件</p>
+          <p style="margin-top:4px;"><strong>数据处理：</strong>前复权价格已包含分红再投资，货币基金使用万份收益折算日收益率，多基金同类资产按规模加权合成指数</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 板块4: 交互式回测分析 ⭐ ===== -->
+  <section id="backtest" class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-tag">⭐ 核心功能</div>
+        <h2 class="section-title">交互式回测分析</h2>
+        <p class="section-subtitle">拖拽滑块调整配置，实时查看回测结果变化。支持锁定对比模式。</p>
+      </div>
+
+      <div class="backtest-layout">
+        <!-- 左侧：滑块面板 -->
+        <div class="slider-panel fade-in" id="slider-panel">
+          <div class="slider-panel-title" id="slider-toggle">
+            <span>🎚️ 资产配置调节</span>
+            <span id="sum-indicator" class="sum-indicator ok">合计: 100%</span>
+          </div>
+          <div class="slider-body">
+
+          <!-- 沪深300 -->
+          <div class="slider-group hs300">
+            <div class="slider-label-row">
+              <span class="slider-name" style="color:#3b82f6">● 沪深300 <small style="color:var(--color-text-muted);font-weight:400">（510300｜510310）</small></span>
+              <span class="slider-value"><input type="number" id="input-沪深300" min="0" max="100">%</span>
+            </div>
+            <input type="range" id="slider-沪深300" min="0" max="100" value="19" step="1">
+          </div>
+
+          <!-- 中证500 -->
+          <div class="slider-group zz500">
+            <div class="slider-label-row">
+              <span class="slider-name" style="color:#60a5fa">● 中证500 <small style="color:var(--color-text-muted);font-weight:400">（512500｜510500）</small></span>
+              <span class="slider-value"><input type="number" id="input-中证500" min="0" max="100">%</span>
+            </div>
+            <input type="range" id="slider-中证500" min="0" max="100" value="11" step="1">
+          </div>
+
+          <!-- 标普500 -->
+          <div class="slider-group sp500">
+            <div class="slider-label-row">
+              <span class="slider-name" style="color:#06b6d4">● 标普500 <small style="color:var(--color-text-muted);font-weight:400">（513500｜513650）</small></span>
+              <span class="slider-value"><input type="number" id="input-标普500" min="0" max="100">%</span>
+            </div>
+            <input type="range" id="slider-标普500" min="0" max="100" value="17" step="1">
+          </div>
+
+          <!-- 纳斯达克100 -->
+          <div class="slider-group nasdaq">
+            <div class="slider-label-row">
+              <span class="slider-name" style="color:#22d3ee">● 纳斯达克100 <small style="color:var(--color-text-muted);font-weight:400">（513100｜159659）</small></span>
+              <span class="slider-value"><input type="number" id="input-纳斯达克100" min="0" max="100">%</span>
+            </div>
+            <input type="range" id="slider-纳斯达克100" min="0" max="100" value="23" step="1">
+          </div>
+
+          <!-- 黄金 -->
+          <div class="slider-group gold">
+            <div class="slider-label-row">
+              <span class="slider-name" style="color:#c9a84c">● 黄金 <small style="color:var(--color-text-muted);font-weight:400">（518880｜518660）</small></span>
+              <span class="slider-value"><input type="number" id="input-黄金" min="0" max="100">%</span>
+            </div>
+            <input type="range" id="slider-黄金" min="0" max="100" value="15" step="1">
+          </div>
+
+          <!-- 现金 -->
+          <div class="slider-group cash">
+            <div class="slider-label-row">
+              <span class="slider-name" style="color:#94a3b8">● 现金·货币基金 <small style="color:var(--color-text-muted);font-weight:400">（余额宝｜逆回购）</small></span>
+              <span class="slider-value"><input type="number" id="input-现金·货币基金" min="0" max="100">%</span>
+            </div>
+            <input type="range" id="slider-现金·货币基金" min="0" max="100" value="15" step="1">
+          </div>
+
+          <div class="slider-actions">
+            <button id="btn-reset" class="btn-sm">↺ 恢复默认</button>
+            <button id="btn-lock" class="btn-sm">🔒 锁定对比</button>
+          </div>
+          <div id="match-indicator" class="match-indicator exact" style="margin-top:12px;">精确匹配</div>
+          </div><!-- /slider-body -->
+        </div>
+
+        <!-- 右侧：结果面板 -->
+        <div class="results-panel fade-in delay-1">
+          <!-- 对比模式提示 -->
+          <div id="comparison-bar" class="comparison-bar">
+            <span id="locked-summary"></span>
+            <button class="btn-sm" onclick="SliderPanel.resetToDefault()">✕ 清除锁定</button>
+          </div>
+
+          <!-- 指标卡片 -->
+          <div class="metrics-row">
+            <div class="metric-card highlight">
+              <div class="metric-label">年化收益</div>
+              <div id="metric-annual" class="metric-value positive">8.59%</div>
+              <div id="diff-annual" class="metric-diff"></div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">最大回撤</div>
+              <div id="metric-dd" class="metric-value negative">-25.0%</div>
+              <div id="diff-dd" class="metric-diff"></div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Sharpe比率</div>
+              <div id="metric-sharpe" class="metric-value neutral">0.3723</div>
+              <div id="diff-sharpe" class="metric-diff"></div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">Sortino比率</div>
+              <div id="metric-sortino" class="metric-value neutral">0.8965</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-label">总收益（131个月）</div>
+              <div id="metric-total" class="metric-value positive">154.6%</div>
+            </div>
+          </div>
+
+          <!-- 图表区：上下布局，时间轴对齐 -->
+          <div class="charts-row charts-stacked">
+            <div class="chart-card">
+              <div class="chart-title">📈 累计收益曲线</div>
+              <div id="chart-equity" class="chart-container chart-wide"></div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-title">📉 回撤曲线</div>
+              <div id="chart-drawdown" class="chart-container chart-wide"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 板块5: 方案对比 ===== -->
+  <section id="comparison" class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-tag">方案对比</div>
+        <h2 class="section-title">三档方案的深度对比</h2>
+        <p class="section-subtitle">保守型、稳健型（推荐）与进取型的全维度比较</p>
+      </div>
+
+      <!-- 三列对比 -->
+        <div class="compare-grid fade-in">
+          <!-- 保守型 -->
+          <div class="compare-card" id="compare-conservative">
+            <div class="compare-card-header">
+              <span class="compare-card-badge balanced">保守型</span>
+              <h3>🛡️ 保守型</h3>
+              <p style="color:var(--color-text-muted);font-size:0.875rem">A股13% + 美股17% + 黄金20% + 现金50%</p>
+            </div>
+            <div class="compare-annual"></div>
+            <div class="alloc-bars"></div>
+            <div class="compare-metrics"></div>
+          </div>
+
+          <!-- 稳健型 ★推荐 -->
+          <div class="compare-card featured" id="compare-balanced">
+            <div class="compare-card-header">
+              <span class="compare-card-badge final">⭐ 推荐方案</span>
+              <h3>🔧 稳健型</h3>
+              <p style="color:var(--color-text-muted);font-size:0.875rem">A股20% + 美股35% + 黄金20% + 现金25%</p>
+            </div>
+            <div class="compare-annual"></div>
+            <div class="alloc-bars"></div>
+            <div class="compare-metrics"></div>
+          </div>
+
+          <!-- 进取型 -->
+          <div class="compare-card" id="compare-aggressive">
+            <div class="compare-card-header">
+              <span class="compare-card-badge aggressive">进取型</span>
+              <h3>🚀 进取型</h3>
+              <p style="color:var(--color-text-muted);font-size:0.875rem">美股92% + 黄金8%（无A股/现金）</p>
+            </div>
+            <div class="compare-annual"></div>
+            <div class="alloc-bars"></div>
+            <div class="compare-metrics"></div>
+          </div>
+        </div>
+
+        <!-- 雷达图 --><!-- 雷达图 -->
+      <div class="chart-card fade-in" style="margin-bottom:var(--space-2xl);">
+        <div class="chart-title">🎯 三方案雷达图对比</div>
+        <div id="chart-radar" class="radar-chart-container"></div>
+      </div>
+
+      <!-- 柱状图 -->
+      <div class="chart-card fade-in" style="margin-bottom:var(--space-2xl);">
+        <div class="chart-title">📊 核心指标柱状图对比</div>
+        <div id="chart-compare-bar" style="width:100%;height:350px;"></div>
+      </div>
+
+      <!-- 三档方案回测数据说明 -->
+        <div class="insight-box fade-in" style="margin-top:var(--space-lg);">
+          <strong>📊 数据说明：</strong>以上三档方案基于 2015年8月 ~ 2026年7月（131个月）真实市场数据回测。
+          数据来源为新浪财经前复权K线（已做除权修正），回测采用恒市值法月度再平衡 ±5%阈值策略。
+          保守型年化 5.60%（回撤 -3.53%），
+          稳健型年化 7.60%（回撤 -6.09%），
+          进取型年化 11.67%（回撤 -10.17%）。
+        </div>
+
+        <!-- 红利国债评估 --><!-- 红利国债评估 -->
+      <div class="insight-box fade-in" style="margin-top:var(--space-lg);">
+        <strong>📋 红利ETF与国债ETF评估：</strong>我们对华泰柏瑞红利ETF（510880）和国泰5年国债ETF（511010）进行了独立回测。红利ETF单独年化约4.09%，国债ETF约2.64%。由于恒市值法的超额收益来源于<strong>高波动资产的再平衡α</strong>，低波动资产（红利/国债）的加入反而稀释了组合的整体收益。结论：<strong>在现金比例已高达25%的情况下，红利和国债ETF不增加边际价值。</strong>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 板块6: 最终方案 ===== -->
+  <section id="final-solution" class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-tag">最终方案</div>
+        <h2 class="section-title">⭐ 推荐配置：稳健型</h2>
+        <p class="section-subtitle">经过53,000+组参数扫描与11年回测验证的最优配置 · 年化7.60% · 回撤-6.09% · 夏普1.25</p>
+      </div>
+
+      <div class="final-grid">
+        <!-- 饼图 -->
+        <div class="chart-card fade-in">
+          <div class="chart-title">🍩 资产配置比例</div>
+          <div id="chart-pie" class="pie-chart-container"></div>
+        </div>
+
+        <!-- 操作指南 -->
+        <div class="final-info fade-in delay-1">
+          <h3>📋 操作指南</h3>
+          <div class="guide-steps">
+            <div class="guide-step">
+              <div class="guide-step-num">1</div>
+              <div class="guide-step-content">
+                <h4>确定初始资金</h4>
+                <p>建议初始资金 ¥50万。在概览表 B2 单元格修改总额，所有子表自动更新目标市值。</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">2</div>
+              <div class="guide-step-content">
+                <h4>分批建仓</h4>
+                <p>默认12个月建仓期。每月初按子表C列目标市值买入，实际交易金额填入F列（G列自动计算期末市值）。</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">3</div>
+              <div class="guide-step-content">
+                <h4>月度再平衡</h4>
+                <p>每月底查看概览表F列偏离度。偏离超过±5%时按G列建议交易金额调仓，实际金额填入子表F列。</p>
+              </div>
+            </div>
+            <div class="guide-step">
+              <div class="guide-step-num">4</div>
+              <div class="guide-step-content">
+                <h4>监控溢价率</h4>
+                <p>QDII ETF（标普500、纳指100）可能存在3-10%溢价。概览表J/K/L列自动监控，溢价≥8%切换备选基金。</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- 溢价率说明 -->
+          <div class="premium-note">
+            <h4>⚠️ QDII ETF 溢价率提醒</h4>
+            <p>由于外汇额度限制，QDII ETF可能出现较大溢价（通常3-10%）。概览表已内置溢价率监控：<strong>溢价 &lt; 3% ✅ 正常交易</strong>，溢价 3%-8% ⚠️ 暂缓买入，溢价 ≥ 8% 🔴 切换备选ETF。</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 下载区 -->
+      <div class="download-area fade-in delay-2">
+        <h3>📥 下载完整操作表</h3>
+        <p>包含6个子表、618个公式、溢价率监控、自动再平衡建议</p>
+        <a href="/workspace/恒市值法理财操作表（稳健型）.xlsx" class="btn btn-accent" download style="font-size:1.0625rem;padding:0.875rem 2rem;">
+          下载 Excel 操作表 (.xlsx)
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== Footer ===== -->
+  <footer class="footer">
+    <div class="container">
+      <p><strong>恒市值法智能理财助手</strong> — 基于11年历史数据回测的资产配置优化平台</p>
+      <p>数据来源：天天基金网 · 新浪财经 | 回测引擎：Python · 前端：纯静态 Web</p>
+      <p class="disclaimer">
+        ⚠️ 免责声明：本工具仅供学习和研究参考，不构成任何投资建议。历史回测结果不代表未来表现。
+        投资有风险，入市需谨慎。请根据自身风险承受能力做出独立判断。
+      </p>
+    </div>
+  </footer>
+
+  <!-- Scripts -->
+  <script src="js/data.js?v=15"></script>
+  <script src="js/engine.js?v=15"></script>
+  <script src="js/sliders.js?v=8"></script>
+  <script src="js/charts.js?v=14"></script>
+  <script src="js/main.js?v=8"></script>
+</body>
+</html>
