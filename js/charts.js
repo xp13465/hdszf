@@ -363,54 +363,63 @@ const ChartManager = (() => {
     const bal = comp.balanced;
     const agg = comp.aggressive;
 
-    compareBarChart.setOption({
+    // 四个独立网格，每个指标有自己的 Y 轴范围，避免量级碾压
+    // 顶部共享 X 轴标签（三档方案），每个网格一个指标
+    const grids = [
+      { top: 60, bottom: '63%', title: '年化收益(%)' },
+      { top: '42%', bottom: '40%', title: '最大回撤(%)' },
+      { top: '23%', bottom: '17%', title: 'Sharpe比率' },
+      { top: '4%', bottom: '-6%', title: '赚钱月占比(%)' }
+    ];
+
+    const barData = [
+      { name: '保守型', color: '#3B82F6',
+        values: [cons.annual, Math.abs(cons.dd), cons.sharpe, cons.win_rate] },
+      { name: '稳健型 ★', color: '#10B981',
+        values: [bal.annual, Math.abs(bal.dd), bal.sharpe, bal.win_rate] },
+      { name: '进取型', color: '#EF4444',
+        values: [agg.annual, Math.abs(agg.dd), agg.sharpe, agg.win_rate] }
+    ];
+
+    // 构建4个grid + 4个xAxis + 4个yAxis + 12个series（3方案×4指标）
+    const option = {
       tooltip: { trigger: 'axis' },
       legend: {
         data: ['保守型', '稳健型 ★', '进取型'],
-        bottom: 0
+        top: 5
       },
-      grid: { left: 40, right: 20, top: 20, bottom: 50 },
-      xAxis: {
+      grid: grids.map(g => ({ left: 60, right: 20, top: g.top, bottom: g.bottom })),
+      xAxis: grids.map((g, i) => ({
+        gridIndex: i,
         type: 'category',
-        data: ['年化收益(%)', '最大回撤(%)', 'Sharpe', '赚钱月占比(%)']
-      },
-      yAxis: { type: 'value', min: 0 },
-      series: [
-        {
-          name: '保守型',
+        data: ['保守', '稳健★', '进取'],
+        axisLabel: i === 3 ? { fontSize: 11 } : { show: false },
+        axisTick: { show: false }
+      })),
+      yAxis: grids.map((g, i) => ({
+        gridIndex: i,
+        type: 'value',
+        name: g.title,
+        nameTextStyle: { fontSize: 10, fontWeight: 'bold' },
+        nameLocation: 'middle',
+        nameGap: 38,
+        min: 0,
+        axisLabel: { fontSize: 9 }
+      })),
+      series: barData.flatMap((d, si) =>
+        d.values.map((v, vi) => ({
+          name: d.name,
           type: 'bar',
-          data: [
-            parseFloat(cons.annual.toFixed(1)),
-            parseFloat(Math.abs(cons.dd).toFixed(1)),
-            parseFloat(cons.sharpe.toFixed(2)),
-            parseFloat(cons.win_rate.toFixed(1))
-          ],
-          itemStyle: { color: '#3B82F6', borderRadius: [4, 4, 0, 0] }
-        },
-        {
-          name: '稳健型 ★',
-          type: 'bar',
-          data: [
-            parseFloat(bal.annual.toFixed(1)),
-            parseFloat(Math.abs(bal.dd).toFixed(1)),
-            parseFloat(bal.sharpe.toFixed(2)),
-            parseFloat(bal.win_rate.toFixed(1))
-          ],
-          itemStyle: { color: '#10B981', borderRadius: [4, 4, 0, 0] }
-        },
-        {
-          name: '进取型',
-          type: 'bar',
-          data: [
-            parseFloat(agg.annual.toFixed(1)),
-            parseFloat(Math.abs(agg.dd).toFixed(1)),
-            parseFloat(agg.sharpe.toFixed(2)),
-            parseFloat(agg.win_rate.toFixed(1))
-          ],
-          itemStyle: { color: '#EF4444', borderRadius: [4, 4, 0, 0] }
-        }
-      ]
-    }, true);
+          xAxisIndex: vi,
+          yAxisIndex: vi,
+          data: Array(3).fill(null).map((_, idx) => idx === si ? parseFloat(v.toFixed(1)) : null),
+          itemStyle: { color: d.color, borderRadius: [3, 3, 0, 0] },
+          barWidth: '40%'
+        }))
+      )
+    };
+
+    compareBarChart.setOption(option, true);
   }
 
   /**
