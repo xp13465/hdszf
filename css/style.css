@@ -413,6 +413,12 @@ input { font-family: inherit; }
 .stat-value.blue { color: var(--color-primary); }
 .stat-value.accent { color: var(--color-accent-dark); }
 
+.stat-sep {
+  font-weight: 300;
+  color: var(--color-text-muted);
+  margin: 0 6px;
+}
+
 .stat-sub {
   font-size: 0.75rem;
   color: var(--color-text-muted);
