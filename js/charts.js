@@ -279,20 +279,23 @@ const ChartManager = (() => {
     const bal = comp.balanced;
     const agg = comp.aggressive;
 
+    // 使用相对排名而非绝对值，使各维度可比
+    // 取三个方案中每个指标的最大值作为基准
     const maxAnnual = Math.max(cons.annual || 0, bal.annual || 0, agg.annual || 0);
     const maxSharpe = Math.max(cons.sharpe || 0, bal.sharpe || 0, agg.sharpe || 0);
-    const maxTotal = Math.max(cons.total_return || 0, bal.total_return || 0, agg.total_return || 0);
+    const maxWinRate = Math.max(cons.win_rate || 0, bal.win_rate || 0, agg.win_rate || 0) / 100;
+    const maxDd = Math.max(Math.abs(cons.dd || 0), Math.abs(bal.dd || 0), Math.abs(agg.dd || 0));
 
     radarChart.setOption({
       radar: {
         center: ['50%', '55%'],
         radius: '65%',
         indicator: [
-          { name: '年化收益', max: Math.ceil(maxAnnual) },
+          { name: '年化收益(%)', max: Math.ceil(maxAnnual) },
           { name: 'Sharpe比率', max: Math.ceil(maxSharpe * 10) / 10 },
-          { name: '总收益', max: Math.ceil(maxTotal / 10) * 10 },
-          { name: '月胜率', max: 1 },
-          { name: '抗回撤', max: 30 }
+          { name: '月胜率(%)', max: Math.ceil(maxWinRate * 100) },
+          { name: '抗回撤能力', max: Math.ceil(maxDd) },
+          { name: '月波动率(%)', max: Math.ceil(Math.max(cons.monthly_vol || 0, bal.monthly_vol || 0, agg.monthly_vol || 0)) }
         ]
       },
       series: [{
@@ -300,21 +303,39 @@ const ChartManager = (() => {
         data: [
           {
             name: '保守型',
-            value: [cons.annual || 0, cons.sharpe || 0, cons.total_return || 0, cons.win_rate / 100 || 0.73, Math.abs(cons.dd || 0)],
+            value: [
+              parseFloat(cons.annual?.toFixed(1)) || 0,
+              parseFloat(cons.sharpe?.toFixed(2)) || 0,
+              parseFloat((cons.win_rate).toFixed(1)) || 0,
+              parseFloat(Math.abs(cons.dd).toFixed(1)) || 0,
+              parseFloat((cons.monthly_vol || 0).toFixed(1))
+            ],
             lineStyle: { color: '#3B82F6', width: 2 },
             areaStyle: { color: 'rgba(59,130,246,0.1)' },
             itemStyle: { color: '#3B82F6' }
           },
           {
             name: '稳健型 ★',
-            value: [bal.annual, bal.sharpe, bal.total_return, bal.win_rate / 100, Math.abs(bal.dd)],
+            value: [
+              parseFloat(bal.annual?.toFixed(1)) || 0,
+              parseFloat(bal.sharpe?.toFixed(2)) || 0,
+              parseFloat((bal.win_rate).toFixed(1)) || 0,
+              parseFloat(Math.abs(bal.dd).toFixed(1)) || 0,
+              parseFloat((bal.monthly_vol || 0).toFixed(1))
+            ],
             lineStyle: { color: '#10B981', width: 2 },
             areaStyle: { color: 'rgba(16,185,129,0.15)' },
             itemStyle: { color: '#10B981' }
           },
           {
             name: '进取型',
-            value: [agg.annual, agg.sharpe, agg.total_return, agg.win_rate / 100, Math.abs(agg.dd)],
+            value: [
+              parseFloat(agg.annual?.toFixed(1)) || 0,
+              parseFloat(agg.sharpe?.toFixed(2)) || 0,
+              parseFloat((agg.win_rate).toFixed(1)) || 0,
+              parseFloat(Math.abs(agg.dd).toFixed(1)) || 0,
+              parseFloat((agg.monthly_vol || 0).toFixed(1))
+            ],
             lineStyle: { color: '#EF4444', width: 2 },
             areaStyle: { color: 'rgba(239,68,68,0.08)' },
             itemStyle: { color: '#EF4444' }
