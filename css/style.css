@@ -283,6 +283,8 @@ input { font-family: inherit; }
   color: var(--color-primary);
   margin-bottom: var(--space-md);
   letter-spacing: 0.04em;
+  padding-left: var(--space-md);
+  border-left: 3px solid var(--color-accent);
 }
 
 .hero-desc {
@@ -387,6 +389,7 @@ input { font-family: inherit; }
 .stat-value.red { color: var(--color-danger); }
 .stat-value.gold { color: var(--color-accent-dark); }
 .stat-value.blue { color: var(--color-primary); }
+.stat-value.accent { color: var(--color-accent-dark); }
 
 .stat-sub {
   font-size: 0.75rem;
