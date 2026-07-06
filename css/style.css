@@ -270,11 +270,19 @@ input { font-family: inherit; }
   font-weight: 800;
   line-height: 1.2;
   color: var(--color-text);
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-sm);
 }
 
 .hero-title span {
   color: var(--color-accent);
+}
+
+.hero-slogan {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: var(--space-md);
+  letter-spacing: 0.04em;
 }
 
 .hero-desc {
@@ -1370,6 +1378,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .hero-title {
     font-size: 1.5rem;
     line-height: 1.3;
+  }
+  .hero-slogan {
+    font-size: 0.85rem;
+    margin-bottom: var(--space-sm);
   }
   .hero-desc {
     font-size: 0.875rem;

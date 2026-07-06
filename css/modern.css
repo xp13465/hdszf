@@ -276,7 +276,7 @@ input { font-family: inherit; }
   font-weight: 800;
   line-height: 1.25;
   color: var(--color-text);
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-sm);
   letter-spacing: -0.02em;
 }
 
@@ -285,6 +285,14 @@ input { font-family: inherit; }
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+}
+
+.hero-slogan {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: var(--space-md);
+  letter-spacing: 0.03em;
 }
 
 .hero-desc {
@@ -1360,6 +1368,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
     padding: calc(var(--nav-height) + var(--space-xl)) 0 var(--space-2xl);
   }
   .hero-title { font-size: 1.5rem; line-height: 1.3; }
+  .hero-slogan { font-size: 0.88rem; margin-bottom: var(--space-sm); }
   .hero-desc { font-size: 0.875rem; line-height: 1.6; margin-bottom: var(--space-lg); }
   .hero-badge { font-size: 0.72rem; padding: 4px 12px; margin-bottom: var(--space-md); }
   .hero-actions { flex-direction: column; gap: var(--space-sm); }
