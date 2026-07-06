@@ -305,10 +305,10 @@ const ChartManager = (() => {
     const maxSharpe = Math.max(cons.sharpe || 0, bal.sharpe || 0, agg.sharpe || 0);
     const maxSortino = Math.max(cons.sortino || 0, bal.sortino || 0, agg.sortino || 0);
 
-    // 抗回撤：1 - |回撤|/max(|回撤|)，归一化到 0~1，值越大越好
-    // 保守 1-3.53/10.17=0.65, 稳健 1-6.09/10.17=0.40, 进取 1-10.17/10.17=0
-    const absDdAgg = Math.abs(agg.dd || 0);
-    const resilience = (dd) => parseFloat((1 - Math.abs(dd) / absDdAgg).toFixed(2));
+    // 抗回撤分 = 15 - |回撤|，15是"不堪忍受"的基准线
+    // 保守 15-3.5=11.5, 稳健 15-6.1=8.9, 进取 15-10.2=4.8
+    // 三个值都在 0~15 范围内，有区分度且没有零值
+    const resilience = (dd) => parseFloat((15 - Math.abs(dd)).toFixed(1));
 
     radarChart.setOption({
       tooltip: {},
@@ -319,7 +319,7 @@ const ChartManager = (() => {
           { name: '年化收益(%)', max: Math.ceil(maxAnnual) },
           { name: 'Sharpe比率', max: Math.ceil(maxSharpe * 10) / 10 },
           { name: '赚钱月占比(%)', max: 100 },
-          { name: '抗回撤能力', max: 1 },
+          { name: '抗回撤分', max: 15 },
           { name: 'Sortino比率', max: Math.ceil(maxSortino * 10) / 10 }
         ]
       },
