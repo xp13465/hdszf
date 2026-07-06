@@ -1069,6 +1069,43 @@ input[type="range"]::-webkit-slider-thumb:hover {
   height: 350px;
 }
 
+/* 雷达+四柱状图并排布局 */
+.compare-charts-row {
+  display: flex;
+  gap: var(--space-lg);
+  align-items: stretch;
+}
+
+.mini-bars-grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: var(--space-sm);
+}
+
+.mini-bar-card {
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px 2px 8px;
+  display: flex;
+  flex-direction: column;
+}
+
+.mini-bar-title {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-align: center;
+  margin-bottom: 2px;
+}
+
+.mini-bar-chart {
+  flex: 1;
+  min-height: 100px;
+}
+
 /* --- Final Solution --- */
 #final-solution {
   background: var(--color-surface);
@@ -1381,6 +1418,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .compare-mini .val { font-size: 1.1rem; }
   .insight-box { font-size: 0.82rem; padding: var(--space-sm); }
   .radar-chart-container { height: 260px; }
+
+  .compare-charts-row { flex-direction: column; }
+  .mini-bars-grid { grid-template-columns: 1fr 1fr; }
 
   .pie-chart-container { height: 280px; }
   .guide-step { padding: var(--space-sm); gap: var(--space-sm); }

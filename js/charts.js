@@ -7,7 +7,7 @@ const ChartManager = (() => {
   let ddChart = null;
   let pieChart = null;
   let radarChart = null;
-  let compareBarChart = null;
+  let barCharts = {};  // { annual, dd, sharpe, winrate }
 
   function init() {
     initEquityChart();
@@ -42,9 +42,11 @@ const ChartManager = (() => {
   }
 
   function initCompareBarChart() {
-    const dom = document.getElementById('chart-compare-bar');
-    if (!dom) return;
-    compareBarChart = echarts.init(dom);
+    const ids = ['chart-bar-annual', 'chart-bar-dd', 'chart-bar-sharpe', 'chart-bar-winrate'];
+    ids.forEach(id => {
+      const dom = document.getElementById(id);
+      if (dom) barCharts[id] = echarts.init(dom);
+    });
   }
 
   /**
@@ -355,71 +357,54 @@ const ChartManager = (() => {
    * 更新对比柱状图
    */
   function updateCompareBarChart() {
-    if (!compareBarChart) return;
-
     const comp = APP_DATA.comparisons?.['三档方案对比'];
     if (!comp) return;
     const cons = comp.conservative;
     const bal = comp.balanced;
     const agg = comp.aggressive;
 
-    // 四个独立网格，每个指标有自己的 Y 轴范围，避免量级碾压
-    // 顶部共享 X 轴标签（三档方案），每个网格一个指标
-    const grids = [
-      { top: 60, bottom: '63%', title: '年化收益(%)' },
-      { top: '42%', bottom: '40%', title: '最大回撤(%)' },
-      { top: '23%', bottom: '17%', title: 'Sharpe比率' },
-      { top: '4%', bottom: '-6%', title: '赚钱月占比(%)' }
+    const colors = ['#3B82F6', '#10B981', '#EF4444'];
+    const names = ['保守型', '稳健型 ★', '进取型'];
+
+    // 每个指标独立的配置
+    const configs = [
+      { id: 'chart-bar-annual',   label: '年化收益(%)', values: [cons.annual, bal.annual, agg.annual] },
+      { id: 'chart-bar-dd',       label: '最大回撤(%)', values: [Math.abs(cons.dd), Math.abs(bal.dd), Math.abs(agg.dd)] },
+      { id: 'chart-bar-sharpe',   label: 'Sharpe比率',  values: [cons.sharpe, bal.sharpe, agg.sharpe] },
+      { id: 'chart-bar-winrate',  label: '赚钱月占比(%)', values: [cons.win_rate, bal.win_rate, agg.win_rate] }
     ];
 
-    const barData = [
-      { name: '保守型', color: '#3B82F6',
-        values: [cons.annual, Math.abs(cons.dd), cons.sharpe, cons.win_rate] },
-      { name: '稳健型 ★', color: '#10B981',
-        values: [bal.annual, Math.abs(bal.dd), bal.sharpe, bal.win_rate] },
-      { name: '进取型', color: '#EF4444',
-        values: [agg.annual, Math.abs(agg.dd), agg.sharpe, agg.win_rate] }
-    ];
+    configs.forEach(cfg => {
+      const chart = barCharts[cfg.id];
+      if (!chart) return;
 
-    // 构建4个grid + 4个xAxis + 4个yAxis + 12个series（3方案×4指标）
-    const option = {
-      tooltip: { trigger: 'axis' },
-      legend: {
-        data: ['保守型', '稳健型 ★', '进取型'],
-        top: 5
-      },
-      grid: grids.map(g => ({ left: 60, right: 20, top: g.top, bottom: g.bottom })),
-      xAxis: grids.map((g, i) => ({
-        gridIndex: i,
-        type: 'category',
-        data: ['保守', '稳健★', '进取'],
-        axisLabel: i === 3 ? { fontSize: 11 } : { show: false },
-        axisTick: { show: false }
-      })),
-      yAxis: grids.map((g, i) => ({
-        gridIndex: i,
-        type: 'value',
-        name: g.title,
-        nameTextStyle: { fontSize: 10, fontWeight: 'bold' },
-        nameLocation: 'middle',
-        nameGap: 38,
-        min: 0,
-        axisLabel: { fontSize: 9 }
-      })),
-      series: barData.flatMap((d, si) =>
-        d.values.map((v, vi) => ({
-          name: d.name,
+      const maxVal = Math.max(...cfg.values);
+      chart.setOption({
+        tooltip: { trigger: 'axis', formatter: (p) => `${p[0].name}: ${p[0].value.toFixed(1)}` },
+        grid: { left: 8, right: 8, top: 6, bottom: 22 },
+        xAxis: {
+          type: 'category',
+          data: names,
+          axisLabel: { fontSize: 9, interval: 0 },
+          axisTick: { show: false }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          max: Math.ceil(maxVal * 1.15),
+          axisLabel: { fontSize: 8 },
+          splitLine: { lineStyle: { type: 'dashed', color: '#eee' } }
+        },
+        series: [{
           type: 'bar',
-          xAxisIndex: vi,
-          yAxisIndex: vi,
-          data: Array(3).fill(null).map((_, idx) => idx === si ? parseFloat(v.toFixed(1)) : null),
-          itemStyle: { color: d.color, borderRadius: [3, 3, 0, 0] },
-          barWidth: '40%'
-        }))
-      )
-    };
-
-    compareBarChart.setOption(option, true);
+          data: cfg.values.map((v, i) => ({
+            value: parseFloat(v.toFixed(1)),
+            itemStyle: { color: colors[i], borderRadius: [3, 3, 0, 0] }
+          })),
+          barWidth: '55%'
+        }]
+      }, true);
+    });
   }
 
   /**
@@ -430,7 +415,7 @@ const ChartManager = (() => {
     ddChart?.resize();
     pieChart?.resize();
     radarChart?.resize();
-    compareBarChart?.resize();
+    Object.values(barCharts).forEach(c => c?.resize());
   }
 
   return {

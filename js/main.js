@@ -369,7 +369,7 @@
       // 短暂延迟后重建 ECharts（等 CSS 变量生效）
       setTimeout(() => {
         if (typeof echarts !== 'undefined') {
-          const chartIds = ['chart-equity', 'chart-drawdown', 'chart-pie', 'chart-radar', 'chart-compare-bar'];
+          const chartIds = ['chart-equity', 'chart-drawdown', 'chart-pie', 'chart-radar', 'chart-bar-annual', 'chart-bar-dd', 'chart-bar-sharpe', 'chart-bar-winrate'];
           chartIds.forEach(id => {
             const dom = document.getElementById(id);
             if (dom) {

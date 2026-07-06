@@ -332,16 +332,32 @@
           </div>
         </div>
 
-        <!-- 雷达图 --><!-- 雷达图 -->
+        <!-- 雷达图 + 四指标柱状图 并排 -->
       <div class="chart-card fade-in" style="margin-bottom:var(--space-2xl);">
-        <div class="chart-title">🎯 三方案雷达图对比</div>
-        <div id="chart-radar" class="radar-chart-container"></div>
-      </div>
-
-      <!-- 柱状图 -->
-      <div class="chart-card fade-in" style="margin-bottom:var(--space-2xl);">
-        <div class="chart-title">📊 核心指标柱状图对比</div>
-        <div id="chart-compare-bar" style="width:100%;height:420px;"></div>
+        <div class="chart-title">🎯 三方案多维对比</div>
+        <div class="compare-charts-row">
+          <!-- 左：雷达图 -->
+          <div id="chart-radar" class="radar-chart-container" style="flex:0 0 38%;"></div>
+          <!-- 右：四个独立小柱状图 2×2 -->
+          <div class="mini-bars-grid">
+            <div class="mini-bar-card">
+              <div class="mini-bar-title">年化收益(%)</div>
+              <div id="chart-bar-annual" class="mini-bar-chart"></div>
+            </div>
+            <div class="mini-bar-card">
+              <div class="mini-bar-title">最大回撤(%)</div>
+              <div id="chart-bar-dd" class="mini-bar-chart"></div>
+            </div>
+            <div class="mini-bar-card">
+              <div class="mini-bar-title">Sharpe比率</div>
+              <div id="chart-bar-sharpe" class="mini-bar-chart"></div>
+            </div>
+            <div class="mini-bar-card">
+              <div class="mini-bar-title">赚钱月占比(%)</div>
+              <div id="chart-bar-winrate" class="mini-bar-chart"></div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <!-- 三档方案回测数据说明 -->
