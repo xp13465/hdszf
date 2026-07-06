@@ -1,6 +1,6 @@
 /**
  * 回测计算引擎
- * 最近邻匹配 + 降级估算
+ * 6维资产权重直接匹配 + 降级估算
  */
 
 const BacktestEngine = (() => {
@@ -14,38 +14,34 @@ const BacktestEngine = (() => {
     '现金·货币基金': 25
   };
 
-  // 距离阈值：超过此值不再信任最近邻匹配，改用真实数据加权估算
-  const MATCH_THRESHOLD = 0.12;
+  const ASSETS = ['沪深300', '中证500', '标普500', '纳斯达克100', '黄金', '现金·货币基金'];
+
+  // 距离阈值：6维欧氏距离超过此值不再信任 trendData 匹配
+  const MATCH_THRESHOLD = 0.15;
 
   /**
-   * 用户6滑块 → 4参数
+   * 6维欧氏距离匹配：直接用6资产权重在 trendData.alloc 中找最近邻
+   * 不再压缩为4维，彻底解决"标普100=纳指100"的问题
    */
-  function slidersToParams(sliders) {
-    return {
-      a: (sliders['沪深300'] + sliders['中证500']) / 100,
-      u: (sliders['标普500'] + sliders['纳斯达克100']) / 100,
-      g: sliders['黄金'] / 100,
-      c: sliders['现金·货币基金'] / 100
-    };
-  }
-
-  /**
-   * 欧氏距离最近邻匹配
-   */
-  function findNearest(params) {
+  function findNearest6D(sliders) {
     const trendData = APP_DATA.trendData;
     let bestDist = Infinity;
     let bestItem = null;
 
-    for (const item of trendData) {
-      const da = params.a - (item.a || 0);
-      const du = params.u - (item.u || 0);
-      const dg = params.g - (item.gold_pct || 0);
-      const dc = params.c - (item.c != null ? item.c : 0.20);
-      const dist = da * da + du * du + dg * dg + dc * dc;
+    const target = {};
+    for (const a of ASSETS) {
+      target[a] = (sliders[a] || 0) / 100;
+    }
 
-      if (dist < bestDist) {
-        bestDist = dist;
+    for (const item of trendData) {
+      const alloc = item.alloc || {};
+      let dist2 = 0;
+      for (const a of ASSETS) {
+        const d = target[a] - (alloc[a] || 0);
+        dist2 += d * d;
+      }
+      if (dist2 < bestDist) {
+        bestDist = dist2;
         bestItem = item;
       }
     }
@@ -64,11 +60,10 @@ const BacktestEngine = (() => {
   }
 
   /**
-   * 降级估算：用各资产独立年化 + 配置权重做加权
-   * 假设资产间相关性为平均值，回撤按加权估计
+   * 降级估算：用各资产独立月度收益率 + 配置权重做加权计算
+   * 这是最精确的计算方式，6资产完全独立，不丢任何信息
    */
   function estimateFromScratch(sliders) {
-    // 用真实月度收益率数据加权计算年化和回撤
     const rr = APP_DATA.realReturns;
     if (!rr || !rr.asset_returns) {
       return { annual: 0, maxDd: 0, sharpe: 0, sortino: 0, total: 0, finalValue: 500000, monthlyWinRate: 0 };
@@ -106,7 +101,7 @@ const BacktestEngine = (() => {
     const annual = (Math.pow(cumulative, 12 / n) - 1) * 100;
     const posMonths = monthlyReturns.filter(r => r > 0).length;
 
-    // Sharpe 简化估算
+    // Sharpe
     const meanR = monthlyReturns.reduce((a, b) => a + b, 0) / n;
     const variance = monthlyReturns.reduce((s, r) => s + (r - meanR) ** 2, 0) / (n - 1);
     const annVol = Math.sqrt(variance) * Math.sqrt(12);
@@ -125,15 +120,13 @@ const BacktestEngine = (() => {
    * 主计算函数
    */
   function compute(sliders) {
-    const params = slidersToParams(sliders);
-    const { item, distance } = findNearest(params);
+    const { item, distance } = findNearest6D(sliders);
     const match = getMatchLevel(distance);
 
-    // 距离太大（>12%）→ 降级为加权估算，避免匹配到无关配置
+    // 距离太大或没有匹配 → 走精确加权估算（永远正确）
     if (!item || distance > MATCH_THRESHOLD) {
       const estimated = estimateFromScratch(sliders);
       return {
-        params,
         sliders: { ...sliders },
         match,
         alloc: Object.fromEntries(
@@ -143,10 +136,9 @@ const BacktestEngine = (() => {
       };
     }
 
-    // 正常匹配
+    // 近距离匹配：用 trendData 中的精确回测结果（包含完整的月度序列）
     const alloc = item.alloc || {};
     return {
-      params,
       sliders: { ...sliders },
       match,
       alloc: {
@@ -155,7 +147,7 @@ const BacktestEngine = (() => {
         '标普500': alloc['标普500'] || 0,
         '纳斯达克100': alloc['纳斯达克100'] || 0,
         '黄金': alloc['黄金'] || 0,
-        '现金·货币基金': item.c || 0.20
+        '现金·货币基金': alloc['现金·货币基金'] || 0
       },
       metrics: {
         annual: item.annual || 0,
