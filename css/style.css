@@ -1064,7 +1064,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-2xl);
-  align-items: start;
+  align-items: stretch;
 }
 
 .pie-chart-container {
@@ -1113,6 +1113,12 @@ input[type="range"]::-webkit-slider-thumb:hover {
   font-size: 1.25rem;
   font-weight: 700;
   margin-bottom: var(--space-lg);
+}
+
+/* 让 final-grid 子元素等高 */
+.final-grid > .chart-card,
+.final-grid > .final-info {
+  height: 100%;
 }
 
 .guide-steps {
