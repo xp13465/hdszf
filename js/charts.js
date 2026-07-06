@@ -363,7 +363,6 @@ const ChartManager = (() => {
     const bal = comp.balanced;
     const agg = comp.aggressive;
 
-    // 四个指标量级相近（0~12），同轴可清晰对比
     compareBarChart.setOption({
       tooltip: { trigger: 'axis' },
       legend: {
@@ -373,7 +372,7 @@ const ChartManager = (() => {
       grid: { left: 40, right: 20, top: 20, bottom: 50 },
       xAxis: {
         type: 'category',
-        data: ['年化收益(%)', '最大回撤(%)', 'Sharpe', '月波动率(%)']
+        data: ['年化收益(%)', '最大回撤(%)', 'Sharpe', '赚钱月占比(%)']
       },
       yAxis: { type: 'value', min: 0 },
       series: [
@@ -384,7 +383,7 @@ const ChartManager = (() => {
             parseFloat(cons.annual.toFixed(1)),
             parseFloat(Math.abs(cons.dd).toFixed(1)),
             parseFloat(cons.sharpe.toFixed(2)),
-            parseFloat((cons.monthly_vol || 0).toFixed(1))
+            parseFloat(cons.win_rate.toFixed(1))
           ],
           itemStyle: { color: '#3B82F6', borderRadius: [4, 4, 0, 0] }
         },
@@ -395,7 +394,7 @@ const ChartManager = (() => {
             parseFloat(bal.annual.toFixed(1)),
             parseFloat(Math.abs(bal.dd).toFixed(1)),
             parseFloat(bal.sharpe.toFixed(2)),
-            parseFloat((bal.monthly_vol || 0).toFixed(1))
+            parseFloat(bal.win_rate.toFixed(1))
           ],
           itemStyle: { color: '#10B981', borderRadius: [4, 4, 0, 0] }
         },
@@ -406,7 +405,7 @@ const ChartManager = (() => {
             parseFloat(agg.annual.toFixed(1)),
             parseFloat(Math.abs(agg.dd).toFixed(1)),
             parseFloat(agg.sharpe.toFixed(2)),
-            parseFloat((agg.monthly_vol || 0).toFixed(1))
+            parseFloat(agg.win_rate.toFixed(1))
           ],
           itemStyle: { color: '#EF4444', borderRadius: [4, 4, 0, 0] }
         }
