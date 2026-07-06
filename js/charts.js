@@ -279,12 +279,18 @@ const ChartManager = (() => {
     const bal = comp.balanced;
     const agg = comp.aggressive;
 
-    // 使用相对排名而非绝对值，使各维度可比
-    // 取三个方案中每个指标的最大值作为基准
     const maxAnnual = Math.max(cons.annual || 0, bal.annual || 0, agg.annual || 0);
     const maxSharpe = Math.max(cons.sharpe || 0, bal.sharpe || 0, agg.sharpe || 0);
     const maxWinRate = Math.max(cons.win_rate || 0, bal.win_rate || 0, agg.win_rate || 0) / 100;
-    const maxDd = Math.max(Math.abs(cons.dd || 0), Math.abs(bal.dd || 0), Math.abs(agg.dd || 0));
+
+    // 抗回撤 = 用回撤越小越好的逻辑，maxDd 取最大回撤作为上限
+    const absDdCons = Math.abs(cons.dd || 0);
+    const absDdBal = Math.abs(bal.dd || 0);
+    const absDdAgg = Math.abs(agg.dd || 0);
+    const maxDd = Math.max(absDdCons, absDdBal, absDdAgg);
+
+    // 抗回撤能力 = maxDd - 实际回撤（越大越好）
+    const resilience = (dd) => parseFloat((maxDd - Math.abs(dd)).toFixed(1));
 
     radarChart.setOption({
       radar: {
@@ -307,7 +313,7 @@ const ChartManager = (() => {
               parseFloat(cons.annual?.toFixed(1)) || 0,
               parseFloat(cons.sharpe?.toFixed(2)) || 0,
               parseFloat((cons.win_rate).toFixed(1)) || 0,
-              parseFloat(Math.abs(cons.dd).toFixed(1)) || 0,
+              resilience(cons.dd),
               parseFloat((cons.monthly_vol || 0).toFixed(1))
             ],
             lineStyle: { color: '#3B82F6', width: 2 },
@@ -320,7 +326,7 @@ const ChartManager = (() => {
               parseFloat(bal.annual?.toFixed(1)) || 0,
               parseFloat(bal.sharpe?.toFixed(2)) || 0,
               parseFloat((bal.win_rate).toFixed(1)) || 0,
-              parseFloat(Math.abs(bal.dd).toFixed(1)) || 0,
+              resilience(bal.dd),
               parseFloat((bal.monthly_vol || 0).toFixed(1))
             ],
             lineStyle: { color: '#10B981', width: 2 },
@@ -333,7 +339,7 @@ const ChartManager = (() => {
               parseFloat(agg.annual?.toFixed(1)) || 0,
               parseFloat(agg.sharpe?.toFixed(2)) || 0,
               parseFloat((agg.win_rate).toFixed(1)) || 0,
-              parseFloat(Math.abs(agg.dd).toFixed(1)) || 0,
+              resilience(agg.dd),
               parseFloat((agg.monthly_vol || 0).toFixed(1))
             ],
             lineStyle: { color: '#EF4444', width: 2 },
@@ -357,6 +363,7 @@ const ChartManager = (() => {
     const bal = comp.balanced;
     const agg = comp.aggressive;
 
+    // 四个指标量级相近（0~12），同轴可清晰对比
     compareBarChart.setOption({
       tooltip: { trigger: 'axis' },
       legend: {
@@ -366,26 +373,41 @@ const ChartManager = (() => {
       grid: { left: 40, right: 20, top: 20, bottom: 50 },
       xAxis: {
         type: 'category',
-        data: ['年化收益(%)', '最大回撤(%)', 'Sharpe', '总收益(%)']
+        data: ['年化收益(%)', '最大回撤(%)', 'Sharpe', '月波动率(%)']
       },
-      yAxis: { type: 'value' },
+      yAxis: { type: 'value', min: 0 },
       series: [
         {
           name: '保守型',
           type: 'bar',
-          data: [cons.annual, Math.abs(cons.dd), cons.sharpe, cons.total_return],
+          data: [
+            parseFloat(cons.annual.toFixed(1)),
+            parseFloat(Math.abs(cons.dd).toFixed(1)),
+            parseFloat(cons.sharpe.toFixed(2)),
+            parseFloat((cons.monthly_vol || 0).toFixed(1))
+          ],
           itemStyle: { color: '#3B82F6', borderRadius: [4, 4, 0, 0] }
         },
         {
           name: '稳健型 ★',
           type: 'bar',
-          data: [bal.annual, Math.abs(bal.dd), bal.sharpe, bal.total_return],
+          data: [
+            parseFloat(bal.annual.toFixed(1)),
+            parseFloat(Math.abs(bal.dd).toFixed(1)),
+            parseFloat(bal.sharpe.toFixed(2)),
+            parseFloat((bal.monthly_vol || 0).toFixed(1))
+          ],
           itemStyle: { color: '#10B981', borderRadius: [4, 4, 0, 0] }
         },
         {
           name: '进取型',
           type: 'bar',
-          data: [agg.annual, Math.abs(agg.dd), agg.sharpe, agg.total_return],
+          data: [
+            parseFloat(agg.annual.toFixed(1)),
+            parseFloat(Math.abs(agg.dd).toFixed(1)),
+            parseFloat(agg.sharpe.toFixed(2)),
+            parseFloat((agg.monthly_vol || 0).toFixed(1))
+          ],
           itemStyle: { color: '#EF4444', borderRadius: [4, 4, 0, 0] }
         }
       ]
