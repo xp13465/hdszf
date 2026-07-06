@@ -230,7 +230,7 @@ input { font-family: inherit; }
   display: flex;
   align-items: center;
   padding-top: var(--nav-height);
-  background: linear-gradient(180deg, #eef2f7 0%, var(--color-bg) 100%);
+  background: linear-gradient(160deg, #e8edf5 0%, #f5f3ee 50%, #f8f7f4 100%);
 }
 
 .hero-grid {
@@ -240,6 +240,15 @@ input { font-family: inherit; }
   align-items: center;
 }
 
+/* 左侧内容区加淡色卡片底 */
+.hero-content {
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255,255,255,0.8);
+  border-radius: var(--radius-lg);
+  padding: var(--space-2xl);
+}
+
 .hero-badge {
   display: inline-flex;
   align-items: center;
@@ -247,7 +256,7 @@ input { font-family: inherit; }
   font-size: 0.8125rem;
   font-weight: 500;
   color: var(--color-primary);
-  background: rgba(26,58,92,0.06);
+  background: rgba(30,58,95,0.06);
   padding: var(--space-xs) var(--space-md);
   border-radius: var(--radius-full);
   margin-bottom: var(--space-lg);
@@ -270,18 +279,21 @@ input { font-family: inherit; }
   font-size: 3rem;
   font-weight: 800;
   line-height: 1.2;
-  color: var(--color-text);
+  color: var(--color-primary-dark);
   margin-bottom: var(--space-sm);
 }
 
 .hero-title span {
-  color: var(--color-accent);
+  background: linear-gradient(135deg, var(--color-accent-dark), var(--color-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .hero-slogan {
   font-size: 1.0625rem;
   font-weight: 600;
-  color: var(--color-primary);
+  color: var(--color-text-secondary);
   margin-bottom: var(--space-md);
   letter-spacing: 0.04em;
   padding-left: var(--space-md);
@@ -361,14 +373,23 @@ input { font-family: inherit; }
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
 }
 
+/* 第1/3/5张卡片微暖底色，形成交错节奏 */
+.hero-stats .stat-card:nth-child(odd) {
+  background: linear-gradient(135deg, #fdfaf3 0%, #fff 100%);
+}
+
+.hero-stats .stat-card:nth-child(even) {
+  background: linear-gradient(135deg, #f7f9fc 0%, #fff 100%);
+}
+
 .stat-card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
 .stat-card.primary {
-  border-color: rgba(184,134,11,0.2);
-  background: linear-gradient(135deg, #fff 0%, #fdf9f0 100%);
+  border-color: rgba(184,134,11,0.25);
+  background: linear-gradient(135deg, #fef9ed 0%, #fff 100%);
 }
 
 .stat-label {
@@ -1378,6 +1399,10 @@ input[type="range"]::-webkit-slider-thumb:hover {
   #hero {
     min-height: auto;
     padding: calc(var(--nav-height) + var(--space-xl)) 0 var(--space-2xl);
+  }
+  .hero-content {
+    padding: var(--space-lg);
+    background: rgba(255,255,255,0.4);
   }
   .hero-title {
     font-size: 1.5rem;
