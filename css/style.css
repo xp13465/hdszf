@@ -1,38 +1,39 @@
 /* ========================================
-   恒市值法智能理财助手 — 简约商务风
+   恒市值法智能理财助手 — 专业金融风
+   蓝+金+白，传统金融的信任感与稳重
    ======================================== */
 
 /* --- CSS Variables --- */
 :root {
-  /* Primary */
-  --color-primary: #1a3a5c;
-  --color-primary-light: #2d5f8a;
-  --color-primary-dark: #0f2440;
+  /* Primary — 藏蓝系 */
+  --color-primary: #1e3a5f;
+  --color-primary-light: #2c5f8a;
+  --color-primary-dark: #0f1f33;
 
-  /* Accent */
-  --color-accent: #c9a84c;
-  --color-accent-light: #e0c87a;
-  --color-accent-dark: #a88a2e;
+  /* Accent — 暖金 */
+  --color-accent: #b8860b;
+  --color-accent-light: #d4a017;
+  --color-accent-dark: #8b6508;
 
   /* Functional */
-  --color-success: #2e7d32;
-  --color-danger: #c62828;
-  --color-warning: #f57c00;
-  --color-info: #0277bd;
+  --color-success: #1a7d3a;
+  --color-danger: #c53030;
+  --color-warning: #c05600;
+  --color-info: #2563eb;
 
-  /* Neutral */
-  --color-bg: #fafbfc;
+  /* Neutral — 暖灰白底 */
+  --color-bg: #f8f7f4;
   --color-surface: #ffffff;
-  --color-border: #e0e4e8;
-  --color-border-light: #eef0f2;
+  --color-border: #e2dfd8;
+  --color-border-light: #f0ede8;
   --color-text: #1a1a2e;
-  --color-text-secondary: #5f6b7a;
-  --color-text-muted: #8e99a4;
+  --color-text-secondary: #5f6368;
+  --color-text-muted: #94989e;
 
-  /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
-  --shadow-lg: 0 8px 32px rgba(0,0,0,0.10);
+  /* Shadows — 更精致的投影 */
+  --shadow-sm: 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.06);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.08);
 
   /* Typography */
   --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Hiragino Sans GB', sans-serif;
@@ -203,7 +204,7 @@ input { font-family: inherit; }
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--color-accent-dark);
-  background: rgba(201,168,76,0.1);
+  background: rgba(184,134,11,0.08);
   padding: var(--space-xs) var(--space-md);
   border-radius: var(--radius-full);
   margin-bottom: var(--space-md);
@@ -229,7 +230,7 @@ input { font-family: inherit; }
   display: flex;
   align-items: center;
   padding-top: var(--nav-height);
-  background: linear-gradient(180deg, #f0f4f8 0%, var(--color-bg) 100%);
+  background: linear-gradient(180deg, #eef2f7 0%, var(--color-bg) 100%);
 }
 
 .hero-grid {
@@ -366,8 +367,8 @@ input { font-family: inherit; }
 }
 
 .stat-card.primary {
-  border-color: rgba(26,58,92,0.15);
-  background: linear-gradient(135deg, #fff 0%, #f7f9fb 100%);
+  border-color: rgba(184,134,11,0.2);
+  background: linear-gradient(135deg, #fff 0%, #fdf9f0 100%);
 }
 
 .stat-label {
@@ -433,17 +434,17 @@ input { font-family: inherit; }
 }
 
 .method-icon.blue {
-  background: rgba(26,58,92,0.08);
+  background: rgba(30,58,95,0.08);
   color: var(--color-primary);
 }
 
 .method-icon.gold {
-  background: rgba(201,168,76,0.12);
+  background: rgba(184,134,11,0.1);
   color: var(--color-accent-dark);
 }
 
 .method-icon.green {
-  background: rgba(46,125,50,0.08);
+  background: rgba(26,125,58,0.08);
   color: var(--color-success);
 }
 
@@ -702,9 +703,9 @@ input[type="range"]::-webkit-slider-thumb:hover {
   display: inline-block;
 }
 
-.match-indicator.exact { background: rgba(46,125,50,0.08); color: var(--color-success); }
-.match-indicator.approx { background: rgba(245,124,0,0.08); color: var(--color-warning); }
-.match-indicator.coarse { background: rgba(198,40,40,0.06); color: var(--color-danger); }
+.match-indicator.exact { background: rgba(26,125,58,0.08); color: var(--color-success); }
+.match-indicator.approx { background: rgba(192,86,0,0.08); color: var(--color-warning); }
+.match-indicator.coarse { background: rgba(197,48,48,0.06); color: var(--color-danger); }
 
 /* Results Panel */
 .results-panel {
@@ -730,7 +731,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .metric-card.highlight {
   border-color: var(--color-accent);
-  background: linear-gradient(135deg, #fff 0%, rgba(201,168,76,0.04) 100%);
+  background: linear-gradient(135deg, #fff 0%, rgba(184,134,11,0.03) 100%);
 }
 
 .metric-label {
@@ -801,8 +802,8 @@ input[type="range"]::-webkit-slider-thumb:hover {
 /* Comparison mode */
 .comparison-bar {
   display: none;
-  background: rgba(201,168,76,0.08);
-  border: 1px solid rgba(201,168,76,0.2);
+  background: rgba(184,134,11,0.06);
+  border: 1px solid rgba(184,134,11,0.15);
   border-radius: var(--radius-md);
   padding: var(--space-md) var(--space-lg);
   margin-bottom: var(--space-md);
@@ -844,7 +845,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .compare-card.featured {
   border: 2px solid var(--color-accent);
-  box-shadow: 0 0 0 4px rgba(201,168,76,0.1);
+  box-shadow: 0 0 0 4px rgba(184,134,11,0.08);
 }
 
 .compare-card-header {
@@ -862,7 +863,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .compare-card-badge.balanced { background: rgba(26,58,92,0.1); color: var(--color-primary); }
 .compare-card-badge.aggressive { background: rgba(2,119,189,0.1); color: var(--color-info); }
-.compare-card-badge.final { background: rgba(201,168,76,0.15); color: var(--color-accent-dark); }
+.compare-card-badge.final { background: rgba(184,134,11,0.12); color: var(--color-accent-dark); }
 
 .compare-card h3 {
   font-size: 1.25rem;
@@ -946,7 +947,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 .alloc-bar-fill.zz500 { background: #60a5fa; }
 .alloc-bar-fill.sp500 { background: #06b6d4; }
 .alloc-bar-fill.nasdaq { background: #22d3ee; }
-.alloc-bar-fill.gold { background: #c9a84c; }
+.alloc-bar-fill.gold { background: #b8860b; }
 .alloc-bar-fill.cash { background: #94a3b8; }
 
 /* Comparison sub-sections */
@@ -998,7 +999,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 }
 
 .insight-box {
-  background: rgba(201,168,76,0.06);
+  background: rgba(184,134,11,0.04);
   border-left: 3px solid var(--color-accent);
   padding: var(--space-md) var(--space-lg);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
@@ -1269,7 +1270,7 @@ input[type="range"]::-webkit-slider-thumb:hover {
 
 .theme-btn.active {
   border-color: var(--color-primary);
-  box-shadow: 0 0 0 4px rgba(26,58,92,0.15);
+  box-shadow: 0 0 0 4px rgba(30,58,95,0.1);
 }
 
 @media (max-width: 640px) {

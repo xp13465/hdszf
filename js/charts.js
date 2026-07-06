@@ -81,8 +81,8 @@ const ChartManager = (() => {
         type: 'line',
         data: lockData.equityCurve,
         smooth: true,
-        lineStyle: { width: 2, type: 'dashed', color: '#c9a84c' },
-        itemStyle: { color: '#c9a84c' }
+        lineStyle: { width: 2, type: 'dashed', color: '#b8860b' },
+        itemStyle: { color: '#b8860b' }
       });
     }
 
@@ -230,7 +230,7 @@ const ChartManager = (() => {
       '中证500': '#60a5fa',
       '标普500': '#06b6d4',
       '纳斯达克100': '#22d3ee',
-      '黄金': '#c9a84c',
+      '黄金': '#b8860b',
       '现金·货币基金': '#94a3b8'
     };
 
@@ -278,7 +278,7 @@ const ChartManager = (() => {
     const dotColors = {
       '沪深300': '#3b82f6', '中证500': '#60a5fa',
       '标普500': '#06b6d4', '纳斯达克100': '#22d3ee',
-      '黄金': '#c9a84c', '现金·货币基金': '#94a3b8'
+      '黄金': '#b8860b', '现金·货币基金': '#94a3b8'
     };
     el.innerHTML = data.map(d => `
       <div class="alloc-summary-item">
