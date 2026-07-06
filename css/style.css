@@ -246,7 +246,7 @@ input { font-family: inherit; }
   backdrop-filter: blur(4px);
   border: 1px solid rgba(255,255,255,0.8);
   border-radius: var(--radius-lg);
-  padding: var(--space-2xl);
+  padding: var(--space-xl);
 }
 
 .hero-badge {
