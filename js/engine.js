@@ -4,14 +4,14 @@
  */
 
 const BacktestEngine = (() => {
-  // 默认配置（最终方案）
+  // 默认配置（稳健型 ★推荐方案）
   const DEFAULT_CONFIG = {
-    '沪深300': 19,
-    '中证500': 11,
-    '标普500': 17,
-    '纳斯达克100': 23,
-    '黄金': 15,
-    '现金·货币基金': 15
+    '沪深300': 15,
+    '中证500': 5,
+    '标普500': 15,
+    '纳斯达克100': 20,
+    '黄金': 20,
+    '现金·货币基金': 25
   };
 
   // 距离阈值：超过此值不再信任最近邻匹配，改用真实数据加权估算
@@ -41,7 +41,7 @@ const BacktestEngine = (() => {
       const da = params.a - (item.a || 0);
       const du = params.u - (item.u || 0);
       const dg = params.g - (item.gold_pct || 0);
-      const dc = params.c - (item.c || 0.20);
+      const dc = params.c - (item.c != null ? item.c : 0.20);
       const dist = da * da + du * du + dg * dg + dc * dc;
 
       if (dist < bestDist) {
