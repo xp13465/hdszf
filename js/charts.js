@@ -248,8 +248,8 @@ const ChartManager = (() => {
       },
       series: [{
         type: 'pie',
-        radius: ['45%', '75%'],
-        center: ['50%', '50%'],
+        radius: ['40%', '70%'],
+        center: ['50%', '48%'],
         itemStyle: {
           borderRadius: 6,
           borderColor: '#fff',
@@ -257,16 +257,36 @@ const ChartManager = (() => {
         },
         label: {
           formatter: '{b}\n{d}%',
-          fontSize: 12,
-          lineHeight: 18
+          fontSize: 11,
+          lineHeight: 16
         },
         emphasis: {
-          label: { fontSize: 16, fontWeight: 'bold' },
+          label: { fontSize: 14, fontWeight: 'bold' },
           scaleSize: 10
         },
         data
       }]
     }, true);
+
+    // 同步填充饼图下方的配置明细表
+    updateAllocSummary(data);
+  }
+
+  function updateAllocSummary(data) {
+    const el = document.getElementById('alloc-summary');
+    if (!el) return;
+    const dotColors = {
+      '沪深300': '#3b82f6', '中证500': '#60a5fa',
+      '标普500': '#06b6d4', '纳斯达克100': '#22d3ee',
+      '黄金': '#c9a84c', '现金·货币基金': '#94a3b8'
+    };
+    el.innerHTML = data.map(d => `
+      <div class="alloc-summary-item">
+        <span class="alloc-dot" style="background:${dotColors[d.name]||'#ccc'}"></span>
+        <span class="alloc-name">${d.name}</span>
+        <span class="alloc-pct">${d.value}%</span>
+      </div>
+    `).join('');
   }
 
   /**
