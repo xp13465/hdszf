@@ -303,27 +303,24 @@ const ChartManager = (() => {
 
     const maxAnnual = Math.max(cons.annual || 0, bal.annual || 0, agg.annual || 0);
     const maxSharpe = Math.max(cons.sharpe || 0, bal.sharpe || 0, agg.sharpe || 0);
-    const maxWinRate = Math.max(cons.win_rate || 0, bal.win_rate || 0, agg.win_rate || 0) / 100;
+    const maxSortino = Math.max(cons.sortino || 0, bal.sortino || 0, agg.sortino || 0);
 
-    // 抗回撤 = 用回撤越小越好的逻辑，maxDd 取最大回撤作为上限
-    const absDdCons = Math.abs(cons.dd || 0);
-    const absDdBal = Math.abs(bal.dd || 0);
+    // 抗回撤：1 - |回撤|/max(|回撤|)，归一化到 0~1，值越大越好
+    // 保守 1-3.53/10.17=0.65, 稳健 1-6.09/10.17=0.40, 进取 1-10.17/10.17=0
     const absDdAgg = Math.abs(agg.dd || 0);
-    const maxDd = Math.max(absDdCons, absDdBal, absDdAgg);
-
-    // 抗回撤能力 = maxDd - 实际回撤（越大越好）
-    const resilience = (dd) => parseFloat((maxDd - Math.abs(dd)).toFixed(1));
+    const resilience = (dd) => parseFloat((1 - Math.abs(dd) / absDdAgg).toFixed(2));
 
     radarChart.setOption({
+      tooltip: {},
       radar: {
         center: ['50%', '55%'],
         radius: '65%',
         indicator: [
           { name: '年化收益(%)', max: Math.ceil(maxAnnual) },
           { name: 'Sharpe比率', max: Math.ceil(maxSharpe * 10) / 10 },
-          { name: '月胜率(%)', max: Math.ceil(maxWinRate * 100) },
-          { name: '抗回撤能力', max: Math.ceil(maxDd) },
-          { name: '月波动率(%)', max: Math.ceil(Math.max(cons.monthly_vol || 0, bal.monthly_vol || 0, agg.monthly_vol || 0)) }
+          { name: '赚钱月占比(%)', max: 100 },
+          { name: '抗回撤能力', max: 1 },
+          { name: 'Sortino比率', max: Math.ceil(maxSortino * 10) / 10 }
         ]
       },
       series: [{
@@ -334,9 +331,9 @@ const ChartManager = (() => {
             value: [
               parseFloat(cons.annual?.toFixed(1)) || 0,
               parseFloat(cons.sharpe?.toFixed(2)) || 0,
-              parseFloat((cons.win_rate).toFixed(1)) || 0,
+              parseFloat(cons.win_rate?.toFixed(1)) || 0,
               resilience(cons.dd),
-              parseFloat((cons.monthly_vol || 0).toFixed(1))
+              parseFloat(cons.sortino?.toFixed(2)) || 0
             ],
             lineStyle: { color: '#3B82F6', width: 2 },
             areaStyle: { color: 'rgba(59,130,246,0.1)' },
@@ -347,9 +344,9 @@ const ChartManager = (() => {
             value: [
               parseFloat(bal.annual?.toFixed(1)) || 0,
               parseFloat(bal.sharpe?.toFixed(2)) || 0,
-              parseFloat((bal.win_rate).toFixed(1)) || 0,
+              parseFloat(bal.win_rate?.toFixed(1)) || 0,
               resilience(bal.dd),
-              parseFloat((bal.monthly_vol || 0).toFixed(1))
+              parseFloat(bal.sortino?.toFixed(2)) || 0
             ],
             lineStyle: { color: '#10B981', width: 2 },
             areaStyle: { color: 'rgba(16,185,129,0.15)' },
@@ -360,9 +357,9 @@ const ChartManager = (() => {
             value: [
               parseFloat(agg.annual?.toFixed(1)) || 0,
               parseFloat(agg.sharpe?.toFixed(2)) || 0,
-              parseFloat((agg.win_rate).toFixed(1)) || 0,
+              parseFloat(agg.win_rate?.toFixed(1)) || 0,
               resilience(agg.dd),
-              parseFloat((agg.monthly_vol || 0).toFixed(1))
+              parseFloat(agg.sortino?.toFixed(2)) || 0
             ],
             lineStyle: { color: '#EF4444', width: 2 },
             areaStyle: { color: 'rgba(239,68,68,0.08)' },
