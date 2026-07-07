@@ -130,25 +130,15 @@ const BacktestEngine = (() => {
    * 主计算函数
    */
   function compute(sliders) {
+    // 缺额补到现金·货币基金，确保恒市值法满仓匹配
+    // trendData 中包含活期记录（现金100%+年化0%），缺额越多→现金占比越高→越接近活期
     const sum = Object.values(sliders).reduce((a, b) => a + b, 0);
-
-    // 缺额 > 0：缺额部分视为活期（0收益）
-    // 用 estimateFromScratch 但把现金月收益临时设为 0
-    // 因为缺额=活期，不是货币基金，不产生收益
+    const normalized = { ...sliders };
     if (sum < 100) {
-      const estimated = estimateFromScratchWithIdleCash(sliders, 100 - sum);
-      return {
-        sliders: { ...sliders },
-        match: { level: 'custom', label: `配置${sum}% · ${100 - sum}%活期` },
-        alloc: Object.fromEntries(
-          Object.entries(sliders).map(([k, v]) => [k, v / 100])
-        ),
-        metrics: estimated
-      };
+      normalized['现金·货币基金'] = (normalized['现金·货币基金'] || 0) + (100 - sum);
     }
 
-    // 满仓：恒市值法 trendData 精确匹配
-    const { item, distance } = findNearest6D(sliders);
+    const { item, distance } = findNearest6D(normalized);
     const match = getMatchLevel(distance);
 
     // 距离太大或没有匹配 → 走精确加权估算（永远正确）

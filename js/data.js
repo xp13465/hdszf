@@ -5500,7 +5500,29 @@ const APP_DATA = {
       "final": 1668473,
       "w_positive_ratio": 0.6565
     },
-  ],
+  
+    {
+      "a": 0,
+      "u": 0,
+      "gold_pct": 0,
+      "c": 1.0,
+      "alloc": {
+        "沪深300": 0,
+        "中证500": 0,
+        "标普500": 0,
+        "纳斯达克100": 0,
+        "黄金": 0,
+        "现金·货币基金": 1.0
+      },
+      "annual": 0,
+      "dd": 0,
+      "sharpe": 0,
+      "sortino": 0,
+      "total": 0,
+      "final": 500000,
+      "w_positive_ratio": 0,
+      "_label": "活期"
+    },],
   "topReturn": [
     {
       "alloc": {
