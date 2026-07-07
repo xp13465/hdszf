@@ -120,6 +120,21 @@ const BacktestEngine = (() => {
    * 主计算函数
    */
   function compute(sliders) {
+    // 如果总和≠100%（允许1%误差），走精确加权计算
+    // trendData 中所有记录都是总和=100%的，不能用于非满仓配置
+    const sum = Object.values(sliders).reduce((a, b) => a + b, 0);
+    if (Math.abs(sum - 100) > 1) {
+      const estimated = estimateFromScratch(sliders);
+      return {
+        sliders: { ...sliders },
+        match: { level: 'custom', label: `配置${sum}%（差额为活期）` },
+        alloc: Object.fromEntries(
+          Object.entries(sliders).map(([k, v]) => [k, v / 100])
+        ),
+        metrics: estimated
+      };
+    }
+
     const { item, distance } = findNearest6D(sliders);
     const match = getMatchLevel(distance);
 

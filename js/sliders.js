@@ -1,6 +1,7 @@
 /**
  * 滑块交互组件
- * 6滑块总和锁定逻辑
+ * 6滑块独立调节，不锁定总和
+ * 总和<100%时，剩余部分视为活期（0收益）
  */
 
 const SliderPanel = (() => {
@@ -54,16 +55,8 @@ const SliderPanel = (() => {
   }
 
   function handleSliderChange(changedAsset, newValue) {
-    // 计算其他资产总和
-    const othersSum = ASSETS
-      .filter(a => a !== changedAsset)
-      .reduce((sum, a) => sum + currentValues[a], 0);
-
-    // 确保总和不超过100
-    const maxAllowed = 100 - othersSum;
-    const clampedValue = Math.min(newValue, maxAllowed);
-
-    currentValues[changedAsset] = clampedValue;
+    // 不锁总和：每个滑块独立调节，总和可以<100%
+    currentValues[changedAsset] = newValue;
     updateAllSliders();
 
     // 触发回调
@@ -88,8 +81,14 @@ const SliderPanel = (() => {
     // 更新总和指示器
     const sumIndicator = document.getElementById('sum-indicator');
     if (sumIndicator) {
-      sumIndicator.textContent = `合计: ${sum}%`;
-      sumIndicator.className = `sum-indicator ${sum === 100 ? 'ok' : 'warn'}`;
+      const idle = 100 - sum;
+      if (sum === 100) {
+        sumIndicator.textContent = '合计: 100%';
+        sumIndicator.className = 'sum-indicator ok';
+      } else {
+        sumIndicator.textContent = `合计: ${sum}%（${idle}% 活期）`;
+        sumIndicator.className = 'sum-indicator warn';
+      }
     }
   }
 
