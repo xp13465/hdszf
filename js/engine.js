@@ -64,6 +64,15 @@ const BacktestEngine = (() => {
    * 这是最精确的计算方式，6资产完全独立，不丢任何信息
    */
   function estimateFromScratch(sliders) {
+    return estimateFromScratchWithIdleCash(sliders, 0);
+  }
+
+  /**
+   * 带活期的加权计算
+   * idlePct = 缺额百分比，视为活期（0收益）
+   * 已配置的现金·货币基金按正常 cash_monthly 计算
+   */
+  function estimateFromScratchWithIdleCash(sliders, idlePct) {
     const rr = APP_DATA.realReturns;
     if (!rr || !rr.asset_returns) {
       return { annual: 0, maxDd: 0, sharpe: 0, sortino: 0, total: 0, finalValue: 500000, monthlyWinRate: 0 };
@@ -83,10 +92,11 @@ const BacktestEngine = (() => {
           r += (pct / 100) * rr.asset_returns[asset][i];
         }
       }
+      // 活期部分不产生收益也不亏损，r 不加任何值
       monthlyReturns.push(r);
     }
 
-    // 累计收益 → 年化
+    // 累计收益 → 年化（基于总投入50万，活期部分不参与增长）
     let cumulative = 1;
     let peak = 1;
     let maxDd = 0;
@@ -120,14 +130,25 @@ const BacktestEngine = (() => {
    * 主计算函数
    */
   function compute(sliders) {
-    // 缺额补到现金·货币基金，确保恒市值法满仓匹配
     const sum = Object.values(sliders).reduce((a, b) => a + b, 0);
-    const normalized = { ...sliders };
+
+    // 缺额 > 0：缺额部分视为活期（0收益）
+    // 用 estimateFromScratch 但把现金月收益临时设为 0
+    // 因为缺额=活期，不是货币基金，不产生收益
     if (sum < 100) {
-      normalized['现金·货币基金'] = (normalized['现金·货币基金'] || 0) + (100 - sum);
+      const estimated = estimateFromScratchWithIdleCash(sliders, 100 - sum);
+      return {
+        sliders: { ...sliders },
+        match: { level: 'custom', label: `配置${sum}% · ${100 - sum}%活期` },
+        alloc: Object.fromEntries(
+          Object.entries(sliders).map(([k, v]) => [k, v / 100])
+        ),
+        metrics: estimated
+      };
     }
 
-    const { item, distance } = findNearest6D(normalized);
+    // 满仓：恒市值法 trendData 精确匹配
+    const { item, distance } = findNearest6D(sliders);
     const match = getMatchLevel(distance);
 
     // 距离太大或没有匹配 → 走精确加权估算（永远正确）
