@@ -81,7 +81,7 @@ const SliderPanel = (() => {
         sumIndicator.textContent = '合计: 100%';
         sumIndicator.className = 'sum-indicator ok';
       } else {
-        sumIndicator.textContent = `合计: ${sum}%（${idle}% 补到现金）`;
+        sumIndicator.textContent = `合计: ${sum}%（${idle}% 活期）`;
         sumIndicator.className = 'sum-indicator warn';
       }
     }
