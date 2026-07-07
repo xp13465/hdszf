@@ -120,6 +120,24 @@ const BacktestEngine = (() => {
    * 主计算函数
    */
   function compute(sliders) {
+    const sum = Object.values(sliders).reduce((a, b) => a + b, 0);
+
+    // 总和≠100%：缺额视为活期(0收益)，用真实月度数据直接加权
+    // 这是用户最直观的理解：配置多少就是多少，缺额不产生收益也不亏损
+    if (Math.abs(sum - 100) > 1) {
+      const estimated = estimateFromScratch(sliders);
+      const idle = 100 - sum;
+      return {
+        sliders: { ...sliders },
+        match: { level: 'custom', label: `配置${sum}% · ${idle}%活期` },
+        alloc: Object.fromEntries(
+          Object.entries(sliders).map(([k, v]) => [k, v / 100])
+        ),
+        metrics: estimated
+      };
+    }
+
+    // 总和=100%：用恒市值法 trendData 精确匹配
     const { item, distance } = findNearest6D(sliders);
     const match = getMatchLevel(distance);
 
