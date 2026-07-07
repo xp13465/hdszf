@@ -1,7 +1,7 @@
 /**
  * 滑块交互组件
- * 6滑块独立调节，不锁定总和
- * 总和<100%时，剩余部分视为活期（0收益）
+ * 6滑块总和锁定100%，调整单项时其他资产等比例缩放
+ * 恒市值法回测基于100%满仓配置，不支持部分持仓
  */
 
 const SliderPanel = (() => {
@@ -22,7 +22,6 @@ const SliderPanel = (() => {
   function init(onChange) {
     onChangeCallback = onChange;
 
-    // 绑定滑块事件
     ASSETS.forEach(asset => {
       const slider = document.getElementById(`slider-${asset}`);
       const input = document.getElementById(`input-${asset}`);
@@ -46,20 +45,22 @@ const SliderPanel = (() => {
       });
     });
 
-    // 绑定按钮
     document.getElementById('btn-reset')?.addEventListener('click', resetToDefault);
     document.getElementById('btn-lock')?.addEventListener('click', toggleLock);
 
-    // 初始渲染
     updateAllSliders();
   }
 
   function handleSliderChange(changedAsset, newValue) {
-    // 不锁总和：每个滑块独立调节，总和可以<100%
-    currentValues[changedAsset] = newValue;
+    const othersSum = ASSETS
+      .filter(a => a !== changedAsset)
+      .reduce((sum, a) => sum + currentValues[a], 0);
+
+    // 限制不超过100
+    const clamped = Math.min(newValue, 100 - othersSum);
+    currentValues[changedAsset] = Math.max(0, clamped);
     updateAllSliders();
 
-    // 触发回调
     if (onChangeCallback) {
       onChangeCallback(currentValues, lockedConfig);
     }
@@ -71,24 +72,14 @@ const SliderPanel = (() => {
     ASSETS.forEach(asset => {
       const slider = document.getElementById(`slider-${asset}`);
       const input = document.getElementById(`input-${asset}`);
-      const valueDisplay = document.getElementById(`value-${asset}`);
-
       if (slider) slider.value = currentValues[asset];
       if (input) input.value = currentValues[asset];
-      if (valueDisplay) valueDisplay.textContent = currentValues[asset] + '%';
     });
 
-    // 更新总和指示器
     const sumIndicator = document.getElementById('sum-indicator');
     if (sumIndicator) {
-      const idle = 100 - sum;
-      if (sum === 100) {
-        sumIndicator.textContent = '合计: 100%';
-        sumIndicator.className = 'sum-indicator ok';
-      } else {
-        sumIndicator.textContent = `合计: ${sum}%（${idle}% 活期）`;
-        sumIndicator.className = 'sum-indicator warn';
-      }
+      sumIndicator.textContent = `合计: ${sum}%`;
+      sumIndicator.className = `sum-indicator ${sum === 100 ? 'ok' : 'warn'}`;
     }
   }
 
