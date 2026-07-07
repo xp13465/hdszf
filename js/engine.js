@@ -62,7 +62,6 @@ const BacktestEngine = (() => {
   function interpolateMetrics(best, second) {
     const d1 = best.distance;
     const d2 = second.distance;
-    // 如果距离为0或没有次近邻，直接返回最近邻
     if (d1 < 0.001 || !second.item) {
       return {
         annual: best.item.annual || 0,
@@ -74,9 +73,12 @@ const BacktestEngine = (() => {
         w_positive_ratio: best.item.w_positive_ratio || 0
       };
     }
-    const total = d1 + d2;
-    const w1 = d2 / total; // 距离越近权重越大
-    const w2 = d1 / total;
+    // 用距离平方做权重，让近邻影响更大，变化更敏感
+    const d1sq = d1 * d1;
+    const d2sq = d2 * d2;
+    const total = d1sq + d2sq;
+    const w1 = d2sq / total;
+    const w2 = d1sq / total;
     return {
       annual: (best.item.annual || 0) * w1 + (second.item.annual || 0) * w2,
       dd: (best.item.dd || 0) * w1 + (second.item.dd || 0) * w2,
