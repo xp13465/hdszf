@@ -20,13 +20,12 @@ const BacktestEngine = (() => {
   const MATCH_THRESHOLD = 0.15;
 
   /**
-   * 6维欧氏距离匹配：直接用6资产权重在 trendData.alloc 中找最近邻
-   * 不再压缩为4维，彻底解决"标普100=纳指100"的问题
+   * 6维欧氏距离匹配：返回最近的两个邻居，用于线性插值
    */
   function findNearest6D(sliders) {
     const trendData = APP_DATA.trendData;
-    let bestDist = Infinity;
-    let bestItem = null;
+    let bestDist = Infinity, bestItem = null;
+    let secondDist = Infinity, secondItem = null;
 
     const target = {};
     for (const a of ASSETS) {
@@ -41,12 +40,52 @@ const BacktestEngine = (() => {
         dist2 += d * d;
       }
       if (dist2 < bestDist) {
+        secondDist = bestDist;
+        secondItem = bestItem;
         bestDist = dist2;
         bestItem = item;
+      } else if (dist2 < secondDist) {
+        secondDist = dist2;
+        secondItem = item;
       }
     }
 
-    return { item: bestItem, distance: Math.sqrt(bestDist) };
+    return {
+      best: { item: bestItem, distance: Math.sqrt(bestDist) },
+      second: { item: secondItem, distance: Math.sqrt(secondDist) }
+    };
+  }
+
+  /**
+   * 线性插值：在最近邻和次近邻之间按距离权重插值
+   */
+  function interpolateMetrics(best, second) {
+    const d1 = best.distance;
+    const d2 = second.distance;
+    // 如果距离为0或没有次近邻，直接返回最近邻
+    if (d1 < 0.001 || !second.item) {
+      return {
+        annual: best.item.annual || 0,
+        dd: best.item.dd || 0,
+        sharpe: best.item.sharpe || 0,
+        sortino: best.item.sortino || 0,
+        total: best.item.total || 0,
+        final: best.item.final || 500000,
+        w_positive_ratio: best.item.w_positive_ratio || 0
+      };
+    }
+    const total = d1 + d2;
+    const w1 = d2 / total; // 距离越近权重越大
+    const w2 = d1 / total;
+    return {
+      annual: (best.item.annual || 0) * w1 + (second.item.annual || 0) * w2,
+      dd: (best.item.dd || 0) * w1 + (second.item.dd || 0) * w2,
+      sharpe: (best.item.sharpe || 0) * w1 + (second.item.sharpe || 0) * w2,
+      sortino: (best.item.sortino || 0) * w1 + (second.item.sortino || 0) * w2,
+      total: (best.item.total || 0) * w1 + (second.item.total || 0) * w2,
+      final: (best.item.final || 500000) * w1 + (second.item.final || 500000) * w2,
+      w_positive_ratio: (best.item.w_positive_ratio || 0) * w1 + (second.item.w_positive_ratio || 0) * w2
+    };
   }
 
   /**
@@ -131,18 +170,17 @@ const BacktestEngine = (() => {
    */
   function compute(sliders) {
     // 缺额补到现金·货币基金，确保恒市值法满仓匹配
-    // trendData 中包含活期记录（现金100%+年化0%），缺额越多→现金占比越高→越接近活期
     const sum = Object.values(sliders).reduce((a, b) => a + b, 0);
     const normalized = { ...sliders };
     if (sum < 100) {
       normalized['现金·货币基金'] = (normalized['现金·货币基金'] || 0) + (100 - sum);
     }
 
-    const { item, distance } = findNearest6D(normalized);
-    const match = getMatchLevel(distance);
+    const { best, second } = findNearest6D(normalized);
+    const match = getMatchLevel(best.distance);
 
-    // 距离太大或没有匹配 → 走精确加权估算（永远正确）
-    if (!item || distance > MATCH_THRESHOLD) {
+    // 距离太大或没有匹配 → 走精确加权估算
+    if (!best.item || best.distance > MATCH_THRESHOLD) {
       const estimated = estimateFromScratch(sliders);
       return {
         sliders: { ...sliders },
@@ -154,8 +192,9 @@ const BacktestEngine = (() => {
       };
     }
 
-    // 近距离匹配：用 trendData 中的精确回测结果（包含完整的月度序列）
-    const alloc = item.alloc || {};
+    // 线性插值：最近邻和次近邻之间平滑过渡
+    const interp = interpolateMetrics(best, second);
+    const alloc = best.item.alloc || {};
     return {
       sliders: { ...sliders },
       match,
@@ -168,13 +207,13 @@ const BacktestEngine = (() => {
         '现金·货币基金': alloc['现金·货币基金'] || 0
       },
       metrics: {
-        annual: item.annual || 0,
-        maxDd: item.dd || 0,
-        sharpe: item.sharpe || 0,
-        sortino: item.sortino || 0,
-        total: item.total || 0,
-        finalValue: item.final || 500000,
-        monthlyWinRate: item.w_positive_ratio || 0
+        annual: interp.annual,
+        maxDd: interp.dd,
+        sharpe: interp.sharpe,
+        sortino: interp.sortino,
+        total: interp.total,
+        finalValue: interp.final,
+        monthlyWinRate: interp.w_positive_ratio
       }
     };
   }
