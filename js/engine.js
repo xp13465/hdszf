@@ -120,24 +120,6 @@ const BacktestEngine = (() => {
    * 主计算函数
    */
   function compute(sliders) {
-    const sum = Object.values(sliders).reduce((a, b) => a + b, 0);
-
-    // 总和≠100%：缺额视为活期(0收益)，用买入持有加权
-    // 恒市值法基于满仓回测，非满仓无法使用
-    if (Math.abs(sum - 100) > 1) {
-      const estimated = estimateFromScratch(sliders);
-      const idle = 100 - sum;
-      return {
-        sliders: { ...sliders },
-        match: { level: 'custom', label: `配置${sum}% · ${idle}%活期` },
-        alloc: Object.fromEntries(
-          Object.entries(sliders).map(([k, v]) => [k, v / 100])
-        ),
-        metrics: estimated
-      };
-    }
-
-    // 总和=100%：恒市值法 trendData 精确匹配
     const { item, distance } = findNearest6D(sliders);
     const match = getMatchLevel(distance);
 
