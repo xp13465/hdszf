@@ -1,6 +1,8 @@
 /**
  * 滑块交互组件
- * 6滑块总和锁定100%，调整单项时其他资产等比例缩放
+ * 6滑块独立调节，不锁定总和
+ * 缺额视为活期（0收益），用户配置多少就是多少
+ * 恒市值法数据（总和=100%时）不受影响
  */
 
 const SliderPanel = (() => {
@@ -51,37 +53,7 @@ const SliderPanel = (() => {
   }
 
   function handleSliderChange(changedAsset, newValue) {
-    const othersSum = ASSETS
-      .filter(a => a !== changedAsset)
-      .reduce((sum, a) => sum + currentValues[a], 0);
-
-    // 如果其他资产总和为0，新值最大100
-    const maxAllowed = othersSum === 0 ? 100 : 100;
-    const clamped = Math.min(Math.max(0, newValue), maxAllowed);
-
-    // 其他资产等比例缩放，使总和保持100
-    const newOthersSum = 100 - clamped;
-    if (othersSum > 0 && newOthersSum !== othersSum) {
-      const ratio = newOthersSum / othersSum;
-      for (const a of ASSETS) {
-        if (a !== changedAsset) {
-          currentValues[a] = Math.round(currentValues[a] * ratio);
-        }
-      }
-      // 修正舍入误差：微调最大的其他资产
-      const actualOthers = ASSETS
-        .filter(a => a !== changedAsset)
-        .reduce((s, a) => s + currentValues[a], 0);
-      if (actualOthers !== newOthersSum) {
-        const diff = newOthersSum - actualOthers;
-        const largest = ASSETS
-          .filter(a => a !== changedAsset)
-          .reduce((best, a) => currentValues[a] > currentValues[best] ? a : best);
-        currentValues[largest] += diff;
-      }
-    }
-
-    currentValues[changedAsset] = clamped;
+    currentValues[changedAsset] = Math.min(100, Math.max(0, newValue));
     updateAllSliders();
 
     if (onChangeCallback) {
@@ -101,8 +73,14 @@ const SliderPanel = (() => {
 
     const sumIndicator = document.getElementById('sum-indicator');
     if (sumIndicator) {
-      sumIndicator.textContent = `合计: ${sum}%`;
-      sumIndicator.className = `sum-indicator ${sum === 100 ? 'ok' : 'warn'}`;
+      const idle = 100 - sum;
+      if (idle === 0) {
+        sumIndicator.textContent = '合计: 100%';
+        sumIndicator.className = 'sum-indicator ok';
+      } else {
+        sumIndicator.textContent = `合计: ${sum}%（${idle}% 活期）`;
+        sumIndicator.className = 'sum-indicator warn';
+      }
     }
   }
 
@@ -130,19 +108,16 @@ const SliderPanel = (() => {
     const comparisonBar = document.getElementById('comparison-bar');
 
     if (lockedConfig) {
-      // 解锁
       lockedConfig = null;
       lockBtn.textContent = '🔒 锁定对比';
       lockBtn.classList.remove('active');
       comparisonBar.classList.remove('active');
     } else {
-      // 锁定当前配置
       lockedConfig = { ...currentValues };
       lockBtn.textContent = '🔓 取消锁定';
       lockBtn.classList.add('active');
       comparisonBar.classList.add('active');
 
-      // 更新对比栏
       const lockedSummary = document.getElementById('locked-summary');
       if (lockedSummary) {
         lockedSummary.textContent = `已锁定: 沪深300 ${lockedConfig['沪深300']}% | 中证500 ${lockedConfig['中证500']}% | 标普500 ${lockedConfig['标普500']}% | 纳指100 ${lockedConfig['纳斯达克100']}% | 黄金 ${lockedConfig['黄金']}% | 现金 ${lockedConfig['现金·货币基金']}%`;
