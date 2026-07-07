@@ -1,8 +1,7 @@
 /**
  * 滑块交互组件
- * 6滑块独立调节，不锁定总和
- * 缺额视为活期（0收益），用户配置多少就是多少
- * 恒市值法数据（总和=100%时）不受影响
+ * 各滑块独立调节，缺额自动补到现金·货币基金
+ * 引擎始终用满仓配置匹配恒市值法 trendData
  */
 
 const SliderPanel = (() => {
@@ -53,35 +52,11 @@ const SliderPanel = (() => {
   }
 
   function handleSliderChange(changedAsset, newValue) {
-    // 上限：不能超过 100 - 其他资产之和
+    // 独立调节，不超100%
     const othersSum = ASSETS
       .filter(a => a !== changedAsset)
       .reduce((sum, a) => sum + currentValues[a], 0);
-    const clamped = Math.min(Math.max(0, newValue), 100 - othersSum);
-
-    // 其他资产等比例缩放，保持总和=100
-    const newOthersSum = 100 - clamped;
-    if (othersSum > 0 && Math.abs(newOthersSum - othersSum) > 0) {
-      const ratio = newOthersSum / othersSum;
-      for (const a of ASSETS) {
-        if (a !== changedAsset) {
-          currentValues[a] = Math.round(currentValues[a] * ratio);
-        }
-      }
-      // 修正舍入误差
-      const actualOthers = ASSETS
-        .filter(a => a !== changedAsset)
-        .reduce((s, a) => s + currentValues[a], 0);
-      const diff = newOthersSum - actualOthers;
-      if (diff !== 0) {
-        const largest = ASSETS
-          .filter(a => a !== changedAsset)
-          .reduce((best, a) => currentValues[a] > (currentValues[best]||0) ? a : best, ASSETS[0]);
-        currentValues[largest] += diff;
-      }
-    }
-
-    currentValues[changedAsset] = clamped;
+    currentValues[changedAsset] = Math.min(Math.max(0, newValue), 100 - othersSum);
     updateAllSliders();
 
     if (onChangeCallback) {
@@ -101,8 +76,14 @@ const SliderPanel = (() => {
 
     const sumIndicator = document.getElementById('sum-indicator');
     if (sumIndicator) {
-      sumIndicator.textContent = `合计: ${sum}%`;
-      sumIndicator.className = 'sum-indicator ok';
+      const idle = 100 - sum;
+      if (idle === 0) {
+        sumIndicator.textContent = '合计: 100%';
+        sumIndicator.className = 'sum-indicator ok';
+      } else {
+        sumIndicator.textContent = `合计: ${sum}%（${idle}% 补到现金）`;
+        sumIndicator.className = 'sum-indicator warn';
+      }
     }
   }
 

@@ -120,7 +120,14 @@ const BacktestEngine = (() => {
    * 主计算函数
    */
   function compute(sliders) {
-    const { item, distance } = findNearest6D(sliders);
+    // 缺额补到现金·货币基金，确保恒市值法满仓匹配
+    const sum = Object.values(sliders).reduce((a, b) => a + b, 0);
+    const normalized = { ...sliders };
+    if (sum < 100) {
+      normalized['现金·货币基金'] = (normalized['现金·货币基金'] || 0) + (100 - sum);
+    }
+
+    const { item, distance } = findNearest6D(normalized);
     const match = getMatchLevel(distance);
 
     // 距离太大或没有匹配 → 走精确加权估算（永远正确）
