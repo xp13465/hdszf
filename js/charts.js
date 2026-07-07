@@ -87,28 +87,20 @@ const ChartManager = (() => {
     }
 
     const monthLabels = curData.monthLabels || [];
-    // X轴：起点 + 每月标签，和 equityCurve 长度一致（1 + N个月）
-    const xLabels = ['起点'];
-    for (let i = 0; i < monthLabels.length; i++) {
-      const m = monthLabels[i];
-      if (i === 0) {
-        xLabels.push(m.slice(0, 7)); // 第一个月显示完整
-      } else if (m.endsWith('-01')) {
-        xLabels.push(m.slice(0, 4)); // 每年1月显示年份
-      } else {
-        xLabels.push('');
-      }
-    }
+    // X轴直接使用月份，equityCurve[0]=0对应起点，equityCurve[1]对应第一个月
+    const xLabels = ['起点', ...monthLabels.map(m => {
+      if (m.endsWith('-01')) return m.slice(0, 4);
+      return '';
+    })];
 
     equityChart.setOption({
       tooltip: {
         trigger: 'axis',
         formatter: (params) => {
           const p = params[0];
-          const idx = p.axisIndex;
-          if (idx === 0) return `起点<br/>${p.seriesName}: ${p.value.toFixed(1)}%`;
-          const label = idx <= monthLabels.length ? monthLabels[idx - 1] : '';
-          return `${label}<br/>${p.seriesName}: ${p.value.toFixed(1)}%`;
+          const label = xLabels[p.dataIndex] || '';
+          const displayLabel = label === '起点' ? '起始' : (label || monthLabels[p.dataIndex - 1]?.slice(0, 7) || '');
+          return `${displayLabel}<br/>${p.seriesName}: ${p.value.toFixed(1)}%`;
         }
       },
       grid: { left: 50, right: 30, top: 20, bottom: 40 },
@@ -172,27 +164,19 @@ const ChartManager = (() => {
     }
 
     const ddMonthLabels = curData.monthLabels || [];
-    const ddXLabels = ['起点'];
-    for (let i = 0; i < ddMonthLabels.length; i++) {
-      const m = ddMonthLabels[i];
-      if (i === 0) {
-        ddXLabels.push(m.slice(0, 7));
-      } else if (m.endsWith('-01')) {
-        ddXLabels.push(m.slice(0, 4));
-      } else {
-        ddXLabels.push('');
-      }
-    }
+    const ddXLabels = ['起点', ...ddMonthLabels.map(m => {
+      if (m.endsWith('-01')) return m.slice(0, 4);
+      return '';
+    })];
 
     ddChart.setOption({
       tooltip: {
         trigger: 'axis',
         formatter: (params) => {
           const p = params[0];
-          const idx = p.axisIndex;
-          if (idx === 0) return `起点<br/>${p.seriesName}: ${p.value.toFixed(2)}%`;
-          const label = idx <= ddMonthLabels.length ? ddMonthLabels[idx - 1] : '';
-          return `${label}<br/>${p.seriesName}: ${p.value.toFixed(2)}%`;
+          const label = ddXLabels[p.dataIndex] || '';
+          const displayLabel = label === '起点' ? '起始' : (label || ddMonthLabels[p.dataIndex - 1]?.slice(0, 7) || '');
+          return `${displayLabel}<br/>${p.seriesName}: ${p.value.toFixed(2)}%`;
         }
       },
       grid: { left: 50, right: 30, top: 20, bottom: 40 },
