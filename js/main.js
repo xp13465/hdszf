@@ -495,7 +495,6 @@
     const dom = document.getElementById('chart-rolling-equity');
     if (!dom || !results || results.length === 0) return;
 
-    // 销毁旧图表
     if (rollingCharts.equity) {
       rollingCharts.equity.dispose();
     }
@@ -503,20 +502,16 @@
     const chart = echarts.init(dom);
     rollingCharts.equity = chart;
 
-    // 颜色映射：从深蓝到浅蓝（10年前→1年前）
-    const colors = [
-      '#0f1f33', '#1a3555', '#1e3a5f', '#2c5f8a', '#3a7bbf',
-      '#5a9fd4', '#7ab8e0', '#9ac8e8', '#b8d8f0', '#d4e8f8'
-    ];
-
+    // 调色板：一次建仓=红色系，分批建仓=蓝绿渐深
     const series = results.map((r, i) => {
-      // 构建累计收益曲线（归一化为从0开始）
-      const data = [];
       const snapshots = r.monthlySnapshots;
+      const data = [];
       for (let j = 0; j < snapshots.length; j++) {
-        const pct = (snapshots[j].totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100;
-        data.push([j, pct]);
+        data.push([j, (snapshots[j].totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100]);
       }
+
+      const isEarliest = r.startPoint.isEarliest;
+      const depth = isEarliest ? 0 : (r.startPoint.yearsAgo / 10); // 0=最深 1=最浅
 
       return {
         name: r.startPoint.label + (r.hasEstimatedData ? ' ⚠️' : ''),
@@ -524,19 +519,59 @@
         data: data,
         smooth: true,
         symbol: 'none',
-        lineStyle: { width: (r.startPoint.isEarliest || r.startPoint.yearsAgo === 10) ? 2.5 : 1.5, color: colors[i] },
-        emphasis: { focus: 'series' }
+        lineStyle: {
+          width: isEarliest ? 3 : 1.5,
+          color: isEarliest
+            ? '#c53030'
+            : `hsl(${200 + depth * 30}, ${60 - depth * 20}%, ${45 + depth * 20}%)`
+        },
+        emphasis: { focus: 'series' },
+        // 终点打点
+        markPoint: isEarliest ? {
+          data: [{
+            name: '终点',
+            coord: [data.length - 1, data[data.length - 1][1]],
+            symbol: 'pin',
+            symbolSize: 38,
+            itemStyle: { color: '#c53030' },
+            label: {
+              show: true,
+              formatter: function() { return `+${data[data.length - 1][1].toFixed(0)}%`; },
+              fontSize: 10,
+              fontWeight: 'bold',
+              color: '#fff'
+            }
+          }],
+          animation: false
+        } : undefined
       };
     });
 
+    // 找出最近和最早起点的数据，用于标注
+    const latestResult = results[results.length - 1]; // 2025-07
+    const earliestResult = results[0]; // 2015-08
+
     const option = {
+      backgroundColor: 'transparent',
       tooltip: {
         trigger: 'axis',
+        backgroundColor: 'rgba(255,255,255,0.96)',
+        borderColor: '#e8e8ed',
+        borderWidth: 1,
+        padding: [10, 14],
+        textStyle: { fontSize: 12, color: '#333' },
         formatter: function(params) {
-          let html = `<strong>第${params[0].axisValue}个月</strong><br/>`;
+          const monthIdx = params[0].axisValue;
+          // 推算年份月份
+          const baseYear = results[0].startPoint.year;
+          const baseMonth = results[0].startPoint.month;
+          const totalM = baseMonth - 1 + monthIdx;
+          const y = baseYear + Math.floor(totalM / 12);
+          const m = (totalM % 12) + 1;
+          let html = `<strong>${y}年${m}月 · 第${monthIdx + 1}个月</strong><br/>`;
           params.sort((a, b) => b.value[1] - a.value[1]);
           for (const p of params) {
-            html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:6px;"></span>`;
+            html += `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:4px;"></span>`;
             html += `${p.seriesName}: <strong>${p.value[1] >= 0 ? '+' : ''}${p.value[1].toFixed(1)}%</strong><br/>`;
           }
           return html;
@@ -545,25 +580,60 @@
       legend: {
         type: 'scroll',
         bottom: 0,
-        textStyle: { fontSize: 11, color: '#5f6368' },
-        pageTextStyle: { color: '#5f6368' }
+        itemWidth: 14,
+        itemHeight: 3,
+        textStyle: { fontSize: 10, color: '#666' },
+        pageTextStyle: { color: '#999' },
+        pageIconSize: 10
       },
-      grid: { left: 55, right: 30, top: 20, bottom: 50 },
+      grid: { left: 55, right: 35, top: 25, bottom: 45 },
       xAxis: {
         type: 'value',
         name: '回测月数',
-        nameTextStyle: { fontSize: 11, color: '#999' },
-        axisLabel: { fontSize: 10, color: '#999' },
-        splitLine: { lineStyle: { color: '#f0f0f0' } }
+        nameTextStyle: { fontSize: 11, color: '#aaa' },
+        axisLabel: {
+          fontSize: 10, color: '#999',
+          formatter: function(v) {
+            // 每隔12个月标年份
+            if (v % 12 === 0 || v === 131) {
+              const baseYear = results[0].startPoint.year;
+              const baseMonth = results[0].startPoint.month;
+              const totalM = baseMonth - 1 + v;
+              const y = baseYear + Math.floor(totalM / 12);
+              return y + '年';
+            }
+            return '';
+          }
+        },
+        min: 0,
+        splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } }
       },
       yAxis: {
         type: 'value',
-        name: '累计收益率(%)',
-        nameTextStyle: { fontSize: 11, color: '#999' },
+        name: '累计收益率',
+        nameTextStyle: { fontSize: 11, color: '#aaa' },
         axisLabel: { fontSize: 10, color: '#999', formatter: '{value}%' },
-        splitLine: { lineStyle: { color: '#f0f0f0' } }
+        splitLine: { lineStyle: { color: '#f0f0f0', type: 'dashed' } },
+        // 0% 基准线加粗
+        min: function(v) { return Math.min(v.min, -15); }
+      },
+      // 0% 水平参考线
+      markLine: {
+        silent: true,
+        symbol: 'none',
+        lineStyle: { color: '#ccc', type: 'solid', width: 1 },
+        data: [{ yAxis: 0 }],
+        label: { show: false }
       },
       series: series
+    };
+
+    // 手动添加 markLine（ECharts 的 markLine 不能在 option 根级）
+    option.series[0].markLine = {
+      silent: true,
+      symbol: 'none',
+      lineStyle: { color: '#d0d0d0', type: 'solid', width: 1.5 },
+      data: [{ yAxis: 0, label: { show: true, formatter: '0%', position: 'start', fontSize: 10, color: '#999' } }]
     };
 
     chart.setOption(option);
