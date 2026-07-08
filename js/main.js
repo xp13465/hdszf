@@ -740,10 +740,6 @@
     modal.style.display = 'flex';
   }
 
-    body.innerHTML = summaryHTML + tableHTML;
-    modal.style.display = 'flex';
-  }
-
   function downloadCSV(csvContent, filename) {
     const BOM = '\uFEFF';
     const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
