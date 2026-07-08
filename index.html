@@ -67,7 +67,7 @@
     .auth-douyin-card { margin: 0 auto 1rem; width: 260px; max-width: 90%; border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,0.18); }
     .auth-card-img { display: block; width: 100%; height: auto; }
     .auth-prompt { text-align: center; margin-bottom: 1rem; }
-    .auth-prompt-icon { font-size: 1.5rem; margin-bottom: 0.4rem; }
+    .auth-prompt-icon { font-size: 1.6rem; margin-bottom: 0.4rem; line-height: 1; }
     .auth-prompt h3 { margin: 0 0 0.5rem; font-size: 1.1rem; color: var(--color-text, #1a1a2e); font-weight: 700; }
     .auth-prompt p { margin: 0; font-size: 0.85rem; color: var(--color-text-secondary, #555); line-height: 1.5; }
     .auth-prompt strong { color: #FE2C55; font-weight: 700; }
@@ -670,7 +670,9 @@
 
     <!-- 文案引导 -->
     <div class="auth-prompt">
-      <div class="auth-prompt-icon">🔒</div>
+      <div class="auth-prompt-icon" style="display:inline-block;width:40px;height:40px;line-height:40px;color:#FE2C55;">
+        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:middle;"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+      </div>
       <h3 id="auth-prompt-title">解锁下载需要授权码</h3>
       <p>
         打开抖音扫码关注 <strong style="color:#FE2C55;">377162882</strong>，
@@ -689,7 +691,7 @@
         maxlength="50"
       />
       <div class="auth-error" id="auth-error" style="display:none;"></div>
-      <button class="auth-submit" id="auth-submit">🎁 立即解锁</button>
+      <button class="auth-submit" id="auth-submit">立即解锁</button>
     </div>
 
     <!-- 已解锁：直接下载按钮 -->
@@ -700,10 +702,10 @@
     </div>
 
     <div class="auth-hint" id="auth-hint-lock">
-      💡 授权码一次输入，5分钟内有效，过期需重新授权
+      授权码一次输入，5分钟内有效，过期需重新授权
     </div>
     <div class="auth-hint" id="auth-hint-unlock" style="display:none;">
-      ✅ 已解锁 · 5分钟后自动失效，点击下载按钮即可获取文件
+      已解锁 · 5分钟后自动失效，点击下载按钮即可获取文件
     </div>
   </div>
 </div>
