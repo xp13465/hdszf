@@ -729,8 +729,8 @@
       <div style="margin-top:12px;font-size:0.75rem;color:var(--color-text-muted);display:flex;flex-wrap:wrap;gap:12px;">
         <span>📘 蓝色行 = 建仓期</span>
         <span>📋 白色行 = 再平衡期</span>
-        <span style="color:var(--color-success);">🟢 买入</span>
-        <span style="color:var(--color-danger);">🔴 卖出</span>
+        <span style="color:var(--color-success);">🔴 买入（涨）</span>
+        <span style="color:var(--color-danger);">🟢 卖出（跌）</span>
         <span>— = 无操作</span>
         <span>偏离≥±5% → 触发调仓</span>
       </div>

@@ -15,9 +15,11 @@
   --color-accent-light: #d4a017;
   --color-accent-dark: #8b6508;
 
-  /* Functional */
-  --color-success: #1a7d3a;
-  --color-danger: #c53030;
+  /* Functional — 中国习惯：红涨绿跌 */
+  --color-rise: #c53030;
+  --color-fall: #1a7d3a;
+  --color-success: #c53030;
+  --color-danger: #1a7d3a;
   --color-warning: #c05600;
   --color-info: #2563eb;
 
