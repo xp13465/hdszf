@@ -32,7 +32,7 @@ investment-advisor/
 │   └── main.js             # 主入口（UI渲染、事件、授权弹窗）
 ├── images/
 │   └── douyin-card.jpg     # 抖音名片图（授权弹窗用）
-├── wrangler.toml           # Cloudflare Workers 配置
+├── wrangler.toml           # ❌ 已删除 — 纯静态站点用 Cloudflare Pages，不需要 Workers 配置
 └── 恒市值法理财操作表（稳健型）.xlsx  # 下载用 Excel 操作表
 ```
 
@@ -102,8 +102,8 @@ investment-advisor/
 ## 七、部署流程
 
 1. `git add -A && git commit -m "..." && git push origin main`
-2. Cloudflare Pages / GitHub Pages 自动检测推送并部署
-3. 如有 Cloudflare Workers 冲突，检查 `wrangler.toml` 中 `name` 是否匹配
+2. Cloudflare Pages（已关联 GitHub 仓库）自动检测推送并部署
+3. **注意**：这是纯静态站点（HTML/CSS/JS），不要创建 `wrangler.toml` — 那是 Workers 用的，会导致 `No loader for ".html"` 错误
 
 ---
 
