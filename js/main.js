@@ -664,10 +664,14 @@
     const TARGET_PCTS = RollingBacktest.CONFIG.allocations;
 
     let tableHTML = '<div class="log-table-wrap"><table class="log-table"><thead><tr>';
-    tableHTML += '<th>月份</th><th>阶段</th><th>资产</th><th>目标市值</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>占总额%</th><th>偏离目标</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th><th>仓位</th>';
+    tableHTML += '<th style="cursor:pointer;" id="log-sort-btn" title="点击切换正序/倒序">月份 <span id="log-sort-icon">↓</span></th><th>阶段</th><th>资产</th><th>目标市值</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>占总额%</th><th>偏离目标</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th><th>仓位</th>';
     tableHTML += '</tr></thead><tbody>';
 
-    for (const snap of result.monthlySnapshots) {
+    // 读取排序偏好（默认正序 = 最旧在上）
+    const sortDesc = (sessionStorage.getItem('log_sort_desc') === '1');
+    const snapshots = sortDesc ? [...result.monthlySnapshots].reverse() : result.monthlySnapshots;
+
+    for (const snap of snapshots) {
       const phaseClass = snap.phase.includes('建仓') ? 'phase-build' : 'phase-rebalance';
       const rowSpan = 6; // 6个资产
 
@@ -751,6 +755,21 @@
 
     body.innerHTML = summaryHTML + tableHTML;
     modal.style.display = 'flex';
+
+    // 绑定排序按钮
+    setTimeout(() => {
+      const sortBtn = document.getElementById('log-sort-btn');
+      const sortIcon = document.getElementById('log-sort-icon');
+      if (sortBtn && sortIcon) {
+        sortIcon.textContent = sortDesc ? '↑' : '↓';
+        sortBtn.addEventListener('click', function() {
+          const current = sessionStorage.getItem('log_sort_desc') === '1';
+          sessionStorage.setItem('log_sort_desc', current ? '0' : '1');
+          // 重新渲染同一个日志
+          showLogDetail(result, index);
+        });
+      }
+    }, 0);
   }
 
   function downloadCSV(csvContent, filename) {
