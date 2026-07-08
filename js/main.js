@@ -481,7 +481,7 @@
           <td class="${annualClass}">${r.annualReturn.toFixed(2)}%</td>
           <td class="${ddClass}">${r.maxDrawdown.toFixed(2)}%</td>
           <td class="${sharpeClass}">${r.sharpe.toFixed(4)}</td>
-          <td>${r.winRate.toFixed(1)}%</td>
+          <td>${r.winRate.toFixed(1)}%<br><small style="color:var(--color-text-muted);font-size:0.7rem;">年${r.yearWinRate.toFixed(0)}%</small></td>
           <td>${r.operationCount}次</td>
           <td class="${isEstimated ? 'cell-estimated' : 'cell-all-real'}">${isEstimated ? '⚠️含估计值' : '✓真实数据'}</td>
           <td><button class="btn-detail" onclick="window.showRollingLog(${i})">📋 查看操作记录</button></td>

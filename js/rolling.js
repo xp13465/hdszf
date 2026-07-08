@@ -405,6 +405,17 @@ const RollingBacktest = (() => {
     const winRate = monthlySnapshots.length > 0
       ? (positiveMonths / monthlySnapshots.length) * 100 
       : 0;
+
+    // 计算自然年胜率（每年收益率汇总后判断）
+    const yearReturns = {};
+    for (const snap of monthlySnapshots) {
+      const y = parseInt(snap.month.substring(0, 4));
+      if (!yearReturns[y]) yearReturns[y] = 1;
+      yearReturns[y] *= (1 + snap.monthReturn);
+    }
+    const years = Object.keys(yearReturns);
+    const positiveYears = years.filter(y => yearReturns[y] > 1).length;
+    const yearWinRate = years.length > 0 ? (positiveYears / years.length) * 100 : 0;
     
     // 计算Sharpe
     const monthlyReturns = monthlySnapshots.map(s => s.monthReturn);
@@ -428,6 +439,7 @@ const RollingBacktest = (() => {
       sharpe: Math.max(0, Math.min(sharpe, 10)),
       sortino: Math.max(0, Math.min(sortino, 10)),
       winRate,
+      yearWinRate,
       annVol,
       totalMonths: totalMonthsNeeded,
       operationCount,
