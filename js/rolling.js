@@ -168,13 +168,13 @@ const RollingBacktest = (() => {
     
     // 初始化状态
     const holdings = {};      // 各资产当前持有市值
-    const targetValues = {};  // 各资产目标市值
+    const targetValues = {};  // 各资产目标市值（恒定不变！）
     for (const asset of ASSETS) {
       holdings[asset] = 0;
       targetValues[asset] = totalCapital * allocations[asset];
     }
     
-    let cashBalance = totalCapital;  // 现金余额（未投资部分，含活期利息）
+    let cashBalance = totalCapital;  // 初始现金（第1个月月初会合并到 holdings[CASH_ASSET]）
     let totalValue = totalCapital;   // 总市值（含现金余额）
     let peakValue = totalCapital;    // 历史最高市值
     let maxDrawdown = 0;             // 最大回撤
@@ -191,6 +191,10 @@ const RollingBacktest = (() => {
       const monthKey = makeMonthKey(currentYear, currentMonth);
       const isBuildPhase = t < buildMonths;
       
+      // 月初：把现金余额合并到现金·货币基金持仓（统一处理）
+      holdings[CASH_ASSET] += cashBalance;
+      cashBalance = 0;
+      
       // 获取本月各资产收益率
       const monthReturns = getMonthReturnsWithFallback(monthKey);
       const anyEstimated = Object.values(monthReturns).some(r => r.estimated);
@@ -203,12 +207,8 @@ const RollingBacktest = (() => {
       }
       
       for (const asset of ASSETS) {
-        if (asset === CASH_ASSET) {
-          holdings[asset] *= (1 + monthReturns[asset].value);
-          cashBalance *= (1 + monthReturns[asset].value);
-        } else {
-          holdings[asset] *= (1 + monthReturns[asset].value);
-        }
+        const ret = monthReturns[asset]?.value ?? monthReturns[asset] ?? 0;
+        holdings[asset] *= (1 + ret);
       }
       
       // === 第2步：如果是建仓期，投入当月建仓金额 ===
@@ -217,7 +217,7 @@ const RollingBacktest = (() => {
       
       if (isBuildPhase) {
         for (const asset of ASSETS) {
-          if (asset === CASH_ASSET) continue; // 现金不需要建仓，保持在现金余额中
+          if (asset === CASH_ASSET) continue; // 现金不需要建仓，保持当前市值
           
           // 恒定市值法建仓：每月目标 = 最终目标市值 × 建仓进度
           const currentTarget = targetValues[asset] * buildFraction;
@@ -228,13 +228,18 @@ const RollingBacktest = (() => {
             const fee = Math.abs(diff) * CONFIG.feeRate;
             
             if (diff > 0) {
-              // 买入：从现金余额扣
-              cashBalance -= (diff + fee);
+              // 买入：从现金持仓扣（现金不足时只买能买的部分）
+              const needed = diff + fee;
+              const available = Math.max(0, Math.min(holdings[CASH_ASSET], needed));
+              if (available > 1) {
+                holdings[CASH_ASSET] -= available;
+                holdings[asset] += (available - fee);
+              }
             } else {
-              // 卖出：回款到现金余额
-              cashBalance += (Math.abs(diff) - fee);
+              // 卖出：回款到现金持仓
+              holdings[CASH_ASSET] += (Math.abs(diff) - fee);
+              holdings[asset] = currentTarget;
             }
-            holdings[asset] = currentTarget;
             
             opEntries.push({
               asset,
@@ -250,7 +255,7 @@ const RollingBacktest = (() => {
       
       // === 第3步：再平衡检查（恒定市值法） ===
       if (!isBuildPhase) {
-        totalValue = Object.values(holdings).reduce((a, b) => a + b, 0) + cashBalance;
+        totalValue = Object.values(holdings).reduce((a, b) => a + b, 0);
         
         for (const asset of ASSETS) {
           const targetVal = targetValues[asset]; // 恒定市值法：目标市值永远不变！
@@ -264,21 +269,23 @@ const RollingBacktest = (() => {
             const fee = Math.abs(diff) * CONFIG.feeRate;
             
             if (asset === CASH_ASSET) {
-              // 现金资产：调整通过现金余额
-              cashBalance += (diff - fee);
-              holdings[asset] = targetVal;
+              // 现金资产偏离目标：从其他资产调仓过来/过去会自然调整
+              // 此处不做操作，现金由其他资产的买卖自动调整
+              // 但如果其他资产都没有触发，现金独自偏离则需要单独处理
+              // 实际上现金的偏离会在其他资产调仓后自动接近目标
+              continue;
             } else {
               if (diff > 0) {
-                // 市值低于目标 → 买入补仓
+                // 市值低于目标 → 买入补仓，从现金持仓扣
                 const needed = diff + fee;
-                const available = Math.min(cashBalance, needed);
+                const available = Math.min(holdings[CASH_ASSET], needed);
                 if (available > 1) {
-                  cashBalance -= available;
+                  holdings[CASH_ASSET] -= available;
                   holdings[asset] += (available - fee);
                 }
               } else {
-                // 市值高于目标 → 卖出获利
-                cashBalance += (Math.abs(diff) - fee);
+                // 市值高于目标 → 卖出获利，回款到现金持仓
+                holdings[CASH_ASSET] += (Math.abs(diff) - fee);
                 holdings[asset] = targetVal;
               }
             }
@@ -296,8 +303,8 @@ const RollingBacktest = (() => {
         }
       }
       
-      // === 第4步：计算本月总市值 ===
-      totalValue = Object.values(holdings).reduce((a, b) => a + b, 0) + cashBalance;
+      // === 第4步：计算本月总市值（全部在 holdings 中） ===
+      totalValue = Object.values(holdings).reduce((a, b) => a + b, 0);
       
       // 更新峰值和回撤
       if (totalValue > peakValue) {
@@ -312,26 +319,22 @@ const RollingBacktest = (() => {
         : 0;
       prevTotalValue = totalValue;
       
-      // === 第5步：构建每月完整持仓快照（展示用，含全部6资产 + 现金余额合并） ===
-      // 展示用的 holdings: 把 cashBalance 合并进 现金·货币基金
-      const displayHoldings = { ...holdings };
-      displayHoldings[CASH_ASSET] += cashBalance;
-      
+      // === 第5步：构建每月完整持仓快照 ===
       const assetDetails = ASSETS.map(asset => {
-        const actualPct = totalValue > 0 ? displayHoldings[asset] / totalValue : 0;
+        const actualPct = totalValue > 0 ? holdings[asset] / totalValue : 0;
         const targetPct = allocations[asset];
-        const targetVal = targetValues[asset]; // 恒定市值法：固定目标市值
-        const deviationFromTarget = targetVal > 0 ? (displayHoldings[asset] - targetVal) / targetVal : 0;
+        const targetVal = targetValues[asset];
+        const deviationFromTarget = targetVal > 0 ? (holdings[asset] - targetVal) / targetVal : 0;
         const op = opEntries.find(e => e.asset === asset);
         return {
           asset,
           targetPct,
-          targetVal,  // 新增：目标市值
-          holdingBefore: holdingsBeforeReturns[asset] + (asset === CASH_ASSET ? cashBalance / (1 + (monthReturns[asset]?.value || monthReturns[asset] || 0)) : 0),
+          targetVal,
+          holdingBefore: holdingsBeforeReturns[asset],
           monthReturn: monthReturns[asset],
-          holdingAfter: displayHoldings[asset],
+          holdingAfter: holdings[asset],
           actualPct,
-          deviationFromTarget,  // 改为：偏离目标市值的百分比
+          deviationFromTarget,
           triggered: op != null,
           action: op ? op.action : '无操作',
           amount: op ? op.amount : 0,
@@ -345,7 +348,6 @@ const RollingBacktest = (() => {
         monthIndex: t + 1,
         phase: isBuildPhase ? `建仓期(${t + 1}/${buildMonths})` : '再平衡期',
         holdings: { ...holdings },
-        cashBalance,
         totalValue,
         drawdown: dd,
         peakValue,
