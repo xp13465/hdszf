@@ -1943,6 +1943,16 @@ input[type="range"]::-webkit-slider-thumb:hover {
   font-weight: 600;
 }
 
+/* 有操作的行高亮 */
+.log-table .has-action {
+  background: rgba(184, 134, 11, 0.04);
+}
+
+/* 月分隔线 */
+.log-table .month-separator td {
+  pointer-events: none;
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
   .rolling-summary-table {

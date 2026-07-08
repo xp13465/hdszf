@@ -609,7 +609,7 @@
     if (!modal || !title || !body) return;
 
     modal.dataset.logIndex = index;
-    title.textContent = `📋 详细操作日志 — ${result.startPoint.label}入场 · ${result.startPoint.yearsAgo}年前`;
+    title.textContent = `📋 完整持仓日志 — ${result.startPoint.label}入场 · ${result.startPoint.yearsAgo}年前`;
 
     // 汇总信息
     const summaryHTML = `
@@ -645,43 +645,100 @@
       </div>
     `;
 
-    // 操作日志表格
+    // 每月完整持仓表格：每月一行，展开显示6个资产
+    const ASSETS = ['沪深300', '中证500', '标普500', '纳斯达克100', '黄金', '现金·货币基金'];
+    const ASSET_COLORS = {
+      '沪深300': '#3b82f6', '中证500': '#60a5fa',
+      '标普500': '#06b6d4', '纳斯达克100': '#22d3ee',
+      '黄金': '#c9a84c', '现金·货币基金': '#94a3b8'
+    };
+    const TARGET_PCTS = RollingBacktest.CONFIG.allocations;
+
     let tableHTML = '<div class="log-table-wrap"><table class="log-table"><thead><tr>';
-    tableHTML += '<th>月份</th><th>阶段</th><th>资产</th><th>操作</th><th>金额(元)</th><th>手续费(元)</th><th>操作后市值(元)</th><th>总市值(元)</th><th>偏离度</th><th>原因</th><th>数据</th>';
+    tableHTML += '<th>月份</th><th>阶段</th><th>资产</th><th>目标</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>实际%</th><th>偏离</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th>';
     tableHTML += '</tr></thead><tbody>';
 
-    if (result.operations.length === 0) {
-      tableHTML += `<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--color-text-muted);">📭 该回测期间无触发调仓操作（偏离均未超过±5%阈值）</td></tr>`;
-    } else {
-      for (const op of result.operations) {
-        const phaseClass = op.phase.includes('建仓') ? 'phase-build' : 'phase-rebalance';
-        const rowSpan = op.entries.length;
-        
-        op.entries.forEach((entry, ei) => {
-          tableHTML += '<tr class="' + phaseClass + '">';
-          if (ei === 0) {
-            tableHTML += `<td rowspan="${rowSpan}"><strong>${op.month}</strong></td>`;
-            tableHTML += `<td rowspan="${rowSpan}">${op.phase}</td>`;
-          }
-          tableHTML += `<td>${entry.asset}</td>`;
-          tableHTML += `<td class="${entry.action.includes('买入') ? 'action-buy' : 'action-sell'}">${entry.action}</td>`;
-          tableHTML += `<td>¥${entry.amount.toFixed(0)}</td>`;
-          tableHTML += `<td>¥${entry.fee.toFixed(2)}</td>`;
-          tableHTML += `<td>¥${entry.holdingAfter.toFixed(0)}</td>`;
-          if (ei === 0) {
-            tableHTML += `<td rowspan="${rowSpan}">¥${op.totalValue.toFixed(0)}</td>`;
-          }
-          tableHTML += `<td>${entry.deviationBefore || '-'}</td>`;
-          tableHTML += `<td style="max-width:200px;white-space:normal;font-size:0.7rem;color:var(--color-text-secondary);">${entry.reason}</td>`;
-          if (ei === 0) {
-            tableHTML += `<td rowspan="${rowSpan}">${op.estimatedMonth ? '<span class="estimated-badge">⚠️估计</span>' : '真实'}</td>`;
-          }
-          tableHTML += '</tr>';
-        });
-      }
+    for (const snap of result.monthlySnapshots) {
+      const phaseClass = snap.phase.includes('建仓') ? 'phase-build' : 'phase-rebalance';
+      const rowSpan = 6; // 6个资产
+
+      snap.assetDetails.forEach((ad, ai) => {
+        const isFirstAsset = ai === 0;
+        const deviationClass = Math.abs(ad.deviation) > 0.05 ? 'action-sell' : (Math.abs(ad.deviation) > 0.03 ? 'action-sell' : '');
+        const hasAction = ad.action !== '无操作';
+
+        tableHTML += '<tr class="' + phaseClass + (hasAction ? ' has-action' : '') + '">';
+
+        if (isFirstAsset) {
+          tableHTML += `<td rowspan="${rowSpan}" style="font-weight:700;color:var(--color-primary);">${snap.month}</td>`;
+          tableHTML += `<td rowspan="${rowSpan}">${snap.phase}</td>`;
+        }
+
+        // 资产名（带颜色点）
+        tableHTML += `<td style="text-align:left;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ASSET_COLORS[ad.asset]};margin-right:4px;"></span>${ad.asset}</td>`;
+
+        // 目标比例
+        tableHTML += `<td style="color:var(--color-text-muted);">${(ad.targetPct * 100).toFixed(0)}%</td>`;
+
+        // 月初市值
+        tableHTML += `<td>¥${ad.holdingBefore.toFixed(0)}</td>`;
+
+        // 月收益率
+        const mr = (ad.monthReturn?.value || ad.monthReturn || 0) * 100;
+        const mrClass = mr > 0 ? 'action-buy' : (mr < 0 ? 'action-sell' : '');
+        tableHTML += `<td class="${mrClass}">${mr >= 0 ? '+' : ''}${mr.toFixed(2)}%</td>`;
+
+        // 月末市值
+        tableHTML += `<td>¥${ad.holdingAfter.toFixed(0)}</td>`;
+
+        // 实际比例
+        tableHTML += `<td>${(ad.actualPct * 100).toFixed(1)}%</td>`;
+
+        // 偏离度
+        const devPct = ad.deviation * 100;
+        tableHTML += `<td class="${Math.abs(devPct) > 5 ? 'action-sell' : ''}">${devPct >= 0 ? '+' : ''}${devPct.toFixed(1)}%</td>`;
+
+        // 操作
+        if (hasAction) {
+          tableHTML += `<td class="${ad.action.includes('买入') ? 'action-buy' : 'action-sell'}">${ad.action}</td>`;
+          tableHTML += `<td>¥${ad.amount.toFixed(0)}</td>`;
+        } else {
+          tableHTML += `<td style="color:var(--color-text-muted);">—</td>`;
+          tableHTML += `<td style="color:var(--color-text-muted);">—</td>`;
+        }
+
+        // 总市值（第一行时显示）
+        if (isFirstAsset) {
+          tableHTML += `<td rowspan="${rowSpan}" style="font-weight:700;">¥${snap.totalValue.toFixed(0)}</td>`;
+          const mrSnap = snap.monthReturn * 100;
+          const mrSnapClass = mrSnap > 0 ? 'action-buy' : (mrSnap < 0 ? 'action-sell' : '');
+          tableHTML += `<td rowspan="${rowSpan}" class="${mrSnapClass}" style="font-weight:700;">${mrSnap >= 0 ? '+' : ''}${mrSnap.toFixed(2)}%</td>`;
+        }
+
+        tableHTML += '</tr>';
+      });
+
+      // 每月之间加分隔线
+      tableHTML += '<tr class="month-separator"><td colspan="13" style="padding:0;border:none;height:4px;background:var(--color-bg);"></td></tr>';
     }
 
     tableHTML += '</tbody></table></div>';
+
+    // 图例说明
+    tableHTML += `
+      <div style="margin-top:12px;font-size:0.75rem;color:var(--color-text-muted);display:flex;flex-wrap:wrap;gap:12px;">
+        <span>📘 蓝色行 = 建仓期</span>
+        <span>📋 白色行 = 再平衡期</span>
+        <span style="color:var(--color-success);">🟢 买入</span>
+        <span style="color:var(--color-danger);">🔴 卖出</span>
+        <span>— = 无操作</span>
+        <span>偏离≥±5% → 触发调仓</span>
+      </div>
+    `;
+
+    body.innerHTML = summaryHTML + tableHTML;
+    modal.style.display = 'flex';
+  }
 
     body.innerHTML = summaryHTML + tableHTML;
     modal.style.display = 'flex';

@@ -180,8 +180,7 @@ const RollingBacktest = (() => {
     let maxDrawdown = 0;             // 最大回撤
     let prevTotalValue = totalCapital; // 上月总市值（用于计算月收益率）
     
-    const operations = [];   // 操作日志
-    const monthlySnapshots = []; // 每月快照
+    const monthlySnapshots = []; // 每月快照（包含全部6资产详情）
     let hasEstimatedData = false;
     
     let currentYear = year;
@@ -198,12 +197,10 @@ const RollingBacktest = (() => {
       if (anyEstimated) hasEstimatedData = true;
       
       // === 第1步：更新资产市值（按当月收益率变动） ===
-      // 先记录月初市值（用于计算纯投资收益）
       const holdingsBeforeReturns = {};
       for (const asset of ASSETS) {
         holdingsBeforeReturns[asset] = holdings[asset];
       }
-      const cashBalanceBeforeReturns = cashBalance;
       
       for (const asset of ASSETS) {
         if (asset === CASH_ASSET) {
@@ -309,14 +306,38 @@ const RollingBacktest = (() => {
       const dd = (totalValue / peakValue - 1) * 100;
       if (dd < maxDrawdown) maxDrawdown = dd;
       
-      // 月收益率：恒市值法无外部现金流，总市值的简单增长率即为真实投资回报
-      // （含现金余额的货币基金利息 + 各资产的市值变动）
+      // 月收益率
       const monthReturn = prevTotalValue > 0 
         ? (totalValue / prevTotalValue - 1)
         : 0;
       prevTotalValue = totalValue;
       
-      // === 第5步：记录月度快照 ===
+      // === 第5步：构建每月完整持仓快照（展示用，含全部6资产 + 现金余额合并） ===
+      // 展示用的 holdings: 把 cashBalance 合并进 现金·货币基金
+      const displayHoldings = { ...holdings };
+      displayHoldings[CASH_ASSET] += cashBalance;
+      
+      const assetDetails = ASSETS.map(asset => {
+        const actualPct = totalValue > 0 ? displayHoldings[asset] / totalValue : 0;
+        const targetPct = allocations[asset];
+        const deviation = actualPct - targetPct;
+        const op = opEntries.find(e => e.asset === asset);
+        return {
+          asset,
+          targetPct,
+          holdingBefore: holdingsBeforeReturns[asset] + (asset === CASH_ASSET ? cashBalance / (1 + (monthReturns[asset]?.value || monthReturns[asset] || 0)) : 0),
+          monthReturn: monthReturns[asset],
+          holdingAfter: displayHoldings[asset],
+          actualPct,
+          deviation,
+          triggered: Math.abs(deviation) > threshold || (isBuildPhase && asset !== CASH_ASSET),
+          action: op ? op.action : (isBuildPhase && asset !== CASH_ASSET ? '买入建仓' : '无操作'),
+          amount: op ? op.amount : 0,
+          fee: op ? op.fee : 0,
+          reason: op ? op.reason : ''
+        };
+      });
+      
       const snapshot = {
         month: monthKey,
         monthIndex: t + 1,
@@ -326,24 +347,13 @@ const RollingBacktest = (() => {
         totalValue,
         drawdown: dd,
         peakValue,
-        operations: opEntries,
+        assetDetails,
+        monthReturn,
         estimatedMonth: anyEstimated,
-        monthReturn
+        hasOperations: opEntries.length > 0,
+        opCount: opEntries.length
       };
       monthlySnapshots.push(snapshot);
-      
-      // 记录操作日志（有操作时才记录）
-      if (opEntries.length > 0) {
-        operations.push({
-          month: monthKey,
-          monthIndex: t + 1,
-          phase: snapshot.phase,
-          totalValue,
-          cashBalance,
-          entries: opEntries,
-          estimatedMonth: anyEstimated
-        });
-      }
       
       // 进入下一个月
       const next = addMonths(currentYear, currentMonth, 1);
@@ -357,13 +367,13 @@ const RollingBacktest = (() => {
     const nYears = totalMonthsNeeded / 12;
     const annualReturn = (Math.pow(finalValue / totalCapital, 1 / nYears) - 1) * 100;
     
-    // 计算赚钱月占比（使用已计算的月收益率）
+    // 计算赚钱月占比
     const positiveMonths = monthlySnapshots.filter(s => s.monthReturn > 0).length;
     const winRate = monthlySnapshots.length > 0
       ? (positiveMonths / monthlySnapshots.length) * 100 
       : 0;
     
-    // 使用已计算的月收益率序列计算Sharpe
+    // 计算Sharpe
     const monthlyReturns = monthlySnapshots.map(s => s.monthReturn);
     const meanR = monthlyReturns.length > 0 ? monthlyReturns.reduce((a, b) => a + b, 0) / monthlyReturns.length : 0;
     const variance = monthlyReturns.length > 1 
@@ -372,6 +382,9 @@ const RollingBacktest = (() => {
     const annVol = Math.sqrt(Math.max(0, variance)) * Math.sqrt(12);
     const sharpe = annVol > 0 ? (annualReturn / 100 - 0.02) / annVol : 0;
     const sortino = sharpe * 1.2;
+    
+    // 计算操作次数（建仓期每月5笔 + 再平衡期触发次数）
+    const operationCount = monthlySnapshots.reduce((sum, s) => sum + s.opCount, 0);
     
     return {
       startPoint,
@@ -384,9 +397,8 @@ const RollingBacktest = (() => {
       winRate,
       annVol,
       totalMonths: totalMonthsNeeded,
-      operationCount: operations.length,
-      operations,          // 详细操作日志
-      monthlySnapshots,    // 每月快照
+      operationCount,
+      monthlySnapshots,    // 每月完整快照（含全部资产详情）
       hasEstimatedData
     };
   }
@@ -424,25 +436,30 @@ const RollingBacktest = (() => {
   }
 
   /**
-   * 导出单个回测的详细日志为CSV
+   * 导出单个回测的完整日志为CSV（每月一行，含全部6资产）
    */
   function exportLogCSV(result) {
-    const rows = [['月份', '阶段', '资产', '操作', '金额(元)', '手续费(元)', '操作后市值(元)', '总市值(元)', '偏离度', '原因', '数据状态']];
+    const header = ['月份', '阶段', '资产', '目标比例', '月初市值(元)', '本月收益率', '月末市值(元)', '实际比例', '偏离度', '操作', '操作金额(元)', '手续费(元)', '总市值(元)', '月收益率', '数据状态'];
+    const rows = [header];
     
-    for (const op of result.operations) {
-      for (const entry of op.entries) {
+    for (const snap of result.monthlySnapshots) {
+      for (const ad of snap.assetDetails) {
         rows.push([
-          op.month,
-          op.phase,
-          entry.asset,
-          entry.action,
-          entry.amount.toFixed(2),
-          entry.fee.toFixed(2),
-          entry.holdingAfter.toFixed(2),
-          op.totalValue.toFixed(2),
-          entry.deviationBefore || '-',
-          entry.reason,
-          op.estimatedMonth ? '⚠️估计值' : '真实数据'
+          snap.month,
+          snap.phase,
+          ad.asset,
+          (ad.targetPct * 100).toFixed(0) + '%',
+          ad.holdingBefore.toFixed(2),
+          ((ad.monthReturn?.value || ad.monthReturn || 0) * 100).toFixed(2) + '%',
+          ad.holdingAfter.toFixed(2),
+          (ad.actualPct * 100).toFixed(2) + '%',
+          (ad.deviation * 100).toFixed(2) + '%',
+          ad.action,
+          ad.amount > 0 ? ad.amount.toFixed(2) : '-',
+          ad.fee > 0 ? ad.fee.toFixed(2) : '-',
+          snap.totalValue.toFixed(2),
+          (snap.monthReturn * 100).toFixed(2) + '%',
+          snap.estimatedMonth ? '⚠️估计值' : '真实数据'
         ]);
       }
     }
