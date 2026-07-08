@@ -655,7 +655,7 @@
     const TARGET_PCTS = RollingBacktest.CONFIG.allocations;
 
     let tableHTML = '<div class="log-table-wrap"><table class="log-table"><thead><tr>';
-    tableHTML += '<th>月份</th><th>阶段</th><th>资产</th><th>目标</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>实际%</th><th>偏离</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th>';
+    tableHTML += '<th>月份</th><th>阶段</th><th>资产</th><th>目标市值</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>占总额%</th><th>偏离目标</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th>';
     tableHTML += '</tr></thead><tbody>';
 
     for (const snap of result.monthlySnapshots) {
@@ -664,7 +664,6 @@
 
       snap.assetDetails.forEach((ad, ai) => {
         const isFirstAsset = ai === 0;
-        const deviationClass = Math.abs(ad.deviation) > 0.05 ? 'action-sell' : (Math.abs(ad.deviation) > 0.03 ? 'action-sell' : '');
         const hasAction = ad.action !== '无操作';
 
         tableHTML += '<tr class="' + phaseClass + (hasAction ? ' has-action' : '') + '">';
@@ -674,11 +673,11 @@
           tableHTML += `<td rowspan="${rowSpan}">${snap.phase}</td>`;
         }
 
-        // 资产名（带颜色点）
+        // 资产名
         tableHTML += `<td style="text-align:left;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ASSET_COLORS[ad.asset]};margin-right:4px;"></span>${ad.asset}</td>`;
 
-        // 目标比例
-        tableHTML += `<td style="color:var(--color-text-muted);">${(ad.targetPct * 100).toFixed(0)}%</td>`;
+        // 目标市值（恒定！）
+        tableHTML += `<td style="font-weight:600;">¥${(ad.targetVal || 0).toFixed(0)}</td>`;
 
         // 月初市值
         tableHTML += `<td>¥${ad.holdingBefore.toFixed(0)}</td>`;
@@ -691,11 +690,11 @@
         // 月末市值
         tableHTML += `<td>¥${ad.holdingAfter.toFixed(0)}</td>`;
 
-        // 实际比例
+        // 占总市值%
         tableHTML += `<td>${(ad.actualPct * 100).toFixed(1)}%</td>`;
 
-        // 偏离度
-        const devPct = ad.deviation * 100;
+        // 偏离目标市值
+        const devPct = (ad.deviationFromTarget || 0) * 100;
         tableHTML += `<td class="${Math.abs(devPct) > 5 ? 'action-sell' : ''}">${devPct >= 0 ? '+' : ''}${devPct.toFixed(1)}%</td>`;
 
         // 操作

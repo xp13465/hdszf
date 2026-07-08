@@ -217,67 +217,67 @@ const RollingBacktest = (() => {
       
       if (isBuildPhase) {
         for (const asset of ASSETS) {
-          if (asset === CASH_ASSET) continue; // 现金不需要建仓
+          if (asset === CASH_ASSET) continue; // 现金不需要建仓，保持在现金余额中
           
+          // 恒定市值法建仓：每月目标 = 最终目标市值 × 建仓进度
           const currentTarget = targetValues[asset] * buildFraction;
           const currentHolding = holdings[asset];
-          const deviation = currentTarget - currentHolding;
+          const diff = currentTarget - currentHolding;
           
-          if (Math.abs(deviation) > 1) { // 偏差超过1元才操作
-            const fee = Math.abs(deviation) * CONFIG.feeRate;
-            const actualInvest = deviation > 0 ? deviation : deviation;
+          if (Math.abs(diff) > 1) {
+            const fee = Math.abs(diff) * CONFIG.feeRate;
             
-            // 从现金余额扣除
-            if (deviation > 0) {
-              cashBalance -= (deviation + fee);
+            if (diff > 0) {
+              // 买入：从现金余额扣
+              cashBalance -= (diff + fee);
             } else {
-              cashBalance += (Math.abs(deviation) - fee);
+              // 卖出：回款到现金余额
+              cashBalance += (Math.abs(diff) - fee);
             }
             holdings[asset] = currentTarget;
             
             opEntries.push({
               asset,
-              action: deviation > 0 ? '买入建仓' : '卖出调整',
-              amount: Math.abs(deviation),
+              action: diff > 0 ? '买入建仓' : '卖出调整',
+              amount: Math.abs(diff),
               fee,
               holdingAfter: holdings[asset],
-              reason: `建仓期第${t + 1}/${buildMonths}月，目标比例${(allocations[asset] * 100).toFixed(0)}% × ${(buildFraction * 100).toFixed(0)}% = ¥${currentTarget.toFixed(0)}`
+              reason: `建仓期第${t + 1}/${buildMonths}月，目标市值 ¥${targetValues[asset].toFixed(0)} × ${(buildFraction * 100).toFixed(0)}% = ¥${currentTarget.toFixed(0)}`
             });
           }
         }
       }
       
-      // === 第3步：再平衡检查（非建仓期） ===
+      // === 第3步：再平衡检查（恒定市值法） ===
       if (!isBuildPhase) {
         totalValue = Object.values(holdings).reduce((a, b) => a + b, 0) + cashBalance;
         
         for (const asset of ASSETS) {
-          const targetPct = allocations[asset];
-          const actualPct = totalValue > 0 ? holdings[asset] / totalValue : 0;
-          const deviation = actualPct - targetPct;
+          const targetVal = targetValues[asset]; // 恒定市值法：目标市值永远不变！
+          const currentHolding = holdings[asset];
           
-          // 偏离超过 ±5% 触发调仓
-          if (Math.abs(deviation) > threshold) {
-            const targetVal = totalValue * targetPct;
-            const diff = targetVal - holdings[asset];
+          // 偏离 = (当前市值 - 目标市值) / 目标市值，超过 ±5% 触发
+          const deviationFromTarget = targetVal > 0 ? (currentHolding - targetVal) / targetVal : 0;
+          
+          if (Math.abs(deviationFromTarget) > threshold) {
+            const diff = targetVal - currentHolding;
             const fee = Math.abs(diff) * CONFIG.feeRate;
             
             if (asset === CASH_ASSET) {
-              // 现金的调仓：从其他资产来/去其他资产
-              // 简化处理：现金的调整通过现金余额完成
+              // 现金资产：调整通过现金余额
               cashBalance += (diff - fee);
               holdings[asset] = targetVal;
             } else {
-              // 从现金余额扣款或回款到现金余额
               if (diff > 0) {
-                // 需要买入：从现金余额扣
-                const available = Math.min(cashBalance, diff + fee);
+                // 市值低于目标 → 买入补仓
+                const needed = diff + fee;
+                const available = Math.min(cashBalance, needed);
                 if (available > 1) {
                   cashBalance -= available;
                   holdings[asset] += (available - fee);
                 }
               } else {
-                // 需要卖出：回款到现金余额
+                // 市值高于目标 → 卖出获利
                 cashBalance += (Math.abs(diff) - fee);
                 holdings[asset] = targetVal;
               }
@@ -285,12 +285,12 @@ const RollingBacktest = (() => {
             
             opEntries.push({
               asset,
-              action: deviation > 0 ? '卖出（超配）' : '买入（低配）',
+              action: deviationFromTarget > 0 ? '卖出（超目标市值）' : '买入（低于目标市值）',
               amount: Math.abs(diff),
               fee,
               holdingAfter: holdings[asset],
-              deviationBefore: (deviation * 100).toFixed(2) + '%',
-              reason: `实际${(actualPct * 100).toFixed(1)}%偏离目标${(targetPct * 100).toFixed(0)}%超过±5%阈值`
+              deviationBefore: (deviationFromTarget * 100).toFixed(1) + '%',
+              reason: `当前市值 ¥${currentHolding.toFixed(0)} 偏离目标 ¥${targetVal.toFixed(0)} 达 ${(deviationFromTarget * 100).toFixed(1)}%，超过±5%阈值`
             });
           }
         }
@@ -320,18 +320,20 @@ const RollingBacktest = (() => {
       const assetDetails = ASSETS.map(asset => {
         const actualPct = totalValue > 0 ? displayHoldings[asset] / totalValue : 0;
         const targetPct = allocations[asset];
-        const deviation = actualPct - targetPct;
+        const targetVal = targetValues[asset]; // 恒定市值法：固定目标市值
+        const deviationFromTarget = targetVal > 0 ? (displayHoldings[asset] - targetVal) / targetVal : 0;
         const op = opEntries.find(e => e.asset === asset);
         return {
           asset,
           targetPct,
+          targetVal,  // 新增：目标市值
           holdingBefore: holdingsBeforeReturns[asset] + (asset === CASH_ASSET ? cashBalance / (1 + (monthReturns[asset]?.value || monthReturns[asset] || 0)) : 0),
           monthReturn: monthReturns[asset],
           holdingAfter: displayHoldings[asset],
           actualPct,
-          deviation,
-          triggered: Math.abs(deviation) > threshold || (isBuildPhase && asset !== CASH_ASSET),
-          action: op ? op.action : (isBuildPhase && asset !== CASH_ASSET ? '买入建仓' : '无操作'),
+          deviationFromTarget,  // 改为：偏离目标市值的百分比
+          triggered: op != null,
+          action: op ? op.action : '无操作',
           amount: op ? op.amount : 0,
           fee: op ? op.fee : 0,
           reason: op ? op.reason : ''
