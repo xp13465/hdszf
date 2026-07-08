@@ -9,17 +9,19 @@
   <link rel="stylesheet" href="css/style.css?v=14" id="theme-style">
   <!-- 共用样式：跨主题通用，不随主题切换 -->
   <style>
-    .rolling-summary-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; line-height: 1.6; }
-    .rolling-summary-table thead th { background: var(--color-primary, #1a3555); color: #fff; padding: 0.75rem 0.5rem; text-align: center; font-weight: 600; font-size: 0.78rem; white-space: nowrap; position: sticky; top: 0; z-index: 1; vertical-align: middle; }
-    .rolling-summary-table tbody td { padding: 0.5rem 0.4rem; text-align: center; border-bottom: 1px solid var(--color-border-light, #eee); vertical-align: middle; word-break: break-word; }
+    .rolling-summary-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; line-height: 1.6; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans SC", sans-serif; }
+    .rolling-summary-table *, .rolling-summary-table *::before, .rolling-summary-table *::after { box-sizing: border-box; }
+    .rolling-summary-table thead th { background: var(--color-primary, #1a3555); color: #fff; padding: 0.75rem 0.4rem; text-align: center; font-weight: 600; font-size: 0.78rem; white-space: nowrap; position: sticky; top: 0; z-index: 1; vertical-align: middle; }
+    .rolling-summary-table tbody td { padding: 0.5rem 0.4rem; text-align: center; border-bottom: 1px solid var(--color-border-light, #eee); vertical-align: middle; font-size: 0.85rem; line-height: 1.4; white-space: nowrap; }
+    .rolling-summary-table tbody td.cell-start { white-space: normal; }
     .rolling-summary-table tbody tr { transition: background 0.2s; }
     .rolling-summary-table tbody tr:hover { background: var(--color-bg-hover, rgba(0,0,0,0.03)); }
-    .rolling-summary-table .cell-start { text-align: left; min-width: 110px; }
+    .rolling-summary-table .cell-start { text-align: left; min-width: 105px; }
     .rolling-summary-table .cell-positive { color: var(--color-rise, #c53030); font-weight: 600; }
     .rolling-summary-table .cell-negative { color: var(--color-fall, #1a7d3a); font-weight: 600; }
     .rolling-summary-table .cell-estimated { color: var(--color-warning, #d69e2e); }
     .rolling-summary-table .cell-all-real { color: var(--color-success, #2d8a6e); }
-    .rolling-summary-table .btn-detail { background: var(--color-primary, #1a3555); color: #fff; border: none; padding: 0.4rem 0.8rem; border-radius: 4px; cursor: pointer; font-size: 0.78rem; transition: all 0.2s; white-space: nowrap; }
+    .rolling-summary-table .btn-detail { background: var(--color-primary, #1a3555); color: #fff; border: none; padding: 0.35rem 0.7rem; border-radius: 4px; cursor: pointer; font-size: 0.76rem; transition: all 0.2s; white-space: nowrap; }
     .rolling-summary-table .btn-detail:hover { background: var(--color-primary-dark, #0f1f33); transform: translateY(-1px); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>

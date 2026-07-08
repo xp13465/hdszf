@@ -491,7 +491,7 @@
       const buildStr = buildMonths === 1
         ? `${r.totalMonths}个月 · <span style="display:inline-block;background:#c53030;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">⚡一次建仓</span>`
         : (r.startPoint.isComparison
-          ? `${r.totalMonths}个月 · <span style="display:inline-block;background:#e8890c;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">🔶分批建仓(${buildMonths}次) · 同起点对比</span>`
+          ? `${r.totalMonths}个月 · <span style="display:inline-block;background:#e8890c;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">🔶分批建仓(${buildMonths}次)</span>`
           : `${r.totalMonths}个月 · <span style="display:inline-block;background:#5a9fd4;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;">📅分批建仓(${buildMonths}次)</span>`);
       
       return `
