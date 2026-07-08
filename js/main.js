@@ -347,6 +347,8 @@
   function initThemeSwitcher() {
     const styleLink = document.getElementById('theme-style');
     const buttons = document.querySelectorAll('.theme-btn');
+    const toggleBtn = document.getElementById('theme-toggle-btn');
+    const optionsPanel = document.getElementById('theme-options');
 
     const themeMap = {
       business: 'css/style.css?v=14',
@@ -364,11 +366,29 @@
 
     setTheme(initialTheme, false);
 
+    // Toggle 按钮：点击展开/收起主题选项
+    if (toggleBtn && optionsPanel) {
+      toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        optionsPanel.classList.toggle('open');
+      });
+      // 点击其他地方关闭
+      document.addEventListener('click', () => {
+        optionsPanel.classList.remove('open');
+      });
+      optionsPanel.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    }
+
     buttons.forEach(btn => {
       btn.addEventListener('click', () => {
         const theme = btn.dataset.theme;
         setTheme(theme, true);
         localStorage.setItem('investment-advisor-theme', theme);
+        if (optionsPanel) optionsPanel.classList.remove('open');
+        // 更新 toggle 按钮图标为当前主题
+        if (toggleBtn) toggleBtn.textContent = btn.textContent;
       });
     });
 
@@ -470,7 +490,9 @@
       const periodStr = `${startLabel} → ${endLabel}`;
       const buildStr = buildMonths === 1
         ? `${r.totalMonths}个月 · <span style="display:inline-block;background:#c53030;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">⚡一次建仓</span>`
-        : `${r.totalMonths}个月 · <span style="display:inline-block;background:#5a9fd4;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;">📅分批建仓(${buildMonths}次)</span>`;
+        : (r.startPoint.isComparison
+          ? `${r.totalMonths}个月 · <span style="display:inline-block;background:#e8890c;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">🔶分批建仓(${buildMonths}次) · 同起点对比</span>`
+          : `${r.totalMonths}个月 · <span style="display:inline-block;background:#5a9fd4;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;">📅分批建仓(${buildMonths}次)</span>`);
       
       return `
         <tr>
@@ -511,19 +533,21 @@
       }
 
       const isEarliest = r.startPoint.isEarliest;
-      const depth = isEarliest ? 0 : (r.startPoint.yearsAgo / 10); // 0=最深 1=最浅
+      const isComparison = r.startPoint.isComparison;
+      const depth = (isEarliest || isComparison) ? 0 : (r.startPoint.yearsAgo / 10);
 
       return {
-        name: r.startPoint.label + (r.hasEstimatedData ? ' ⚠️' : ''),
+        name: r.startPoint.label + (r.hasEstimatedData ? ' ⚠️' : '') + (isComparison ? ' 分批' : (isEarliest ? ' 一次' : '')),
         type: 'line',
         data: data,
         smooth: true,
         symbol: 'none',
         lineStyle: {
-          width: isEarliest ? 3 : 1.5,
+          width: isEarliest ? 3 : (isComparison ? 2 : 1.5),
           color: isEarliest
             ? '#c53030'
-            : `hsl(${200 + depth * 30}, ${60 - depth * 20}%, ${45 + depth * 20}%)`
+            : (isComparison ? '#e8890c' : `hsl(${200 + depth * 30}, ${60 - depth * 20}%, ${45 + depth * 20}%)`),
+          type: isComparison ? 'dashed' : 'solid'
         },
         emphasis: { focus: 'series' },
         // 终点打点

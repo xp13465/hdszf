@@ -23,9 +23,12 @@
 
   <!-- ===== 主题切换器 ===== -->
   <div class="theme-switcher" id="theme-switcher">
-    <button class="theme-btn active" data-theme="business" title="简约商务风 — 适合保守投资者">🏦</button>
-    <button class="theme-btn" data-theme="modern" title="清新现代风 — 适合宝妈/白领">🌸</button>
-    <button class="theme-btn" data-theme="tech" title="深色科技风 — 适合技术玩家">🚀</button>
+    <button class="theme-toggle-btn" id="theme-toggle-btn" title="切换主题" aria-label="切换主题">🎨</button>
+    <div class="theme-options" id="theme-options">
+      <button class="theme-btn active" data-theme="business" title="简约商务风 — 适合保守投资者">🏦</button>
+      <button class="theme-btn" data-theme="modern" title="清新现代风 — 适合宝妈/白领">🌸</button>
+      <button class="theme-btn" data-theme="tech" title="深色科技风 — 适合技术玩家">🚀</button>
+    </div>
   </div>
 
   <!-- ===== 导航栏 ===== -->
@@ -56,7 +59,7 @@
         <div class="hero-content fade-in">
           <div class="hero-badge">
             <span class="hero-badge-dot"></span>
-            53,000+组参数扫描 · 11年真实数据验证
+            35,000+条基金净值记录 · 131个月真实数据验证
           </div>
           <h1 class="hero-title">
             恒市值法<br><span>智能资产配置</span>
@@ -104,6 +107,7 @@
             <div class="stat-sub">穿越牛熊的真实回测</div>
           </div>
         </div>
+        <p class="risk-disclaimer" style="font-size:0.68rem;color:var(--color-text-muted);opacity:0.6;text-align:center;margin-top:0.75rem;">* 历史回测不代表未来表现。投资有风险，入市需谨慎。</p>
       </div>
     </div>
   </section>
@@ -202,6 +206,7 @@
       </div>
     </div>
   </section>
+  <p class="risk-disclaimer" style="font-size:0.68rem;color:var(--color-text-muted);opacity:0.6;text-align:center;margin-top:0.25rem;margin-bottom:1rem;">* 历史回测不代表未来表现。投资有风险，入市需谨慎。</p>
 
   <!-- ===== 板块4: 数据选型 ===== -->
   <section id="data-selection" class="section">
@@ -250,6 +255,9 @@
         <div class="section-tag">⭐ 核心功能</div>
         <h2 class="section-title">交互式回测分析</h2>
         <p class="section-subtitle">拖拽滑块调整配置，实时查看回测结果变化。支持锁定对比模式。</p>
+        <div class="backtest-notice" style="background:var(--color-bg);border-left:3px solid var(--color-primary);padding:0.5rem 0.75rem;margin-top:0.5rem;border-radius:0 6px 6px 0;font-size:0.78rem;color:var(--color-text-secondary);">
+          ⚠️ 基于预计算模型插值估算，非逐月真实回测。精确回测结果请查看下方 <a href="#rolling-backtest" style="color:var(--color-primary);font-weight:600;">滚动回测板块</a>
+        </div>
       </div>
 
       <div class="backtest-layout">
@@ -469,7 +477,7 @@
       <div class="section-header fade-in">
         <div class="section-tag">最终方案</div>
         <h2 class="section-title">⭐ 推荐配置：稳健型</h2>
-        <p class="section-subtitle">经过53,000+组参数扫描与11年回测验证的最优配置 · 年化7.60% · 回撤-6.09% · 夏普1.25</p>
+        <p class="section-subtitle">基于35,000+条基金净值记录与131个月回测验证的最优配置 · 年化7.60% · 回撤-6.09% · 夏普1.25</p>
       </div>
 
       <div class="final-grid">
@@ -533,6 +541,7 @@
         </a>
       </div>
     </div>
+    <p class="risk-disclaimer" style="font-size:0.68rem;color:var(--color-text-muted);opacity:0.6;text-align:center;margin-top:0.5rem;">* 历史回测不代表未来表现。投资有风险，入市需谨慎。</p>
   </section>
 
   <!-- ===== Footer ===== -->
@@ -549,11 +558,11 @@
 
   <!-- Scripts -->
   <script src="js/data.js?v=15"></script>
-  <script src="js/engine.js?v=15"></script>
+  <script src="js/engine.js?v=16"></script>
   <script src="js/sliders.js?v=8"></script>
-  <script src="js/charts.js?v=14"></script>
-  <script src="js/rolling.js?v=9"></script>
-  <script src="js/main.js?v=31"></script>
+  <script src="js/charts.js?v=15"></script>
+  <script src="js/rolling.js?v=10"></script>
+  <script src="js/main.js?v=32"></script>
 
 </body>
 

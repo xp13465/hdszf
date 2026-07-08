@@ -157,7 +157,13 @@ const BacktestEngine = (() => {
     const variance = monthlyReturns.reduce((s, r) => s + (r - meanR) ** 2, 0) / (n - 1);
     const annVol = Math.sqrt(variance) * Math.sqrt(12);
     const sharpe = annVol > 0 ? (annual / 100 - 0.02) / annVol : 0;
-    const sortino = sharpe * 1.2;
+    // Sortino: 只对负收益率计算下行标准差
+    const negReturns = monthlyReturns.filter(r => r < 0);
+    const downVariance = negReturns.length > 1
+      ? negReturns.reduce((s, r) => s + r ** 2, 0) / (negReturns.length - 1)
+      : (negReturns.length === 1 ? negReturns[0] ** 2 : 0);
+    const annDownVol = Math.sqrt(Math.max(0, downVariance)) * Math.sqrt(12);
+    const sortino = annDownVol > 0 ? (annual / 100 - 0.02) / annDownVol : 0;
 
     return {
       annual, maxDd, sharpe: Math.max(0, Math.min(sharpe, 10)),

@@ -296,6 +296,12 @@ const ChartManager = (() => {
 
     radarChart.setOption({
       tooltip: {},
+      legend: {
+        data: ['保守型', '稳健型 ★', '进取型'],
+        bottom: 0,
+        textStyle: { fontSize: 11, color: '#666' },
+        itemWidth: 14, itemHeight: 3
+      },
       radar: {
         center: ['50%', '55%'],
         radius: '65%',

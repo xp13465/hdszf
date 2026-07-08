@@ -44,7 +44,7 @@ const RollingBacktest = (() => {
     const [ey, em] = earliestKey.split('-').map(Number);
     const earliestMonthsNeeded = (endDate.getFullYear() - ey) * 12 + (endDate.getMonth() + 1 - em);
     points.push({
-      yearsAgo: null,           // 不适用（超过10年范围）
+      yearsAgo: null,
       label: `${ey}年${em}月`,
       key: earliestKey,
       year: ey,
@@ -53,9 +53,26 @@ const RollingBacktest = (() => {
       monthIdx: 0,
       totalMonthsNeeded: earliestMonthsNeeded,
       dataMonthsAvailable: rr.months.length,
-      isEarliest: true,          // 标记为最早起点（完整数据覆盖）
-      buildMonths: 1,            // 一次建仓：第一个月全仓买入
-      buildLabel: '一次建仓版'   // 版本标签
+      isEarliest: true,
+      buildMonths: 1,
+      buildLabel: '一次建仓版'
+    });
+
+    // 1b. 同起点（2015-08）— 分批建仓版（公平对比）
+    points.push({
+      yearsAgo: null,
+      label: `${ey}年${em}月`,
+      key: earliestKey,
+      year: ey,
+      month: em,
+      inDataRange: true,
+      monthIdx: 0,
+      totalMonthsNeeded: earliestMonthsNeeded,
+      dataMonthsAvailable: rr.months.length,
+      isEarliest: false,
+      isComparison: true,         // 标记为对比版本
+      buildMonths: 12,
+      buildLabel: '分批建仓版'
     });
     
     // 2. 再添加常规起点（10年前 ~ 1年前）
@@ -425,7 +442,13 @@ const RollingBacktest = (() => {
       : 0;
     const annVol = Math.sqrt(Math.max(0, variance)) * Math.sqrt(12);
     const sharpe = annVol > 0 ? (annualReturn / 100 - 0.02) / annVol : 0;
-    const sortino = sharpe * 1.2;
+    // Sortino: 只对负收益率计算下行标准差
+    const negReturns = monthlyReturns.filter(r => r < 0);
+    const downVariance = negReturns.length > 1
+      ? negReturns.reduce((s, r) => s + r ** 2, 0) / (negReturns.length - 1)
+      : (negReturns.length === 1 ? negReturns[0] ** 2 : 0);
+    const annDownVol = Math.sqrt(Math.max(0, downVariance)) * Math.sqrt(12);
+    const sortino = annDownVol > 0 ? (annualReturn / 100 - 0.02) / annDownVol : 0;
     
     // 计算交易次数
     const operationCount = monthlySnapshots.reduce((sum, s) => sum + s.opCount, 0);

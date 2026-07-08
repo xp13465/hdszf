@@ -806,7 +806,7 @@ const APP_DATA = {
   },
   "meta": {
     "generated_from": {
-      "detailed_results": "53,000+ records grid search",
+      "detailed_results": "35,784 fund NAV records from eastmoney",
       "cash20_v2_results": "189 records (cash=20% gold sweep)",
       "all_fund_data": "13 funds daily NAV"
     },
