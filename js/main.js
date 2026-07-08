@@ -636,6 +636,10 @@
           <div class="value ${result.finalValue >= 500000 ? 'green' : 'red'}">¥${RollingBacktest.fmtMoney(result.finalValue)}</div>
         </div>
         <div class="log-summary-item">
+          <div class="label">总收益率</div>
+          <div class="value ${result.totalReturn >= 0 ? 'green' : 'red'}">${RollingBacktest.fmtPct(result.totalReturn)}</div>
+        </div>
+        <div class="log-summary-item">
           <div class="label">年化收益</div>
           <div class="value ${result.annualReturn >= 0 ? 'green' : 'red'}">${result.annualReturn.toFixed(2)}%</div>
         </div>
@@ -664,7 +668,7 @@
     const TARGET_PCTS = RollingBacktest.CONFIG.allocations;
 
     let tableHTML = '<div class="log-table-wrap"><table class="log-table"><thead><tr>';
-    tableHTML += '<th style="cursor:pointer;" id="log-sort-btn" title="点击切换正序/倒序">月份 <span id="log-sort-icon">↓</span></th><th>阶段</th><th>资产</th><th>目标市值</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>占总额%</th><th>偏离目标</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th><th>仓位</th>';
+    tableHTML += '<th style="cursor:pointer;" id="log-sort-btn" title="点击切换正序/倒序">月份 <span id="log-sort-icon">↓</span></th><th>阶段</th><th>资产</th><th>目标市值</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>占总额%</th><th>偏离目标</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th><th>累计收益</th><th>仓位</th>';
     tableHTML += '</tr></thead><tbody>';
 
     // 读取排序偏好（默认正序 = 最旧在上）
@@ -725,6 +729,10 @@
           const mrSnap = snap.monthReturn * 100;
           const mrSnapClass = mrSnap > 0 ? 'action-buy' : (mrSnap < 0 ? 'action-sell' : '');
           tableHTML += `<td rowspan="${rowSpan}" class="${mrSnapClass}" style="font-weight:700;">${mrSnap >= 0 ? '+' : ''}${mrSnap.toFixed(2)}%</td>`;
+          // 累计收益 = (当前总市值 / 初始资金 - 1) × 100%
+          const cumReturn = (snap.totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100;
+          const cumClass = cumReturn >= 0 ? 'action-buy' : 'action-sell';
+          tableHTML += `<td rowspan="${rowSpan}" class="${cumClass}" style="font-weight:600;">${cumReturn >= 0 ? '+' : ''}${cumReturn.toFixed(1)}%</td>`;
           // 仓位占比 = 排除现金后的权益 / 总市值
           const cashHolding = snap.holdings['现金·货币基金'] || 0;
           const positionPct = snap.totalValue > 0 ? ((snap.totalValue - cashHolding) / snap.totalValue * 100) : 0;
@@ -736,7 +744,7 @@
       });
 
       // 每月之间加分隔线
-      tableHTML += '<tr class="month-separator"><td colspan="14" style="padding:0;border:none;height:4px;background:var(--color-bg);"></td></tr>';
+      tableHTML += '<tr class="month-separator"><td colspan="15" style="padding:0;border:none;height:4px;background:var(--color-bg);"></td></tr>';
     }
 
     tableHTML += '</tbody></table></div>';
