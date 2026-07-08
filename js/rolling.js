@@ -427,8 +427,17 @@ const RollingBacktest = (() => {
     const sharpe = annVol > 0 ? (annualReturn / 100 - 0.02) / annVol : 0;
     const sortino = sharpe * 1.2;
     
-    // 计算操作次数（建仓期每月5笔 + 再平衡期触发次数）
+    // 计算交易次数
     const operationCount = monthlySnapshots.reduce((sum, s) => sum + s.opCount, 0);
+    
+    // 计算有交易的月份数（排除现金操作）
+    const activeMonths = monthlySnapshots.filter(s => s.opCount > 0).length;
+
+    // 计算平均仓位（排除现金·货币基金后的持仓占比）
+    const avgPosition = monthlySnapshots.reduce((sum, s) => {
+      const equityValue = s.totalValue - (s.holdings[CASH_ASSET] || 0);
+      return sum + (s.totalValue > 0 ? equityValue / s.totalValue : 0);
+    }, 0) / Math.max(1, monthlySnapshots.length);
     
     return {
       startPoint,
@@ -443,6 +452,8 @@ const RollingBacktest = (() => {
       annVol,
       totalMonths: totalMonthsNeeded,
       operationCount,
+      activeMonths,
+      avgPosition,
       monthlySnapshots,    // 每月完整快照（含全部资产详情）
       hasEstimatedData
     };
