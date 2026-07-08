@@ -1,9 +1,0 @@
-name = "hdszf"
-main = "index.html"
-compatibility_date = "2026-07-08"
-
-[site]
-bucket = "."
-
-[env.production]
-name = "hdszf"
