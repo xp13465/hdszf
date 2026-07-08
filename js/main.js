@@ -484,7 +484,7 @@
           <td>${r.winRate.toFixed(1)}%<br><small style="color:var(--color-text-muted);font-size:0.7rem;">年${r.yearWinRate.toFixed(0)}%</small></td>
           <td>${r.operationCount}次<br><small style="color:var(--color-text-muted);font-size:0.7rem;">${r.activeMonths}个月有交易</small></td>
           <td><span style="font-weight:600;">${(r.finalPosition * 100).toFixed(0)}%</span><br><small style="color:var(--color-text-muted);font-size:0.7rem;">期末仓位</small></td>
-          <td class="${isEstimated ? 'cell-estimated' : 'cell-all-real'}">${isEstimated ? '⚠️含估计值' : '✓ 真实数据'}</td>
+          <td class="${isEstimated ? 'cell-estimated' : 'cell-all-real'}">${isEstimated ? '⚠️含估计值' : '✓ 真实数据<br><small style="color:var(--color-text-muted);font-size:0.65rem;">真实模拟</small>'}</td>
           <td><button class="btn-detail" onclick="window.showRollingLog(${i})">📋 查看操作记录</button></td>
         </tr>
       `;
