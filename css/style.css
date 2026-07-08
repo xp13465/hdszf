@@ -1972,3 +1972,233 @@ input[type="range"]::-webkit-slider-thumb:hover {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+/* ===== 抖音授权弹窗 ===== */
+.auth-modal-overlay {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(6px);
+  z-index: 20000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  animation: authFadeIn 0.25s ease-out;
+}
+@keyframes authFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes authShake {
+  0%, 100% { transform: translateX(0); }
+  20%, 60% { transform: translateX(-8px); }
+  40%, 80% { transform: translateX(8px); }
+}
+.auth-shake {
+  animation: authShake 0.4s ease-in-out;
+}
+
+.auth-modal {
+  position: relative;
+  background: linear-gradient(180deg, #ffffff 0%, #fff8f9 100%);
+  border-radius: 20px;
+  box-shadow: 0 25px 80px rgba(254, 44, 85, 0.25), 0 5px 20px rgba(0, 0, 0, 0.15);
+  width: 420px;
+  max-width: 100%;
+  padding: 2rem 1.75rem 1.5rem;
+  animation: authSlideUp 0.3s ease-out;
+}
+@keyframes authSlideUp {
+  from { transform: translateY(30px) scale(0.95); opacity: 0; }
+  to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.auth-close {
+  position: absolute;
+  top: 12px; right: 12px;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.05);
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #666;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.auth-close:hover {
+  background: rgba(254, 44, 85, 0.1);
+  color: #FE2C55;
+}
+
+/* 抖音名片卡片（图片） */
+.auth-douyin-card {
+  margin: 0 auto 1rem;
+  width: 260px;
+  max-width: 90%;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+.auth-card-img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* 引导文案 */
+.auth-prompt {
+  text-align: center;
+  margin-bottom: 1rem;
+}
+.auth-prompt-icon {
+  font-size: 1.5rem;
+  margin-bottom: 0.4rem;
+}
+.auth-prompt h3 {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+  color: #1a1a2e;
+  font-weight: 700;
+}
+.auth-prompt p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #555;
+  line-height: 1.5;
+}
+.auth-prompt strong {
+  color: #FE2C55;
+  font-weight: 700;
+}
+
+/* 表单 */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+.auth-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e8e8ed;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  transition: all 0.2s;
+  box-sizing: border-box;
+  background: #fafafa;
+}
+.auth-input:focus {
+  outline: none;
+  border-color: #FE2C55;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(254, 44, 85, 0.1);
+}
+.auth-input::placeholder {
+  color: #999;
+}
+.auth-error {
+  background: #fff0f3;
+  color: #c53030;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  border-left: 3px solid #FE2C55;
+  text-align: left;
+}
+.auth-submit {
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #25F4EE 0%, #FE2C55 100%);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(254, 44, 85, 0.3);
+  margin-top: 0.25rem;
+}
+.auth-submit:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(254, 44, 85, 0.4);
+}
+.auth-submit:active {
+  transform: translateY(0);
+}
+.auth-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* 已解锁状态 */
+.auth-unlocked-badge {
+  text-align: center;
+  font-size: 0.85rem;
+  color: #2d8a6e;
+  font-weight: 600;
+  padding: 0.4rem 0;
+}
+.auth-download {
+  padding: 0.75rem 1rem;
+  background: linear-gradient(135deg, #FE2C55 0%, #c53030 100%);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow: 0 4px 12px rgba(254, 44, 85, 0.3);
+}
+.auth-download:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(254, 44, 85, 0.45);
+}
+.auth-download:active {
+  transform: translateY(0);
+}
+
+/* 重置按钮 */
+.auth-reset {
+  padding: 0.4rem 0.5rem;
+  background: none;
+  color: #999;
+  border: none;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: color 0.2s;
+  margin-top: 0.3rem;
+}
+.auth-reset:hover {
+  color: #c53030;
+}
+
+.auth-hint {
+  text-align: center;
+  font-size: 0.75rem;
+  color: #999;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #e8e8ed;
+}
+
+@media (max-width: 480px) {
+  .auth-modal {
+    padding: 1.5rem 1.25rem 1.25rem;
+  }
+  .auth-douyin-card {
+    width: 220px;
+  }
+  .auth-prompt h3 {
+    font-size: 1rem;
+  }
+  .auth-prompt p {
+    font-size: 0.8rem;
+  }
+}

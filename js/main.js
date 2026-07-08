@@ -133,8 +133,7 @@
     const assetClassMap = {
       '510300': 'A股', '160706': 'A股', '512500': 'A股', '160119': 'A股',
       '513650': '美股', '513500': '美股', '096001': '美股', '159659': '美股', '513100': '美股', '270042': '美股',
-      '518660': '黄金', '518880': '黄金',
-      '320013': '现金',
+      '518660': '黄金', '518880': '黄金', '320013': '黄金',
       '510880': 'A股', '511010': '债券'
     };
 
@@ -142,16 +141,30 @@
       '510300': '华泰柏瑞沪深300ETF', '160706': '嘉实沪深300ETF联接', '512500': '华夏中证500ETF', '160119': '南方中证500ETF联接',
       '513650': '南方标普500ETF', '513500': '博时标普500ETF', '096001': '大成标普500等权重', '159659': '招商纳斯达克100ETF', '513100': '国泰纳斯达克100ETF', '270042': '广发纳斯达克100ETF',
       '518660': '工银黄金ETF', '518880': '华安黄金ETF',
-      '320013': '诺安货币基金',
+      '320013': '诺安全球黄金',
       '510880': '华泰柏瑞红利ETF', '511010': '国泰5年国债ETF'
     };
 
+    // 回测用途说明
+    const usageMap = {
+      '510300': '沪深300指数合成', '160706': '沪深300指数合成',
+      '512500': '中证500指数合成', '160119': '中证500指数合成',
+      '513650': '标普500指数合成', '513500': '标普500指数合成', '096001': '标普500指数合成',
+      '159659': '纳斯达克100指数合成', '513100': '纳斯达克100指数合成', '270042': '纳斯达克100指数合成',
+      '518660': '黄金指数合成', '518880': '黄金指数合成', '320013': '黄金指数合成',
+      '510880': '备选评估（未纳入）', '511010': '备选评估（未纳入）'
+    };
+
     const funds = APP_DATA.funds || [];
+    // 回测实际截止日期
+    const actualEndDate = '2026-07';
+
     funds.forEach(fund => {
       const code = fund.code || fund.fund_code || '';
       const assetType = assetClassMap[code] || '其他';
       const tagClass = assetTypeMap[assetType] || 'cash';
       const name = assetNameMap[code] || fund.name || code;
+      const usage = usageMap[code] || '—';
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
@@ -159,8 +172,9 @@
         <td>${name}</td>
         <td><span class="asset-tag ${tagClass}">${assetType}</span></td>
         <td>${fund.date_start || fund.start || '-'}</td>
-        <td>${fund.date_end || fund.end || '-'}</td>
+        <td>${actualEndDate}</td>
         <td>${fund.record_count || fund.records || fund.count || '-'}</td>
+        <td style="font-size:0.8rem;color:var(--color-text-secondary);">${usage}</td>
       `;
       tbody.appendChild(tr);
     });
@@ -444,20 +458,24 @@
       const isEstimated = r.hasEstimatedData;
       const startLabel = r.startPoint.label;
       const yearsAgo = r.startPoint.yearsAgo;
+      const buildMonths = r.startPoint.buildMonths || 12;
       
       // 高亮最佳值
       const annualClass = r.annualReturn === bestAnnual ? 'cell-positive' : (r.annualReturn >= 0 ? 'cell-positive' : 'cell-negative');
       const sharpeClass = r.sharpe === bestSharpe ? 'cell-positive' : '';
       const ddClass = r.maxDrawdown === bestDD ? 'cell-negative' : 'cell-negative';
       
-      // 构建周期字符串
+      // 构建周期字符串 + 建仓方式
       const endLabel = `${RollingBacktest.CONFIG.endYear}年${RollingBacktest.CONFIG.endMonth}月`;
       const periodStr = `${startLabel} → ${endLabel}`;
+      const buildStr = buildMonths === 1
+        ? `${r.totalMonths}个月 · <span style="display:inline-block;background:#c53030;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">⚡一次建仓</span>`
+        : `${r.totalMonths}个月 · <span style="display:inline-block;background:#5a9fd4;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;">📅分批建仓(${buildMonths}次)</span>`;
       
       return `
         <tr>
-          <td class="cell-start">${startLabel}<br><small style="color:var(--color-text-muted)">${yearsAgo}年前入场</small></td>
-          <td>${periodStr}<br><small style="color:var(--color-text-muted)">${r.totalMonths}个月</small></td>
+          <td class="cell-start">${startLabel}<br><small style="color:var(--color-text-muted)">${yearsAgo != null ? yearsAgo + '年前入场' : '数据最早月 · 完整回测'}</small></td>
+          <td>${periodStr}<br><small style="color:var(--color-text-muted)">${buildStr}</small></td>
           <td class="${r.finalValue >= 500000 ? 'cell-positive' : 'cell-negative'}">¥${RollingBacktest.fmtMoney(r.finalValue)}</td>
           <td class="${r.totalReturn >= 0 ? 'cell-positive' : 'cell-negative'}">${RollingBacktest.fmtPct(r.totalReturn)}</td>
           <td class="${annualClass}">${r.annualReturn.toFixed(2)}%</td>
@@ -466,7 +484,7 @@
           <td>${r.winRate.toFixed(1)}%</td>
           <td>${r.operationCount}次</td>
           <td class="${isEstimated ? 'cell-estimated' : 'cell-all-real'}">${isEstimated ? '⚠️含估计值' : '✓真实数据'}</td>
-          <td><button class="btn-detail" onclick="window.showRollingLog(${i})">📋 查看日志</button></td>
+          <td><button class="btn-detail" onclick="window.showRollingLog(${i})">📋 查看操作记录</button></td>
         </tr>
       `;
     }).join('');
@@ -505,7 +523,7 @@
         data: data,
         smooth: true,
         symbol: 'none',
-        lineStyle: { width: r.startPoint.yearsAgo === 10 ? 2.5 : 1.5, color: colors[i] },
+        lineStyle: { width: (r.startPoint.isEarliest || r.startPoint.yearsAgo === 10) ? 2.5 : 1.5, color: colors[i] },
         emphasis: { focus: 'series' }
       };
     });
@@ -579,19 +597,7 @@
       if (e.target === modal) closeModal();
     });
 
-    // 导出CSV
-    exportLogBtn?.addEventListener('click', function() {
-      const idx = parseInt(modal.dataset.logIndex);
-      if (isNaN(idx) || !rollingResults || idx >= rollingResults.length) return;
-      const csv = RollingBacktest.exportLogCSV(rollingResults[idx]);
-      downloadCSV(csv, `恒市值法_操作日志_${rollingResults[idx].startPoint.key}.csv`);
-    });
-
-    exportSummaryBtn?.addEventListener('click', function() {
-      if (!rollingResults) return;
-      const csv = RollingBacktest.exportSummaryCSV(rollingResults);
-      downloadCSV(csv, '恒市值法_滚动回测汇总.csv');
-    });
+    // 导出CSV — 授权拦截逻辑统一在 initAuthGate() 中实现
 
     // ESC关闭
     document.addEventListener('keydown', function(e) {
@@ -609,7 +615,9 @@
     if (!modal || !title || !body) return;
 
     modal.dataset.logIndex = index;
-    title.textContent = `📋 完整持仓日志 — ${result.startPoint.label}入场 · ${result.startPoint.yearsAgo}年前`;
+    const yearsLabel = result.startPoint.yearsAgo != null ? ` · ${result.startPoint.yearsAgo}年前` : ' · 数据最早月（完整回测）';
+    const buildTag = result.startPoint.buildLabel ? ` · ${result.startPoint.buildLabel}` : '';
+    title.textContent = `📋 完整持仓日志 — ${result.startPoint.label}入场${yearsLabel}${buildTag}`;
 
     // 汇总信息
     const summaryHTML = `
@@ -750,5 +758,284 @@
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  }
+
+  // ============================================================
+  //  下载授权弹窗（抖音号引导 · 加密口令）
+  // ============================================================
+
+  // 加密口令（XOR + 十六进制 + Base64 混淆，避免静态明文暴露）
+  const _AK = (() => {
+    const _h = 'NTc1ODQyNDg1ZjVjNWM1NzQ3MzkxYTFiMDMwZTA2';
+    const _k = [100,111,117,121,105,110].map(c => String.fromCharCode(c)).join('');
+    const _hex = atob(_h);
+    let _r = '';
+    for (let i = 0; i < _hex.length; i += 2) {
+      _r += String.fromCharCode(parseInt(_hex.substring(i, i + 2), 16) ^ _k.charCodeAt((i / 2) % _k.length));
+    }
+    return _r;
+  })();
+
+  const AUTH_STORAGE_KEY = 'auth_douyin_unlocked';
+  let authPendingAction = null;     // 待执行动作
+  let authPendingPayload = null;    // 动作参数
+
+  /**
+   * 校验授权码（与加密口令比对）
+   */
+  function verifyAuthCode(input) {
+    return String(input || '').trim() === _AK;
+  }
+
+  /**
+   * 检查是否已解锁（5分钟内有效）
+   */
+  function isAuthUnlocked() {
+    try {
+      const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+      if (!raw) return false;
+      const data = JSON.parse(raw);
+      const now = Date.now();
+      // 5分钟 = 300000ms
+      if (now - data.timestamp > 300000) {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        return false;
+      }
+      return data.status === '1';
+    } catch (e) { return false; }
+  }
+
+  /**
+   * 标记已解锁（记录时间戳）
+   */
+  function markAuthUnlocked() {
+    try {
+      localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify({
+        status: '1',
+        timestamp: Date.now()
+      }));
+    } catch (e) { /* ignore */ }
+  }
+
+  /**
+   * 清除授权
+   */
+  function clearAuth() {
+    try { localStorage.removeItem(AUTH_STORAGE_KEY); } catch (e) {}
+  }
+
+  /**
+   * 切换弹窗 UI：未解锁 ⇄ 已解锁
+   */
+  function setAuthUI(unlocked) {
+    const formInput = document.getElementById('auth-form-input');
+    const formDownload = document.getElementById('auth-form-download');
+    const hintLock = document.getElementById('auth-hint-lock');
+    const hintUnlock = document.getElementById('auth-hint-unlock');
+    const promptTitle = document.getElementById('auth-prompt-title');
+
+    if (unlocked) {
+      if (formInput) formInput.style.display = 'none';
+      if (formDownload) formDownload.style.display = 'flex';
+      if (hintLock) hintLock.style.display = 'none';
+      if (hintUnlock) hintUnlock.style.display = 'block';
+      if (promptTitle) promptTitle.textContent = '已解锁 · 点击下载';
+    } else {
+      if (formInput) formInput.style.display = 'flex';
+      if (formDownload) formDownload.style.display = 'none';
+      if (hintLock) hintLock.style.display = 'block';
+      if (hintUnlock) hintUnlock.style.display = 'none';
+      if (promptTitle) promptTitle.textContent = '解锁下载需要授权码';
+    }
+  }
+
+  /**
+   * 显示授权弹窗（每次点击都弹）
+   */
+  function showAuthModal(action, payload) {
+    authPendingAction = action;
+    authPendingPayload = payload;
+    const modal = document.getElementById('auth-modal');
+    const input = document.getElementById('auth-code-input');
+    const errEl = document.getElementById('auth-error');
+    if (!modal) return;
+
+    const unlocked = isAuthUnlocked();
+    setAuthUI(unlocked);
+    if (!unlocked) {
+      if (input) { input.value = ''; input.classList.remove('auth-shake'); }
+      if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    }
+    modal.style.display = 'flex';
+    setTimeout(() => {
+      if (!unlocked && input) input.focus();
+    }, 100);
+  }
+
+  /**
+   * 关闭授权弹窗
+   */
+  function closeAuthModal() {
+    const modal = document.getElementById('auth-modal');
+    if (modal) modal.style.display = 'none';
+    authPendingAction = null;
+    authPendingPayload = null;
+  }
+
+  /**
+   * 执行待定动作（解锁后或已解锁直接调用）
+   */
+  function executePendingAction() {
+    const action = authPendingAction;
+    const payload = authPendingPayload;
+    closeAuthModal();
+    if (typeof action === 'function') {
+      action(payload);
+    }
+  }
+
+  /**
+   * 处理授权提交
+   */
+  function handleAuthSubmit() {
+    const input = document.getElementById('auth-code-input');
+    const errEl = document.getElementById('auth-error');
+    const submitBtn = document.getElementById('auth-submit');
+    const code = input?.value || '';
+
+    if (!verifyAuthCode(code)) {
+      if (errEl) {
+        errEl.textContent = '❌ 授权码不正确，请关注抖音号后私信领取';
+        errEl.style.display = 'block';
+      }
+      if (input) {
+        input.classList.remove('auth-shake');
+        void input.offsetWidth;
+        input.classList.add('auth-shake');
+      }
+      return;
+    }
+
+    // 校验通过
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.textContent = '✓ 解锁成功';
+    }
+    markAuthUnlocked();
+    setAuthUI(true);
+
+    // 0.6s 后自动关闭
+    setTimeout(() => {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.textContent = '🎁 立即解锁';
+      }
+      // 不自动关闭：让用户点击下载按钮
+    }, 600);
+  }
+
+  /**
+   * 处理已解锁状态下的下载按钮点击
+   */
+  function handleDownloadClick() {
+    executePendingAction();
+  }
+
+  /**
+   * 拦截入口
+   */
+  function gateAction(action, payload) {
+    showAuthModal(action, payload);
+  }
+
+  /**
+   * 编程式触发文件下载
+   */
+  function triggerFileDownload(href, downloadName) {
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = downloadName || '';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
+  /**
+   * 初始化授权拦截
+   */
+  function initAuthGate() {
+    // 1. 绑定弹窗事件
+    const closeBtn = document.getElementById('auth-close');
+    const submitBtn = document.getElementById('auth-submit');
+    const input = document.getElementById('auth-code-input');
+    const modal = document.getElementById('auth-modal');
+    const downloadBtn = document.getElementById('auth-download-btn');
+    const resetBtn = document.getElementById('auth-reset-btn');
+
+    closeBtn?.addEventListener('click', closeAuthModal);
+    submitBtn?.addEventListener('click', handleAuthSubmit);
+    downloadBtn?.addEventListener('click', handleDownloadClick);
+    resetBtn?.addEventListener('click', function() {
+      clearAuth();
+      setAuthUI(false);
+      const inp = document.getElementById('auth-code-input');
+      const errEl = document.getElementById('auth-error');
+      if (inp) { inp.value = ''; inp.focus(); }
+      if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
+    });
+    input?.addEventListener('keypress', function(e) {
+      if (e.key === 'Enter') handleAuthSubmit();
+    });
+    modal?.addEventListener('click', function(e) {
+      if (e.target === modal) closeAuthModal();
+    });
+
+    // 2. 拦截所有 <a download> 链接 — 每次点击都弹窗
+    document.querySelectorAll('a[download]').forEach(a => {
+      const href = a.getAttribute('href');
+      const filename = a.getAttribute('download') || '';
+      a.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (isAuthUnlocked()) {
+          // 已解锁：弹窗但显示下载按钮
+          gateAction(() => triggerFileDownload(href, filename));
+        } else {
+          gateAction(() => triggerFileDownload(href, filename));
+        }
+      });
+    });
+
+    // 3. 拦截日志弹窗 CSV 导出按钮
+    const exportLogBtn = document.getElementById('btn-export-log-csv');
+    const exportSummaryBtn = document.getElementById('btn-export-summary-csv');
+
+    if (exportLogBtn) {
+      exportLogBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        const idx = parseInt(document.getElementById('log-modal')?.dataset?.logIndex, 10);
+        if (isNaN(idx) || !rollingResults || idx >= rollingResults.length) return;
+        gateAction(() => {
+          const csv = RollingBacktest.exportLogCSV(rollingResults[idx]);
+          downloadCSV(csv, `恒市值法_操作日志_${rollingResults[idx].startPoint.key}.csv`);
+        });
+      });
+    }
+    if (exportSummaryBtn) {
+      exportSummaryBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (!rollingResults) return;
+        gateAction(() => {
+          const csv = RollingBacktest.exportSummaryCSV(rollingResults);
+          downloadCSV(csv, '恒市值法_滚动回测汇总.csv');
+        });
+      });
+    }
+  }
+
+  // DOM Ready 后启动
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initAuthGate);
+  } else {
+    initAuthGate();
   }
 })();

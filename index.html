@@ -208,7 +208,7 @@
       <div class="section-header fade-in">
         <div class="section-tag">数据选型</div>
         <h2 class="section-title">基金筛选与数据源</h2>
-        <p class="section-subtitle">覆盖6大资产类别、15只候选基金、11年历史净值数据</p>
+        <p class="section-subtitle">覆盖6大资产类别、15只候选基金、131个月（约11年）历史回测数据</p>
       </div>
 
       <div class="fund-table-wrap fade-in">
@@ -221,6 +221,7 @@
               <th>数据起始</th>
               <th>数据截止</th>
               <th>记录数</th>
+              <th>用途</th>
             </tr>
           </thead>
           <tbody id="fund-table-body">
@@ -232,9 +233,10 @@
       <div class="data-source-card fade-in delay-1">
         <div class="data-source-icon">📡</div>
         <div>
-          <p><strong>数据来源：</strong>天天基金网（eastmoney）净值API + 新浪财经（Sina Finance）前复权K线数据</p>
-          <p style="margin-top:4px;"><strong>时间跨度：</strong>2015年8月 — 2026年7月，共11年完整市场周期，覆盖2015年股灾、2018年熊市、2020年疫情、2022年回调等重大事件</p>
-          <p style="margin-top:4px;"><strong>数据处理：</strong>前复权价格已包含分红再投资，货币基金使用万份收益折算日收益率，多基金同类资产按规模加权合成指数</p>
+          <p><strong>数据来源：</strong>天天基金网（eastmoney）净值API（用于基金筛选）+ 新浪财经（Sina Finance）前复权月度K线数据（用于回测）</p>
+          <p style="margin-top:4px;"><strong>回测时间跨度：</strong>2015年8月 — 2026年7月，共 <strong>131个月</strong>（约11年），覆盖2015年股灾、2018年熊市、2020年疫情、2022年回调等完整市场周期</p>
+          <p style="margin-top:4px;"><strong>数据处理：</strong>前复权价格已包含分红再投资；货币基金使用万份收益折算日收益率；多基金同类资产按规模加权合成指数；QDII ETF 溢价率已做 3%/8% 分档预警</p>
+          <p style="margin-top:4px;"><strong>回测引擎：</strong>滚动回测（10个不同历史起点）+ 一次建仓版（数据最早月全仓买入），恒市值法月度再平衡 ±5% 阈值，交易费率 0.1%</p>
         </div>
       </div>
     </div>
@@ -549,7 +551,59 @@
   <script src="js/engine.js?v=15"></script>
   <script src="js/sliders.js?v=8"></script>
   <script src="js/charts.js?v=14"></script>
-  <script src="js/rolling.js?v=4"></script>
-  <script src="js/main.js?v=12"></script>
+  <script src="js/rolling.js?v=6"></script>
+  <script src="js/main.js?v=23"></script>
+
 </body>
+
+<!-- ===== 抖音授权弹窗 ===== -->
+<div class="auth-modal-overlay" id="auth-modal" style="display:none;">
+  <div class="auth-modal">
+    <button class="auth-close" id="auth-close" aria-label="关闭">✕</button>
+
+    <!-- 抖音名片图（可直接扫描） -->
+    <div class="auth-douyin-card">
+      <img src="images/douyin-card.jpg" alt="抖音名片 - 扫码关注 @sugas" class="auth-card-img" />
+    </div>
+
+    <!-- 文案引导 -->
+    <div class="auth-prompt">
+      <div class="auth-prompt-icon">🔒</div>
+      <h3 id="auth-prompt-title">解锁下载需要授权码</h3>
+      <p>
+        打开抖音扫码关注 <strong style="color:#FE2C55;">377162882</strong>，
+        私信回复 <strong>"授权码"</strong> 即可免费领取
+      </p>
+    </div>
+
+    <!-- 未解锁：输入框 + 解锁按钮 -->
+    <div class="auth-form" id="auth-form-input">
+      <input
+        type="text"
+        id="auth-code-input"
+        class="auth-input"
+        placeholder="请输入授权码"
+        autocomplete="off"
+        maxlength="50"
+      />
+      <div class="auth-error" id="auth-error" style="display:none;"></div>
+      <button class="auth-submit" id="auth-submit">🎁 立即解锁</button>
+    </div>
+
+    <!-- 已解锁：直接下载按钮 -->
+    <div class="auth-form" id="auth-form-download" style="display:none;">
+      <div class="auth-unlocked-badge">✓ 已授权</div>
+      <button class="auth-download" id="auth-download-btn">📥 下载文件</button>
+      <button class="auth-reset" id="auth-reset-btn">🔓 重置授权（测试用）</button>
+    </div>
+
+    <div class="auth-hint" id="auth-hint-lock">
+      💡 授权码一次输入，5分钟内有效，过期需重新授权
+    </div>
+    <div class="auth-hint" id="auth-hint-unlock" style="display:none;">
+      ✅ 已解锁 · 5分钟后自动失效，点击下载按钮即可获取文件
+    </div>
+  </div>
+</div>
+
 </html>

@@ -31,13 +31,34 @@ const RollingBacktest = (() => {
   const CASH_ASSET = '现金·货币基金';
 
   /**
-   * 获取所有回测起点（10年前 ~ 1年前，按月对齐）
-   * 起点列表: 2016-07, 2017-07, 2018-07, ..., 2025-07
+   * 获取所有回测起点（数据最早月 ~ 1年前，按月对齐）
+   * 起点列表: 2015-08 (131个月), 2016-07, 2017-07, ..., 2025-07
    */
   function getStartPoints() {
     const points = [];
+    const rr = APP_DATA.realReturns;
     const endDate = new Date(CONFIG.endYear, CONFIG.endMonth - 1, 1);
     
+    // 1. 先添加数据最早月作为起点（2015-08）— 一次建仓版
+    const earliestKey = rr.months[0]; // "2015-08"
+    const [ey, em] = earliestKey.split('-').map(Number);
+    const earliestMonthsNeeded = (endDate.getFullYear() - ey) * 12 + (endDate.getMonth() + 1 - em);
+    points.push({
+      yearsAgo: null,           // 不适用（超过10年范围）
+      label: `${ey}年${em}月`,
+      key: earliestKey,
+      year: ey,
+      month: em,
+      inDataRange: true,
+      monthIdx: 0,
+      totalMonthsNeeded: earliestMonthsNeeded,
+      dataMonthsAvailable: rr.months.length,
+      isEarliest: true,          // 标记为最早起点（完整数据覆盖）
+      buildMonths: 1,            // 一次建仓：第一个月全仓买入
+      buildLabel: '一次建仓版'   // 版本标签
+    });
+    
+    // 2. 再添加常规起点（10年前 ~ 1年前）
     for (let yearsAgo = 10; yearsAgo >= 1; yearsAgo--) {
       const startDate = new Date(endDate);
       startDate.setFullYear(startDate.getFullYear() - yearsAgo);
@@ -46,12 +67,11 @@ const RollingBacktest = (() => {
       const label = `${y}年${m}月`;
       const key = `${y}-${String(m).padStart(2, '0')}`;
       
-      // 检查这个起点是否在数据范围内
-      const rr = APP_DATA.realReturns;
+      // 跳过与最早起点重复的月份
+      if (key === earliestKey) continue;
+      
       const monthIdx = rr.months.indexOf(key);
       const inDataRange = monthIdx >= 0;
-      
-      // 从起点到终点需要的月数
       const totalMonthsNeeded = (endDate.getFullYear() - y) * 12 + (endDate.getMonth() + 1 - m);
       
       points.push({
@@ -63,8 +83,9 @@ const RollingBacktest = (() => {
         inDataRange,
         monthIdx,
         totalMonthsNeeded,
-        // 数据覆盖的月数（从起点到数据末尾）
-        dataMonthsAvailable: inDataRange ? (rr.months.length - monthIdx) : 0
+        dataMonthsAvailable: inDataRange ? (rr.months.length - monthIdx) : 0,
+        buildMonths: CONFIG.buildMonths,  // 12个月分批建仓
+        buildLabel: '分批建仓版'           // 版本标签
       });
     }
     return points;
@@ -163,7 +184,7 @@ const RollingBacktest = (() => {
     const { year, month, totalMonthsNeeded } = startPoint;
     const allocations = CONFIG.allocations;
     const totalCapital = CONFIG.totalCapital;
-    const buildMonths = CONFIG.buildMonths;
+    const buildMonths = startPoint.buildMonths || CONFIG.buildMonths;
     const threshold = CONFIG.threshold;
     
     // 初始化状态
@@ -216,6 +237,10 @@ const RollingBacktest = (() => {
       const opEntries = [];
       
       if (isBuildPhase) {
+        // 建仓阶段标签：一次建仓 vs 分批建仓
+        const buildPhaseLabel = buildMonths === 1 
+          ? '一次建仓(第1个月全仓买入)' 
+          : `分批建仓(${t + 1}/${buildMonths})`;
         for (const asset of ASSETS) {
           if (asset === CASH_ASSET) continue; // 现金不需要建仓，保持当前市值
           
@@ -247,7 +272,9 @@ const RollingBacktest = (() => {
               amount: Math.abs(diff),
               fee,
               holdingAfter: holdings[asset],
-              reason: `建仓期第${t + 1}/${buildMonths}月，目标市值 ¥${targetValues[asset].toFixed(0)} × ${(buildFraction * 100).toFixed(0)}% = ¥${currentTarget.toFixed(0)}`
+              reason: buildMonths === 1
+                ? `一次建仓：目标市值 ¥${targetValues[asset].toFixed(0)}，一次性买入到位`
+                : `分批建仓第${t + 1}/${buildMonths}月，目标市值 ¥${targetValues[asset].toFixed(0)} × ${(buildFraction * 100).toFixed(0)}% = ¥${currentTarget.toFixed(0)}`
             });
           }
         }
@@ -346,7 +373,9 @@ const RollingBacktest = (() => {
       const snapshot = {
         month: monthKey,
         monthIndex: t + 1,
-        phase: isBuildPhase ? `建仓期(${t + 1}/${buildMonths})` : '再平衡期',
+        phase: isBuildPhase 
+          ? (buildMonths === 1 ? '一次建仓' : `分批建仓(${t + 1}/${buildMonths})`)
+          : '再平衡期',
         holdings: { ...holdings },
         totalValue,
         drawdown: dd,
