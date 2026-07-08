@@ -433,11 +433,10 @@ const RollingBacktest = (() => {
     // 计算有交易的月份数（排除现金操作）
     const activeMonths = monthlySnapshots.filter(s => s.opCount > 0).length;
 
-    // 计算平均仓位（排除现金·货币基金后的持仓占比）
-    const avgPosition = monthlySnapshots.reduce((sum, s) => {
-      const equityValue = s.totalValue - (s.holdings[CASH_ASSET] || 0);
-      return sum + (s.totalValue > 0 ? equityValue / s.totalValue : 0);
-    }, 0) / Math.max(1, monthlySnapshots.length);
+    // 计算期末仓位（排除现金·货币基金后的权益占比）
+    const lastSnap = monthlySnapshots[monthlySnapshots.length - 1];
+    const finalEquity = lastSnap.totalValue - (lastSnap.holdings[CASH_ASSET] || 0);
+    const finalPosition = lastSnap.totalValue > 0 ? finalEquity / lastSnap.totalValue : 0;
     
     return {
       startPoint,
@@ -453,7 +452,7 @@ const RollingBacktest = (() => {
       totalMonths: totalMonthsNeeded,
       operationCount,
       activeMonths,
-      avgPosition,
+      finalPosition,
       monthlySnapshots,    // 每月完整快照（含全部资产详情）
       hasEstimatedData
     };

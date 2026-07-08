@@ -482,9 +482,9 @@
           <td class="${ddClass}">${r.maxDrawdown.toFixed(2)}%</td>
           <td class="${sharpeClass}">${r.sharpe.toFixed(4)}</td>
           <td>${r.winRate.toFixed(1)}%<br><small style="color:var(--color-text-muted);font-size:0.7rem;">年${r.yearWinRate.toFixed(0)}%</small></td>
-          <td>${r.operationCount}次<br><small style="color:var(--color-text-muted);font-size:0.7rem;">${r.activeMonths}月交易</small></td>
-          <td><span style="font-weight:600;">${(r.avgPosition * 100).toFixed(0)}%</span><br><small style="color:var(--color-text-muted);font-size:0.7rem;">平均仓位</small></td>
-          <td class="${isEstimated ? 'cell-estimated' : 'cell-all-real'}">${isEstimated ? '⚠️含估计值' : '<span style="color:#2d8a6e;">✓</span> 真实'}${!isEstimated ? '<br><small style="color:var(--color-text-muted);font-size:0.65rem;">131月·11年</small>' : ''}</td>
+          <td>${r.operationCount}次<br><small style="color:var(--color-text-muted);font-size:0.7rem;">${r.activeMonths}个月有交易</small></td>
+          <td><span style="font-weight:600;">${(r.finalPosition * 100).toFixed(0)}%</span><br><small style="color:var(--color-text-muted);font-size:0.7rem;">期末仓位</small></td>
+          <td class="${isEstimated ? 'cell-estimated' : 'cell-all-real'}">${isEstimated ? '⚠️含估计值' : '✓ 真实数据'}</td>
           <td><button class="btn-detail" onclick="window.showRollingLog(${i})">📋 查看操作记录</button></td>
         </tr>
       `;
@@ -664,7 +664,7 @@
     const TARGET_PCTS = RollingBacktest.CONFIG.allocations;
 
     let tableHTML = '<div class="log-table-wrap"><table class="log-table"><thead><tr>';
-    tableHTML += '<th>月份</th><th>阶段</th><th>资产</th><th>目标市值</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>占总额%</th><th>偏离目标</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th>';
+    tableHTML += '<th>月份</th><th>阶段</th><th>资产</th><th>目标市值</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>占总额%</th><th>偏离目标</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th><th>仓位</th>';
     tableHTML += '</tr></thead><tbody>';
 
     for (const snap of result.monthlySnapshots) {
@@ -721,13 +721,18 @@
           const mrSnap = snap.monthReturn * 100;
           const mrSnapClass = mrSnap > 0 ? 'action-buy' : (mrSnap < 0 ? 'action-sell' : '');
           tableHTML += `<td rowspan="${rowSpan}" class="${mrSnapClass}" style="font-weight:700;">${mrSnap >= 0 ? '+' : ''}${mrSnap.toFixed(2)}%</td>`;
+          // 仓位占比 = 排除现金后的权益 / 总市值
+          const cashHolding = snap.holdings['现金·货币基金'] || 0;
+          const positionPct = snap.totalValue > 0 ? ((snap.totalValue - cashHolding) / snap.totalValue * 100) : 0;
+          const posClass = positionPct >= 75 ? 'action-buy' : (positionPct < 50 ? 'action-sell' : '');
+          tableHTML += `<td rowspan="${rowSpan}" class="${posClass}" style="font-weight:600;">${positionPct.toFixed(0)}%</td>`;
         }
 
         tableHTML += '</tr>';
       });
 
       // 每月之间加分隔线
-      tableHTML += '<tr class="month-separator"><td colspan="13" style="padding:0;border:none;height:4px;background:var(--color-bg);"></td></tr>';
+      tableHTML += '<tr class="month-separator"><td colspan="14" style="padding:0;border:none;height:4px;background:var(--color-bg);"></td></tr>';
     }
 
     tableHTML += '</tbody></table></div>';
