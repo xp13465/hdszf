@@ -300,6 +300,9 @@
 
     // 主题切换
     initThemeSwitcher();
+
+    // 滚动回测
+    initRollingBacktest();
   }
 
   // --- 移动端滑块折叠 ---
@@ -401,5 +404,299 @@
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
+  }
+
+  // ============================================================
+  //  滚动回测模块
+  // ============================================================
+
+  let rollingResults = null;
+  let rollingCharts = {};
+
+  function initRollingBacktest() {
+    // 异步运行回测（避免阻塞UI）
+    setTimeout(() => {
+      try {
+        rollingResults = RollingBacktest.runAll();
+        renderRollingSummary(rollingResults);
+        renderRollingEquityChart(rollingResults);
+        initLogModal();
+      } catch (e) {
+        console.error('滚动回测运行失败:', e);
+        const tbody = document.getElementById('rolling-summary-body');
+        if (tbody) {
+          tbody.innerHTML = `<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--color-danger);">❌ 回测运行失败: ${e.message}</td></tr>`;
+        }
+      }
+    }, 200);
+  }
+
+  function renderRollingSummary(results) {
+    const tbody = document.getElementById('rolling-summary-body');
+    if (!tbody || !results || results.length === 0) return;
+
+    // 找最佳值用于高亮
+    const bestAnnual = Math.max(...results.map(r => r.annualReturn));
+    const bestSharpe = Math.max(...results.map(r => r.sharpe));
+    const bestDD = Math.max(...results.map(r => r.maxDrawdown)); // 最大回撤（最不负面）
+
+    tbody.innerHTML = results.map((r, i) => {
+      const isEstimated = r.hasEstimatedData;
+      const startLabel = r.startPoint.label;
+      const yearsAgo = r.startPoint.yearsAgo;
+      
+      // 高亮最佳值
+      const annualClass = r.annualReturn === bestAnnual ? 'cell-positive' : (r.annualReturn >= 0 ? 'cell-positive' : 'cell-negative');
+      const sharpeClass = r.sharpe === bestSharpe ? 'cell-positive' : '';
+      const ddClass = r.maxDrawdown === bestDD ? 'cell-negative' : 'cell-negative';
+      
+      // 构建周期字符串
+      const endLabel = `${RollingBacktest.CONFIG.endYear}年${RollingBacktest.CONFIG.endMonth}月`;
+      const periodStr = `${startLabel} → ${endLabel}`;
+      
+      return `
+        <tr>
+          <td class="cell-start">${startLabel}<br><small style="color:var(--color-text-muted)">${yearsAgo}年前入场</small></td>
+          <td>${periodStr}<br><small style="color:var(--color-text-muted)">${r.totalMonths}个月</small></td>
+          <td class="${r.finalValue >= 500000 ? 'cell-positive' : 'cell-negative'}">¥${RollingBacktest.fmtMoney(r.finalValue)}</td>
+          <td class="${r.totalReturn >= 0 ? 'cell-positive' : 'cell-negative'}">${RollingBacktest.fmtPct(r.totalReturn)}</td>
+          <td class="${annualClass}">${r.annualReturn.toFixed(2)}%</td>
+          <td class="${ddClass}">${r.maxDrawdown.toFixed(2)}%</td>
+          <td class="${sharpeClass}">${r.sharpe.toFixed(4)}</td>
+          <td>${r.winRate.toFixed(1)}%</td>
+          <td>${r.operationCount}次</td>
+          <td class="${isEstimated ? 'cell-estimated' : 'cell-all-real'}">${isEstimated ? '⚠️含估计值' : '✓真实数据'}</td>
+          <td><button class="btn-detail" onclick="window.showRollingLog(${i})">📋 查看日志</button></td>
+        </tr>
+      `;
+    }).join('');
+  }
+
+  function renderRollingEquityChart(results) {
+    const dom = document.getElementById('chart-rolling-equity');
+    if (!dom || !results || results.length === 0) return;
+
+    // 销毁旧图表
+    if (rollingCharts.equity) {
+      rollingCharts.equity.dispose();
+    }
+
+    const chart = echarts.init(dom);
+    rollingCharts.equity = chart;
+
+    // 颜色映射：从深蓝到浅蓝（10年前→1年前）
+    const colors = [
+      '#0f1f33', '#1a3555', '#1e3a5f', '#2c5f8a', '#3a7bbf',
+      '#5a9fd4', '#7ab8e0', '#9ac8e8', '#b8d8f0', '#d4e8f8'
+    ];
+
+    const series = results.map((r, i) => {
+      // 构建累计收益曲线（归一化为从0开始）
+      const data = [];
+      const snapshots = r.monthlySnapshots;
+      for (let j = 0; j < snapshots.length; j++) {
+        const pct = (snapshots[j].totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100;
+        data.push([j, pct]);
+      }
+
+      return {
+        name: r.startPoint.label + (r.hasEstimatedData ? ' ⚠️' : ''),
+        type: 'line',
+        data: data,
+        smooth: true,
+        symbol: 'none',
+        lineStyle: { width: r.startPoint.yearsAgo === 10 ? 2.5 : 1.5, color: colors[i] },
+        emphasis: { focus: 'series' }
+      };
+    });
+
+    const option = {
+      tooltip: {
+        trigger: 'axis',
+        formatter: function(params) {
+          let html = `<strong>第${params[0].axisValue}个月</strong><br/>`;
+          params.sort((a, b) => b.value[1] - a.value[1]);
+          for (const p of params) {
+            html += `<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};margin-right:6px;"></span>`;
+            html += `${p.seriesName}: <strong>${p.value[1] >= 0 ? '+' : ''}${p.value[1].toFixed(1)}%</strong><br/>`;
+          }
+          return html;
+        }
+      },
+      legend: {
+        type: 'scroll',
+        bottom: 0,
+        textStyle: { fontSize: 11, color: '#5f6368' },
+        pageTextStyle: { color: '#5f6368' }
+      },
+      grid: { left: 55, right: 30, top: 20, bottom: 50 },
+      xAxis: {
+        type: 'value',
+        name: '回测月数',
+        nameTextStyle: { fontSize: 11, color: '#999' },
+        axisLabel: { fontSize: 10, color: '#999' },
+        splitLine: { lineStyle: { color: '#f0f0f0' } }
+      },
+      yAxis: {
+        type: 'value',
+        name: '累计收益率(%)',
+        nameTextStyle: { fontSize: 11, color: '#999' },
+        axisLabel: { fontSize: 10, color: '#999', formatter: '{value}%' },
+        splitLine: { lineStyle: { color: '#f0f0f0' } }
+      },
+      series: series
+    };
+
+    chart.setOption(option);
+
+    // 响应式
+    window.addEventListener('resize', () => {
+      if (rollingCharts.equity) rollingCharts.equity.resize();
+    });
+  }
+
+  function initLogModal() {
+    const modal = document.getElementById('log-modal');
+    const closeBtn = document.getElementById('log-modal-close');
+    const closeBtn2 = document.getElementById('btn-log-modal-close');
+    const exportLogBtn = document.getElementById('btn-export-log-csv');
+    const exportSummaryBtn = document.getElementById('btn-export-summary-csv');
+
+    // 暴露到全局
+    window.showRollingLog = function(index) {
+      if (!rollingResults || index >= rollingResults.length) return;
+      const result = rollingResults[index];
+      showLogDetail(result, index);
+    };
+
+    function closeModal() {
+      modal.style.display = 'none';
+    }
+
+    closeBtn?.addEventListener('click', closeModal);
+    closeBtn2?.addEventListener('click', closeModal);
+    modal?.addEventListener('click', function(e) {
+      if (e.target === modal) closeModal();
+    });
+
+    // 导出CSV
+    exportLogBtn?.addEventListener('click', function() {
+      const idx = parseInt(modal.dataset.logIndex);
+      if (isNaN(idx) || !rollingResults || idx >= rollingResults.length) return;
+      const csv = RollingBacktest.exportLogCSV(rollingResults[idx]);
+      downloadCSV(csv, `恒市值法_操作日志_${rollingResults[idx].startPoint.key}.csv`);
+    });
+
+    exportSummaryBtn?.addEventListener('click', function() {
+      if (!rollingResults) return;
+      const csv = RollingBacktest.exportSummaryCSV(rollingResults);
+      downloadCSV(csv, '恒市值法_滚动回测汇总.csv');
+    });
+
+    // ESC关闭
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape' && modal.style.display !== 'none') {
+        closeModal();
+      }
+    });
+  }
+
+  function showLogDetail(result, index) {
+    const modal = document.getElementById('log-modal');
+    const title = document.getElementById('log-modal-title');
+    const body = document.getElementById('log-modal-body');
+
+    if (!modal || !title || !body) return;
+
+    modal.dataset.logIndex = index;
+    title.textContent = `📋 详细操作日志 — ${result.startPoint.label}入场 · ${result.startPoint.yearsAgo}年前`;
+
+    // 汇总信息
+    const summaryHTML = `
+      <div class="log-summary">
+        <div class="log-summary-item">
+          <div class="label">起点</div>
+          <div class="value accent">${result.startPoint.label}</div>
+        </div>
+        <div class="log-summary-item">
+          <div class="label">回测月数</div>
+          <div class="value">${result.totalMonths}个月</div>
+        </div>
+        <div class="log-summary-item">
+          <div class="label">最终市值</div>
+          <div class="value ${result.finalValue >= 500000 ? 'green' : 'red'}">¥${RollingBacktest.fmtMoney(result.finalValue)}</div>
+        </div>
+        <div class="log-summary-item">
+          <div class="label">年化收益</div>
+          <div class="value ${result.annualReturn >= 0 ? 'green' : 'red'}">${result.annualReturn.toFixed(2)}%</div>
+        </div>
+        <div class="log-summary-item">
+          <div class="label">最大回撤</div>
+          <div class="value red">${result.maxDrawdown.toFixed(2)}%</div>
+        </div>
+        <div class="log-summary-item">
+          <div class="label">总操作次数</div>
+          <div class="value accent">${result.operationCount}次</div>
+        </div>
+        <div class="log-summary-item">
+          <div class="label">数据质量</div>
+          <div class="value ${result.hasEstimatedData ? 'red' : 'green'}">${result.hasEstimatedData ? '⚠️含估计值' : '✓全部真实'}</div>
+        </div>
+      </div>
+    `;
+
+    // 操作日志表格
+    let tableHTML = '<div class="log-table-wrap"><table class="log-table"><thead><tr>';
+    tableHTML += '<th>月份</th><th>阶段</th><th>资产</th><th>操作</th><th>金额(元)</th><th>手续费(元)</th><th>操作后市值(元)</th><th>总市值(元)</th><th>偏离度</th><th>原因</th><th>数据</th>';
+    tableHTML += '</tr></thead><tbody>';
+
+    if (result.operations.length === 0) {
+      tableHTML += `<tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--color-text-muted);">📭 该回测期间无触发调仓操作（偏离均未超过±5%阈值）</td></tr>`;
+    } else {
+      for (const op of result.operations) {
+        const phaseClass = op.phase.includes('建仓') ? 'phase-build' : 'phase-rebalance';
+        const rowSpan = op.entries.length;
+        
+        op.entries.forEach((entry, ei) => {
+          tableHTML += '<tr class="' + phaseClass + '">';
+          if (ei === 0) {
+            tableHTML += `<td rowspan="${rowSpan}"><strong>${op.month}</strong></td>`;
+            tableHTML += `<td rowspan="${rowSpan}">${op.phase}</td>`;
+          }
+          tableHTML += `<td>${entry.asset}</td>`;
+          tableHTML += `<td class="${entry.action.includes('买入') ? 'action-buy' : 'action-sell'}">${entry.action}</td>`;
+          tableHTML += `<td>¥${entry.amount.toFixed(0)}</td>`;
+          tableHTML += `<td>¥${entry.fee.toFixed(2)}</td>`;
+          tableHTML += `<td>¥${entry.holdingAfter.toFixed(0)}</td>`;
+          if (ei === 0) {
+            tableHTML += `<td rowspan="${rowSpan}">¥${op.totalValue.toFixed(0)}</td>`;
+          }
+          tableHTML += `<td>${entry.deviationBefore || '-'}</td>`;
+          tableHTML += `<td style="max-width:200px;white-space:normal;font-size:0.7rem;color:var(--color-text-secondary);">${entry.reason}</td>`;
+          if (ei === 0) {
+            tableHTML += `<td rowspan="${rowSpan}">${op.estimatedMonth ? '<span class="estimated-badge">⚠️估计</span>' : '真实'}</td>`;
+          }
+          tableHTML += '</tr>';
+        });
+      }
+    }
+
+    tableHTML += '</tbody></table></div>';
+
+    body.innerHTML = summaryHTML + tableHTML;
+    modal.style.display = 'flex';
+  }
+
+  function downloadCSV(csvContent, filename) {
+    const BOM = '\uFEFF';
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }
 })();

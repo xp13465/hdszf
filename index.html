@@ -41,6 +41,7 @@
         <li><a href="#backtest">回测分析</a></li>
         <li><a href="#comparison">方案对比</a></li>
         <li><a href="#final-solution">最终方案</a></li>
+        <li><a href="#rolling-backtest">滚动回测</a></li>
       </ul>
       <button class="nav-toggle" aria-label="菜单">
         <span></span><span></span><span></span>
@@ -466,6 +467,70 @@
     </div>
   </section>
 
+  <!-- ===== 板块7: 滚动回测 ===== -->
+  <section id="rolling-backtest" class="section">
+    <div class="container">
+      <div class="section-header fade-in">
+        <div class="section-tag">🔬 深度测试</div>
+        <h2 class="section-title">滚动回测：不同起点入场效果对比</h2>
+        <p class="section-subtitle">使用稳健型配置（15/5/15/20/20/25），初始资金50万，分别从10年前到1年前共10个不同起点入场，验证策略在不同市场环境下的表现</p>
+      </div>
+
+      <!-- 汇总结果表 -->
+      <div class="chart-card fade-in" style="margin-bottom:var(--space-lg);">
+        <div class="chart-title">📊 滚动回测汇总 · 稳健型配置 · 初始资金50万</div>
+        <div style="overflow-x:auto;">
+          <table class="rolling-summary-table" id="rolling-summary-table">
+            <thead>
+              <tr>
+                <th>起点</th>
+                <th>回测周期</th>
+                <th>最终市值</th>
+                <th>总收益率</th>
+                <th>年化收益</th>
+                <th>最大回撤</th>
+                <th>Sharpe</th>
+                <th>月胜率</th>
+                <th>操作次数</th>
+                <th>数据</th>
+                <th>详情</th>
+              </tr>
+            </thead>
+            <tbody id="rolling-summary-body">
+              <tr><td colspan="11" style="text-align:center;padding:2rem;color:var(--color-text-muted);">⏳ 正在运行滚动回测...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 滚动回测可视化图表 -->
+      <div class="charts-row charts-stacked fade-in">
+        <div class="chart-card">
+          <div class="chart-title">📈 不同起点的累计收益曲线对比</div>
+          <div id="chart-rolling-equity" class="chart-container chart-wide"></div>
+        </div>
+      </div>
+
+      <!-- 详细操作日志弹窗 -->
+      <div class="modal-overlay" id="log-modal" style="display:none;">
+        <div class="modal-content log-modal-content">
+          <div class="modal-header">
+            <h3 id="log-modal-title">📋 详细操作日志</h3>
+            <button class="modal-close" id="log-modal-close">✕</button>
+          </div>
+          <div class="modal-body" id="log-modal-body">
+            <!-- 动态填充 -->
+          </div>
+          <div class="modal-footer">
+            <button class="btn btn-outline" id="btn-export-log-csv">📥 导出CSV</button>
+            <button class="btn btn-outline" id="btn-export-summary-csv">📊 导出汇总CSV</button>
+            <button class="btn btn-primary" id="btn-log-modal-close">关闭</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- ===== Footer ===== -->
   <footer class="footer">
     <div class="container">
@@ -483,6 +548,7 @@
   <script src="js/engine.js?v=15"></script>
   <script src="js/sliders.js?v=8"></script>
   <script src="js/charts.js?v=14"></script>
-  <script src="js/main.js?v=8"></script>
+  <script src="js/rolling.js?v=2"></script>
+  <script src="js/main.js?v=10"></script>
 </body>
 </html>
