@@ -28,64 +28,46 @@ const ShareImage = (() => {
   };
 
   /**
-   * 生成站点 URL 的二维码 DataURL
+   * 在 Canvas 上逐个像素绑制二维码
+   * 使用 qrcode-generator 的 getModuleCount/isDark API，完全同步，无异步问题
    */
-  function generateQRCode(url) {
-    try {
-      // qrcode-generator API: typeNumber=0 (auto), errorCorrectionLevel='M'
-      const qr = qrcode(0, 'M');
-      qr.addData(url);
-      qr.make();
-      return qr.createDataURL(6, 0);  // cellSize=6, margin=0
-    } catch (e) {
-      console.error('二维码生成失败:', e);
-      return null;
-    }
-  }
-
-  /**
-   * 在 Canvas 上绘制二维码
-   */
-  function drawQRCode(ctx, x, y, size, url) {
-    const dataUrl = generateQRCode(url);
-    if (!dataUrl) {
-      // 失败时绘制占位
-      ctx.fillStyle = 'rgba(255,255,255,0.2)';
-      ctx.fillRect(x, y, size, size);
-      ctx.fillStyle = COLORS.white;
-      ctx.font = '12px sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText('QR 错误', x + size/2, y + size/2);
-      return;
-    }
-
-    // 用 Image 对象加载 dataURL 并绘制
-    const img = new Image();
-    img.onload = function() {
-      ctx.drawImage(img, x, y, size, size);
-    };
-    img.src = dataUrl;
-    // 同步绘制无法等待 onload，使用 createPattern 的替代方案：直接绘制像素
-    return img;
-  }
-
-  /**
-   * 同步绘制二维码（基于 qrcode.createSvgTag + 转 Canvas）
-   * 实际更稳的做法：直接用 createImgTag 拿到 img 元素，然后 drawImage
-   * 但 createImgTag 是同步返回 dataURL 的
-   */
-  function drawQRSync(ctx, x, y, size, url) {
+  function drawQRPixels(ctx, x, y, size, url) {
     try {
       const qr = qrcode(0, 'M');
       qr.addData(url);
       qr.make();
-      const dataUrl = qr.createDataURL(6, 0);
-      const img = new Image();
-      img.src = dataUrl;
-      // 由于 img 是同步缓存，drawImage 不会等待
-      ctx.drawImage(img, x, y, size, size);
+
+      const moduleCount = qr.getModuleCount();
+      const cellSize = Math.floor(size / moduleCount);
+      const offset = Math.floor((size - cellSize * moduleCount) / 2);
+
+      // 先画白色背景
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x + offset - 2, y + offset - 2, cellSize * moduleCount + 4, cellSize * moduleCount + 4);
+
+      // 逐格绘制暗色模块
+      ctx.fillStyle = '#000000';
+      for (let row = 0; row < moduleCount; row++) {
+        for (let col = 0; col < moduleCount; col++) {
+          if (qr.isDark(row, col)) {
+            ctx.fillRect(
+              x + offset + col * cellSize,
+              y + offset + row * cellSize,
+              cellSize,
+              cellSize
+            );
+          }
+        }
+      }
     } catch (e) {
       console.error('二维码绘制失败:', e);
+      // 绘制错误占位
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x, y, size, size);
+      ctx.fillStyle = '#c53030';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('QR 生成失败', x + size/2, y + size/2 + 6);
     }
   }
 
@@ -160,23 +142,23 @@ const ShareImage = (() => {
   }
 
   /**
-   * 在分享图右下角绘制二维码区
+   * 在分享图上绘制二维码区块（白底卡片 + QR + 说明）
    */
   function drawQRBlock(ctx, x, y, size, url, label) {
-    // 背景卡片
+    // 白色背景卡片
     ctx.fillStyle = 'rgba(255,255,255,0.95)';
-    roundRect(ctx, x - 8, y - 8, size + 16, size + 28, 10);
+    roundRect(ctx, x - 10, y - 10, size + 20, size + 32, 10);
     ctx.fill();
 
     // 绘制二维码
-    drawQRSync(ctx, x, y, size, url);
+    drawQRPixels(ctx, x, y, size, url);
 
     // 文字说明
     if (label) {
       ctx.fillStyle = COLORS.textSecondary;
       ctx.font = '10px -apple-system, "Noto Sans SC", sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(label, x + size/2, y + size + 14);
+      ctx.fillText(label, x + size/2, y + size + 18);
     }
   }
 
@@ -554,14 +536,61 @@ const ShareImage = (() => {
 
   /**
    * 初始化分享按钮
-   * 注意：不在 Hero 区域加按钮（那里空间紧凑，会挤压其他按钮）
-   * 按钮位置：① 下载区（最终方案板块） ② 交互式回测板块
+   * 按钮位置：
+   *   ① 首屏 Hero stat-card 区域末尾（小图标，不挤压布局）
+   *   ② 右下角主题切换浮动按钮旁边
+   *   ③ 最终方案下载区（与下载按钮并排）
+   *   ④ 交互式回测板块指标卡片下方
    */
   function init() {
-    // 1. 在最终方案的「下载完整操作表」区加按钮
+    // ── ① 首屏 Hero 统计卡片区末尾加小分享入口 ──
+    const heroStats = document.querySelector('.hero-stats');
+    if (heroStats) {
+      const shareCard = document.createElement('div');
+      shareCard.className = 'stat-card share-card';
+      shareCard.style.cssText = 'cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;';
+      shareCard.title = '生成宣传海报分享到朋友圈/微博';
+      shareCard.innerHTML = `
+        <div class="stat-label">📸 分享工具</div>
+        <div class="stat-value accent" style="font-size:1.4rem;line-height:2.2;">生成海报</div>
+        <div class="stat-sub">一键分享给朋友</div>
+      `;
+      shareCard.addEventListener('click', () => {
+        const canvas = generateHeroCard();
+        showPreview(canvas, '📸 恒市值法宣传海报');
+      });
+      shareCard.addEventListener('mouseenter', () => {
+        shareCard.style.transform = 'translateY(-2px)';
+        shareCard.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
+      });
+      shareCard.addEventListener('mouseleave', () => {
+        shareCard.style.transform = '';
+        shareCard.style.boxShadow = '';
+      });
+      heroStats.appendChild(shareCard);
+    }
+
+    // ── ② 右下角主题切换浮动按钮旁边加分享按钮 ──
+    const themeSwitcher = document.getElementById('theme-switcher');
+    if (themeSwitcher) {
+      const shareFloatBtn = document.createElement('button');
+      shareFloatBtn.id = 'btn-share-float';
+      shareFloatBtn.className = 'theme-toggle-btn';
+      shareFloatBtn.style.cssText = 'margin-top:8px;';
+      shareFloatBtn.title = '生成分享海报';
+      shareFloatBtn.setAttribute('aria-label', '生成分享图');
+      shareFloatBtn.textContent = '📸';
+      shareFloatBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const canvas = generateHeroCard();
+        showPreview(canvas, '📸 恒市值法宣传海报');
+      });
+      themeSwitcher.appendChild(shareFloatBtn);
+    }
+
+    // ── ③ 最终方案下载区 ──
     const downloadArea = document.querySelector('.download-area');
     if (downloadArea) {
-      // 把单个 .btn-accent 链接包成一个 button-group
       let btnGroup = downloadArea.querySelector('.btn-group');
       if (!btnGroup) {
         btnGroup = document.createElement('div');
@@ -573,14 +602,13 @@ const ShareImage = (() => {
           existingBtn.parentNode.insertBefore(btnGroup, existingBtn);
           btnGroup.appendChild(existingBtn);
         } else {
-          btnGroup.style.justifyContent = 'center';
           downloadArea.appendChild(btnGroup);
         }
       }
 
       const shareBtn = document.createElement('button');
-      shareBtn.id = 'btn-share-hero';
-      shareBtn.className = 'btn btn-outline';
+      shareBtn.id = 'btn-share-download';
+      shareBtn.className = 'btn btn-accent';
       shareBtn.style.cssText = 'font-size:1.0625rem;padding:0.875rem 2rem;';
       shareBtn.textContent = '📸 生成分享图';
       shareBtn.title = '生成宣传海报分享到朋友圈/微博';
@@ -591,7 +619,7 @@ const ShareImage = (() => {
       btnGroup.appendChild(shareBtn);
     }
 
-    // 2. 交互式回测板块：指标卡片下方加分享按钮
+    // ── ④ 交互式回测板块 ──
     const metricsRow = document.querySelector('#backtest .metrics-row');
     if (metricsRow) {
       const shareWrap = document.createElement('div');
