@@ -6,15 +6,7 @@
     "enabled": true
   },
   "assets": {
-    "directory": ".",
-    "headers": {
-      "/css/*": {
-        "Cache-Control": "public, max-age=300"
-      },
-      "/js/*": {
-        "Cache-Control": "public, max-age=300"
-      }
-    }
+    "directory": "."
   },
   "compatibility_flags": [
     "nodejs_compat"
