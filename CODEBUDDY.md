@@ -32,6 +32,7 @@ investment-advisor/
 │   ├── rolling.js          # 滚动回测引擎（逐月真实回测，无前视偏差）✅ 可审计
 │   ├── charts.js           # ECharts 图表（含雷达图三色图例）
 │   ├── sliders.js          # 滑块交互
+│   ├── share-image.js      # 分享图生成（Canvas 绑制，Hero海报 + 回测结果卡）
 │   └── main.js             # 主入口（UI渲染、事件、授权弹窗、主题切换）
 ├── images/
 │   └── douyin-card.jpg     # 抖音名片图（1125×1680，授权弹窗用）

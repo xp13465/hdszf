@@ -317,6 +317,11 @@
 
     // 滚动回测
     initRollingBacktest();
+
+    // 分享图生成按钮
+    if (typeof ShareImage !== 'undefined') {
+      ShareImage.init();
+    }
   }
 
   // --- 移动端滑块折叠 ---
