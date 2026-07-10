@@ -120,14 +120,15 @@ const ShareImage = (() => {
     const barH = 22;
     const barY = y;
 
-    ctx.fillStyle = COLORS.textSecondary;
+    // 资产名称 — 白色，深蓝底上可见
+    ctx.fillStyle = 'rgba(255,255,255,0.85)';
     ctx.font = '14px -apple-system, "Noto Sans SC", sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(name, x, barY + barH / 2 + 5);
 
     const barX = x + 130;
     const barW = w - 200;
-    ctx.fillStyle = '#e8e8ed';
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
     roundRect(ctx, barX, barY + 4, barW, barH - 8, 4);
     ctx.fill();
 
@@ -135,7 +136,8 @@ const ShareImage = (() => {
     roundRect(ctx, barX, barY + 4, Math.max(barW * pct / 100, 4), barH - 8, 4);
     ctx.fill();
 
-    ctx.fillStyle = COLORS.text;
+    // 百分比 — 白色加粗
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
     ctx.font = 'bold 13px -apple-system, "Noto Sans SC", sans-serif';
     ctx.textAlign = 'right';
     ctx.fillText(`${pct}%`, x + w - 5, barY + barH / 2 + 5);
@@ -537,37 +539,24 @@ const ShareImage = (() => {
   /**
    * 初始化分享按钮
    * 按钮位置：
-   *   ① 首屏 Hero stat-card 区域末尾（小图标，不挤压布局）
+   *   ① Hero CTA 区（📥 下载 + 🔍 探索 后面加 📸 分享）
    *   ② 右下角主题切换浮动按钮旁边
    *   ③ 最终方案下载区（与下载按钮并排）
-   *   ④ 交互式回测板块指标卡片下方
    */
   function init() {
-    // ── ① 首屏 Hero 统计卡片区末尾加小分享入口 ──
-    const heroStats = document.querySelector('.hero-stats');
-    if (heroStats) {
-      const shareCard = document.createElement('div');
-      shareCard.className = 'stat-card share-card';
-      shareCard.style.cssText = 'cursor:pointer;transition:transform 0.2s,box-shadow 0.2s;';
-      shareCard.title = '生成宣传海报分享到朋友圈/微博';
-      shareCard.innerHTML = `
-        <div class="stat-label">📸 分享工具</div>
-        <div class="stat-value accent" style="font-size:1.4rem;line-height:2.2;">生成海报</div>
-        <div class="stat-sub">一键分享给朋友</div>
-      `;
-      shareCard.addEventListener('click', () => {
+    // ── ① Hero CTA 区：在下载和探索按钮后面加「📸 分享」按钮 ──
+    const heroActions = document.querySelector('.hero-actions');
+    if (heroActions) {
+      const shareBtn = document.createElement('button');
+      shareBtn.id = 'btn-share-hero';
+      shareBtn.className = 'btn btn-outline';
+      shareBtn.textContent = '📸 分享';
+      shareBtn.title = '生成宣传海报分享到朋友圈/微博';
+      shareBtn.addEventListener('click', () => {
         const canvas = generateHeroCard();
         showPreview(canvas, '📸 恒市值法宣传海报');
       });
-      shareCard.addEventListener('mouseenter', () => {
-        shareCard.style.transform = 'translateY(-2px)';
-        shareCard.style.boxShadow = '0 8px 24px rgba(0,0,0,0.12)';
-      });
-      shareCard.addEventListener('mouseleave', () => {
-        shareCard.style.transform = '';
-        shareCard.style.boxShadow = '';
-      });
-      heroStats.appendChild(shareCard);
+      heroActions.appendChild(shareBtn);
     }
 
     // ── ② 右下角主题切换浮动按钮旁边加分享按钮 ──
@@ -617,27 +606,6 @@ const ShareImage = (() => {
         showPreview(canvas, '📸 恒市值法宣传海报');
       });
       btnGroup.appendChild(shareBtn);
-    }
-
-    // ── ④ 交互式回测板块 ──
-    const metricsRow = document.querySelector('#backtest .metrics-row');
-    if (metricsRow) {
-      const shareWrap = document.createElement('div');
-      shareWrap.style.cssText = 'text-align:right;margin-top:8px;margin-bottom:4px;';
-
-      const shareBtn = document.createElement('button');
-      shareBtn.id = 'btn-share-result';
-      shareBtn.className = 'btn btn-outline';
-      shareBtn.style.cssText = 'font-size:0.85rem;padding:0.45rem 1rem;';
-      shareBtn.textContent = '📸 生成我的回测分享图';
-      shareBtn.title = '将当前回测结果生成为分享图片';
-      shareBtn.addEventListener('click', () => {
-        const canvas = generateResultCard();
-        showPreview(canvas, '📸 我的恒市值法回测结果');
-      });
-      shareWrap.appendChild(shareBtn);
-
-      metricsRow.insertAdjacentElement('afterend', shareWrap);
     }
   }
 

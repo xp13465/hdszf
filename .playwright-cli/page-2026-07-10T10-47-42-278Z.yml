@@ -1,0 +1,940 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - button "切换主题" [ref=f1e3] [cursor=pointer]: 🎨
+    - button "生成分享图" [ref=f1e4] [cursor=pointer]: 📸
+  - navigation [ref=f1e5]:
+    - generic [ref=f1e6]:
+      - link "📊 恒市值助手" [ref=f1e7] [cursor=pointer]:
+        - /url: "#hero"
+        - generic [ref=f1e8]: 📊
+        - generic [ref=f1e9]: 恒市值助手
+      - list [ref=f1e10]:
+        - listitem [ref=f1e11]:
+          - link "方法论" [ref=f1e12] [cursor=pointer]:
+            - /url: "#methodology"
+        - listitem [ref=f1e13]:
+          - link "数据选型" [ref=f1e14] [cursor=pointer]:
+            - /url: "#data-selection"
+        - listitem [ref=f1e15]:
+          - link "回测分析" [ref=f1e16] [cursor=pointer]:
+            - /url: "#backtest"
+        - listitem [ref=f1e17]:
+          - link "方案对比" [ref=f1e18] [cursor=pointer]:
+            - /url: "#comparison"
+        - listitem [ref=f1e19]:
+          - link "最终方案" [ref=f1e20] [cursor=pointer]:
+            - /url: "#final-solution"
+        - listitem [ref=f1e21]:
+          - link "滚动回测" [ref=f1e22] [cursor=pointer]:
+            - /url: "#rolling-backtest"
+  - generic [ref=f1e25]:
+    - generic [ref=f1e26]:
+      - generic [ref=f1e27]: 35,000+条基金净值记录 · 131个月真实数据验证
+      - heading "恒市值法 智能资产配置" [level=1] [ref=f1e29]:
+        - text: 恒市值法
+        - text: 智能资产配置
+      - paragraph [ref=f1e30]: 不盯盘 · 不择时 · 每月5分钟 · 50万变111万
+      - paragraph [ref=f1e31]: 覆盖A股、美股、黄金、现金四大类资产，按表格每月操作一次。 回撤控制在6%以内，近7成月份正收益，睡得着觉的理财方式。
+      - generic [ref=f1e32]:
+        - link "📥 下载稳健型操作表" [ref=f1e33] [cursor=pointer]:
+          - /url: 恒市值法理财操作表（稳健型）.xlsx
+        - button "🔍 开始探索" [ref=f1e34] [cursor=pointer]
+        - button "📸 分享" [active] [ref=f1e35] [cursor=pointer]
+    - generic [ref=f1e36]:
+      - generic [ref=f1e37]:
+        - generic [ref=f1e38]: 💰 50万 → 最终变成
+        - generic [ref=f1e39]: 111.2万
+        - generic [ref=f1e40]: 11年翻倍 · 年化7.6%
+      - generic [ref=f1e41]:
+        - generic [ref=f1e42]: 📅 月胜率 67.9%
+        - generic [ref=f1e43]: 89 / 131月
+        - generic [ref=f1e44]: 10年仅2年亏损 · 最多亏3.7%
+      - generic [ref=f1e45]:
+        - generic [ref=f1e46]: 🛡️ 最大回撤
+        - generic [ref=f1e47]: "-6.1%"
+        - generic [ref=f1e48]: 50万最多浮亏约3万
+      - generic [ref=f1e49]:
+        - generic [ref=f1e50]: 🏦 现金储备比例
+        - generic [ref=f1e51]: 25%
+        - generic [ref=f1e52]: 随时可取 · 睡得着觉
+      - generic [ref=f1e53]:
+        - generic [ref=f1e54]: ⏱️ 每月操作时间
+        - generic [ref=f1e55]: 5分钟
+        - generic [ref=f1e56]: 打开表格看一眼就行
+      - generic [ref=f1e57]:
+        - generic [ref=f1e58]: 📊 实盘验证时长
+        - generic [ref=f1e59]: 11年
+        - generic [ref=f1e60]: 穿越牛熊的真实回测
+    - paragraph [ref=f1e61]: "* 历史回测不代表未来表现。投资有风险，入市需谨慎。"
+  - generic [ref=f1e63]:
+    - generic [ref=f1e64]:
+      - generic [ref=f1e65]: 方法论
+      - heading "恒市值法的核心逻辑" [level=2] [ref=f1e66]
+      - paragraph [ref=f1e67]: 一种纪律严明的资产配置策略，通过定期再平衡实现被动择时
+    - generic [ref=f1e68]:
+      - generic [ref=f1e69]:
+        - generic [ref=f1e70]: ⚖️
+        - heading "恒定目标市值" [level=3] [ref=f1e71]
+        - paragraph [ref=f1e72]:
+          - text: 设定每类资产的
+          - strong [ref=f1e73]: 目标市值
+          - text: （而非目标比例），每月检查偏离度。当某类资产上涨超出阈值，自动卖出获利部分；下跌时则补仓买入，实现"低买高卖"的纪律性操作。
+      - generic [ref=f1e74]:
+        - generic [ref=f1e75]: 🏗️
+        - heading "分批建仓机制" [level=3] [ref=f1e76]
+        - paragraph [ref=f1e77]:
+          - text: 初始资金不一次性投入，而是按
+          - strong [ref=f1e78]: 月度等额
+          - text: 逐步建仓（默认12个月）。避免在极端高点全仓买入，降低择时风险，让成本均匀分布在市场周期中。
+      - generic [ref=f1e79]:
+        - generic [ref=f1e80]: 🎯
+        - heading "再平衡阈值" [level=3] [ref=f1e81]
+        - paragraph [ref=f1e82]:
+          - text: 设置
+          - strong [ref=f1e83]: ±5%偏离阈值
+          - text: ，只有当实际比例与目标比例偏差超过阈值时才触发交易。避免频繁小额调仓，降低交易成本，同时保留足够的灵活性应对市场变化。
+  - generic [ref=f1e85]:
+    - generic [ref=f1e86]:
+      - generic [ref=f1e87]: 🔬 深度测试
+      - heading "滚动回测：不同起点入场效果对比" [level=2] [ref=f1e88]
+      - paragraph [ref=f1e89]: 使用稳健型配置（15/5/15/20/20/25），初始资金50万，分别从10年前到1年前共10个不同起点入场，验证策略在不同市场环境下的表现
+    - generic [ref=f1e90]:
+      - generic [ref=f1e91]: 📊 滚动回测汇总 · 稳健型配置 · 初始资金50万
+      - table [ref=f1e93]:
+        - rowgroup [ref=f1e94]:
+          - row "起点 回测周期 最终市值 总收益率 年化收益 最大回撤 Sharpe 胜率 月/年 交易 次/月 仓位 期末 数据 详情" [ref=f1e95]:
+            - columnheader "起点" [ref=f1e96]
+            - columnheader "回测周期" [ref=f1e97]
+            - columnheader "最终市值" [ref=f1e98]
+            - columnheader "总收益率" [ref=f1e99]
+            - columnheader "年化收益" [ref=f1e100]
+            - columnheader "最大回撤" [ref=f1e101]
+            - columnheader "Sharpe" [ref=f1e102]
+            - columnheader "胜率 月/年" [ref=f1e103]:
+              - text: 胜率
+              - text: 月/年
+            - columnheader "交易 次/月" [ref=f1e104]:
+              - text: 交易
+              - text: 次/月
+            - columnheader "仓位 期末" [ref=f1e105]:
+              - text: 仓位
+              - text: 期末
+            - columnheader "数据" [ref=f1e106]
+            - columnheader "详情" [ref=f1e107]
+        - rowgroup [ref=f1e108]:
+          - row "2015年8月 数据最早月 · 完整回测 2015年8月 → 2026年7月 131个月 · ⚡一次建仓 ¥111.17万 +122.34% 7.59% -6.09% 0.9245 67.9% 年92% 237次 111个月有交易 33% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e650]:
+            - cell "2015年8月 数据最早月 · 完整回测" [ref=f1e651]:
+              - text: 2015年8月
+              - text: 数据最早月 · 完整回测
+            - cell "2015年8月 → 2026年7月 131个月 · ⚡一次建仓" [ref=f1e652]:
+              - text: 2015年8月 → 2026年7月
+              - generic [ref=f1e653]:
+                - text: 131个月 ·
+                - generic [ref=f1e654]: ⚡一次建仓
+            - cell "¥111.17万" [ref=f1e655]
+            - cell "+122.34%" [ref=f1e656]
+            - cell "7.59%" [ref=f1e657]
+            - cell "-6.09%" [ref=f1e658]
+            - cell "0.9245" [ref=f1e659]
+            - cell "67.9% 年92%" [ref=f1e660]:
+              - text: 67.9%
+              - text: 年92%
+            - cell "237次 111个月有交易" [ref=f1e661]:
+              - text: 237次
+              - text: 111个月有交易
+            - cell "33% 期末仓位" [ref=f1e662]:
+              - text: 33%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e663]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e664]:
+              - button "📋 查看操作记录" [ref=f1e665] [cursor=pointer]
+          - row "2015年8月 数据最早月 · 完整回测 2015年8月 → 2026年7月 131个月 · 🔶分批建仓(12次) ¥107.48万 +114.97% 7.26% -6.39% 0.9466 67.9% 年83% 271次 112个月有交易 34% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e666]:
+            - cell "2015年8月 数据最早月 · 完整回测" [ref=f1e667]:
+              - text: 2015年8月
+              - text: 数据最早月 · 完整回测
+            - cell "2015年8月 → 2026年7月 131个月 · 🔶分批建仓(12次)" [ref=f1e668]:
+              - text: 2015年8月 → 2026年7月
+              - generic [ref=f1e669]:
+                - text: 131个月 ·
+                - generic [ref=f1e670]: 🔶分批建仓(12次)
+            - cell "¥107.48万" [ref=f1e671]
+            - cell "+114.97%" [ref=f1e672]
+            - cell "7.26%" [ref=f1e673]
+            - cell "-6.39%" [ref=f1e674]
+            - cell "0.9466" [ref=f1e675]
+            - cell "67.9% 年83%" [ref=f1e676]:
+              - text: 67.9%
+              - text: 年83%
+            - cell "271次 112个月有交易" [ref=f1e677]:
+              - text: 271次
+              - text: 112个月有交易
+            - cell "34% 期末仓位" [ref=f1e678]:
+              - text: 34%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e679]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e680]:
+              - button "📋 查看操作记录" [ref=f1e681] [cursor=pointer]
+          - row "2016年7月 10年前入场 2016年7月 → 2026年7月 120个月 · 📅分批建仓(12次) ¥101.34万 +102.67% 7.32% -6.94% 0.8765 66.7% 年91% 253次 104个月有交易 37% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e682]:
+            - cell "2016年7月 10年前入场" [ref=f1e683]:
+              - text: 2016年7月
+              - text: 10年前入场
+            - cell "2016年7月 → 2026年7月 120个月 · 📅分批建仓(12次)" [ref=f1e684]:
+              - text: 2016年7月 → 2026年7月
+              - generic [ref=f1e685]:
+                - text: 120个月 ·
+                - generic [ref=f1e686]: 📅分批建仓(12次)
+            - cell "¥101.34万" [ref=f1e687]
+            - cell "+102.67%" [ref=f1e688]
+            - cell "7.32%" [ref=f1e689]
+            - cell "-6.94%" [ref=f1e690]
+            - cell "0.8765" [ref=f1e691]
+            - cell "66.7% 年91%" [ref=f1e692]:
+              - text: 66.7%
+              - text: 年91%
+            - cell "253次 104个月有交易" [ref=f1e693]:
+              - text: 253次
+              - text: 104个月有交易
+            - cell "37% 期末仓位" [ref=f1e694]:
+              - text: 37%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e695]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e696]:
+              - button "📋 查看操作记录" [ref=f1e697] [cursor=pointer]
+          - row "2017年7月 9年前入场 2017年7月 → 2026年7月 108个月 · 📅分批建仓(12次) ¥97.86万 +95.73% 7.75% -7.30% 0.8722 65.7% 年90% 239次 93个月有交易 38% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e698]:
+            - cell "2017年7月 9年前入场" [ref=f1e699]:
+              - text: 2017年7月
+              - text: 9年前入场
+            - cell "2017年7月 → 2026年7月 108个月 · 📅分批建仓(12次)" [ref=f1e700]:
+              - text: 2017年7月 → 2026年7月
+              - generic [ref=f1e701]:
+                - text: 108个月 ·
+                - generic [ref=f1e702]: 📅分批建仓(12次)
+            - cell "¥97.86万" [ref=f1e703]
+            - cell "+95.73%" [ref=f1e704]
+            - cell "7.75%" [ref=f1e705]
+            - cell "-7.30%" [ref=f1e706]
+            - cell "0.8722" [ref=f1e707]
+            - cell "65.7% 年90%" [ref=f1e708]:
+              - text: 65.7%
+              - text: 年90%
+            - cell "239次 93个月有交易" [ref=f1e709]:
+              - text: 239次
+              - text: 93个月有交易
+            - cell "38% 期末仓位" [ref=f1e710]:
+              - text: 38%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e711]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e712]:
+              - button "📋 查看操作记录" [ref=f1e713] [cursor=pointer]
+          - row "2018年7月 8年前入场 2018年7月 → 2026年7月 96个月 · 📅分批建仓(12次) ¥95.92万 +91.84% 8.48% -7.51% 1.0065 65.6% 年89% 210次 81个月有交易 39% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e714]:
+            - cell "2018年7月 8年前入场" [ref=f1e715]:
+              - text: 2018年7月
+              - text: 8年前入场
+            - cell "2018年7月 → 2026年7月 96个月 · 📅分批建仓(12次)" [ref=f1e716]:
+              - text: 2018年7月 → 2026年7月
+              - generic [ref=f1e717]:
+                - text: 96个月 ·
+                - generic [ref=f1e718]: 📅分批建仓(12次)
+            - cell "¥95.92万" [ref=f1e719]
+            - cell "+91.84%" [ref=f1e720]
+            - cell "8.48%" [ref=f1e721]
+            - cell "-7.51%" [ref=f1e722]
+            - cell "1.0065" [ref=f1e723]
+            - cell "65.6% 年89%" [ref=f1e724]:
+              - text: 65.6%
+              - text: 年89%
+            - cell "210次 81个月有交易" [ref=f1e725]:
+              - text: 210次
+              - text: 81个月有交易
+            - cell "39% 期末仓位" [ref=f1e726]:
+              - text: 39%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e727]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e728]:
+              - button "📋 查看操作记录" [ref=f1e729] [cursor=pointer]
+          - row "2019年7月 7年前入场 2019年7月 → 2026年7月 84个月 · 📅分批建仓(12次) ¥87.22万 +74.44% 8.27% -8.61% 0.9292 65.5% 年100% 188次 71个月有交易 42% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e730]:
+            - cell "2019年7月 7年前入场" [ref=f1e731]:
+              - text: 2019年7月
+              - text: 7年前入场
+            - cell "2019年7月 → 2026年7月 84个月 · 📅分批建仓(12次)" [ref=f1e732]:
+              - text: 2019年7月 → 2026年7月
+              - generic [ref=f1e733]:
+                - text: 84个月 ·
+                - generic [ref=f1e734]: 📅分批建仓(12次)
+            - cell "¥87.22万" [ref=f1e735]
+            - cell "+74.44%" [ref=f1e736]
+            - cell "8.27%" [ref=f1e737]
+            - cell "-8.61%" [ref=f1e738]
+            - cell "0.9292" [ref=f1e739]
+            - cell "65.5% 年100%" [ref=f1e740]:
+              - text: 65.5%
+              - text: 年100%
+            - cell "188次 71个月有交易" [ref=f1e741]:
+              - text: 188次
+              - text: 71个月有交易
+            - cell "42% 期末仓位" [ref=f1e742]:
+              - text: 42%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e743]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e744]:
+              - button "📋 查看操作记录" [ref=f1e745] [cursor=pointer]
+          - row "2020年7月 6年前入场 2020年7月 → 2026年7月 72个月 · 📅分批建仓(12次) ¥78.49万 +56.98% 7.81% -10.00% 0.9034 62.5% 年86% 165次 59个月有交易 47% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e746]:
+            - cell "2020年7月 6年前入场" [ref=f1e747]:
+              - text: 2020年7月
+              - text: 6年前入场
+            - cell "2020年7月 → 2026年7月 72个月 · 📅分批建仓(12次)" [ref=f1e748]:
+              - text: 2020年7月 → 2026年7月
+              - generic [ref=f1e749]:
+                - text: 72个月 ·
+                - generic [ref=f1e750]: 📅分批建仓(12次)
+            - cell "¥78.49万" [ref=f1e751]
+            - cell "+56.98%" [ref=f1e752]
+            - cell "7.81%" [ref=f1e753]
+            - cell "-10.00%" [ref=f1e754]
+            - cell "0.9034" [ref=f1e755]
+            - cell "62.5% 年86%" [ref=f1e756]:
+              - text: 62.5%
+              - text: 年86%
+            - cell "165次 59个月有交易" [ref=f1e757]:
+              - text: 165次
+              - text: 59个月有交易
+            - cell "47% 期末仓位" [ref=f1e758]:
+              - text: 47%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e759]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e760]:
+              - button "📋 查看操作记录" [ref=f1e761] [cursor=pointer]
+          - row "2021年7月 5年前入场 2021年7月 → 2026年7月 60个月 · 📅分批建仓(12次) ¥77.14万 +54.28% 9.06% -6.76% 1.1147 63.3% 年83% 142次 49个月有交易 48% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e762]:
+            - cell "2021年7月 5年前入场" [ref=f1e763]:
+              - text: 2021年7月
+              - text: 5年前入场
+            - cell "2021年7月 → 2026年7月 60个月 · 📅分批建仓(12次)" [ref=f1e764]:
+              - text: 2021年7月 → 2026年7月
+              - generic [ref=f1e765]:
+                - text: 60个月 ·
+                - generic [ref=f1e766]: 📅分批建仓(12次)
+            - cell "¥77.14万" [ref=f1e767]
+            - cell "+54.28%" [ref=f1e768]
+            - cell "9.06%" [ref=f1e769]
+            - cell "-6.76%" [ref=f1e770]
+            - cell "1.1147" [ref=f1e771]
+            - cell "63.3% 年83%" [ref=f1e772]:
+              - text: 63.3%
+              - text: 年83%
+            - cell "142次 49个月有交易" [ref=f1e773]:
+              - text: 142次
+              - text: 49个月有交易
+            - cell "48% 期末仓位" [ref=f1e774]:
+              - text: 48%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e775]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e776]:
+              - button "📋 查看操作记录" [ref=f1e777] [cursor=pointer]
+          - row "2022年7月 4年前入场 2022年7月 → 2026年7月 48个月 · 📅分批建仓(12次) ¥77.15万 +54.30% 11.45% -4.81% 1.6400 66.7% 年100% 127次 42个月有交易 48% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e778]:
+            - cell "2022年7月 4年前入场" [ref=f1e779]:
+              - text: 2022年7月
+              - text: 4年前入场
+            - cell "2022年7月 → 2026年7月 48个月 · 📅分批建仓(12次)" [ref=f1e780]:
+              - text: 2022年7月 → 2026年7月
+              - generic [ref=f1e781]:
+                - text: 48个月 ·
+                - generic [ref=f1e782]: 📅分批建仓(12次)
+            - cell "¥77.15万" [ref=f1e783]
+            - cell "+54.30%" [ref=f1e784]
+            - cell "11.45%" [ref=f1e785]
+            - cell "-4.81%" [ref=f1e786]
+            - cell "1.6400" [ref=f1e787]
+            - cell "66.7% 年100%" [ref=f1e788]:
+              - text: 66.7%
+              - text: 年100%
+            - cell "127次 42个月有交易" [ref=f1e789]:
+              - text: 127次
+              - text: 42个月有交易
+            - cell "48% 期末仓位" [ref=f1e790]:
+              - text: 48%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e791]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e792]:
+              - button "📋 查看操作记录" [ref=f1e793] [cursor=pointer]
+          - row "2023年7月 3年前入场 2023年7月 → 2026年7月 36个月 · 📅分批建仓(12次) ¥70.73万 +41.46% 12.26% -5.26% 1.6157 63.9% 年100% 106次 32个月有交易 52% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e794]:
+            - cell "2023年7月 3年前入场" [ref=f1e795]:
+              - text: 2023年7月
+              - text: 3年前入场
+            - cell "2023年7月 → 2026年7月 36个月 · 📅分批建仓(12次)" [ref=f1e796]:
+              - text: 2023年7月 → 2026年7月
+              - generic [ref=f1e797]:
+                - text: 36个月 ·
+                - generic [ref=f1e798]: 📅分批建仓(12次)
+            - cell "¥70.73万" [ref=f1e799]
+            - cell "+41.46%" [ref=f1e800]
+            - cell "12.26%" [ref=f1e801]
+            - cell "-5.26%" [ref=f1e802]
+            - cell "1.6157" [ref=f1e803]
+            - cell "63.9% 年100%" [ref=f1e804]:
+              - text: 63.9%
+              - text: 年100%
+            - cell "106次 32个月有交易" [ref=f1e805]:
+              - text: 106次
+              - text: 32个月有交易
+            - cell "52% 期末仓位" [ref=f1e806]:
+              - text: 52%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e807]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e808]:
+              - button "📋 查看操作记录" [ref=f1e809] [cursor=pointer]
+          - row "2024年7月 2年前入场 2024年7月 → 2026年7月 24个月 · 📅分批建仓(12次) ¥62.47万 +24.94% 11.78% -5.98% 1.2483 70.8% 年100% 86次 22个月有交易 59% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e810]:
+            - cell "2024年7月 2年前入场" [ref=f1e811]:
+              - text: 2024年7月
+              - text: 2年前入场
+            - cell "2024年7月 → 2026年7月 24个月 · 📅分批建仓(12次)" [ref=f1e812]:
+              - text: 2024年7月 → 2026年7月
+              - generic [ref=f1e813]:
+                - text: 24个月 ·
+                - generic [ref=f1e814]: 📅分批建仓(12次)
+            - cell "¥62.47万" [ref=f1e815]
+            - cell "+24.94%" [ref=f1e816]
+            - cell "11.78%" [ref=f1e817]
+            - cell "-5.98%" [ref=f1e818]
+            - cell "1.2483" [ref=f1e819]
+            - cell "70.8% 年100%" [ref=f1e820]:
+              - text: 70.8%
+              - text: 年100%
+            - cell "86次 22个月有交易" [ref=f1e821]:
+              - text: 86次
+              - text: 22个月有交易
+            - cell "59% 期末仓位" [ref=f1e822]:
+              - text: 59%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e823]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e824]:
+              - button "📋 查看操作记录" [ref=f1e825] [cursor=pointer]
+          - row "2025年7月 1年前入场 2025年7月 → 2026年7月 12个月 · 📅分批建仓(12次) ¥52.14万 +4.27% 4.27% -4.12% 0.3110 58.3% 年100% 60次 12个月有交易 72% 期末仓位 ✓ 真实数据 真实模拟 📋 查看操作记录" [ref=f1e826]:
+            - cell "2025年7月 1年前入场" [ref=f1e827]:
+              - text: 2025年7月
+              - text: 1年前入场
+            - cell "2025年7月 → 2026年7月 12个月 · 📅分批建仓(12次)" [ref=f1e828]:
+              - text: 2025年7月 → 2026年7月
+              - generic [ref=f1e829]:
+                - text: 12个月 ·
+                - generic [ref=f1e830]: 📅分批建仓(12次)
+            - cell "¥52.14万" [ref=f1e831]
+            - cell "+4.27%" [ref=f1e832]
+            - cell "4.27%" [ref=f1e833]
+            - cell "-4.12%" [ref=f1e834]
+            - cell "0.3110" [ref=f1e835]
+            - cell "58.3% 年100%" [ref=f1e836]:
+              - text: 58.3%
+              - text: 年100%
+            - cell "60次 12个月有交易" [ref=f1e837]:
+              - text: 60次
+              - text: 12个月有交易
+            - cell "72% 期末仓位" [ref=f1e838]:
+              - text: 72%
+              - text: 期末仓位
+            - cell "✓ 真实数据 真实模拟" [ref=f1e839]:
+              - text: ✓ 真实数据
+              - text: 真实模拟
+            - cell "📋 查看操作记录" [ref=f1e840]:
+              - button "📋 查看操作记录" [ref=f1e841] [cursor=pointer]
+    - generic [ref=f1e113]: 📈 不同起点的累计收益曲线对比
+  - paragraph [ref=f1e115]: "* 历史回测不代表未来表现。投资有风险，入市需谨慎。"
+  - generic [ref=f1e117]:
+    - generic [ref=f1e118]:
+      - generic [ref=f1e119]: 数据选型
+      - heading "基金筛选与数据源" [level=2] [ref=f1e120]
+      - paragraph [ref=f1e121]: 覆盖6大资产类别、15只候选基金、131个月（约11年）历史回测数据
+    - table [ref=f1e123]:
+      - rowgroup [ref=f1e124]:
+        - row "基金代码 基金名称 资产类型 数据起始 数据截止 记录数 用途" [ref=f1e125]:
+          - columnheader "基金代码" [ref=f1e126]
+          - columnheader "基金名称" [ref=f1e127]
+          - columnheader "资产类型" [ref=f1e128]
+          - columnheader "数据起始" [ref=f1e129]
+          - columnheader "数据截止" [ref=f1e130]
+          - columnheader "记录数" [ref=f1e131]
+          - columnheader "用途" [ref=f1e132]
+      - rowgroup [ref=f1e133]:
+        - row "160119 南方中证500ETF联接 A股 2009-09-25 2026-07 3945 中证500指数合成" [ref=f1e134]:
+          - cell "160119" [ref=f1e135]:
+            - code [ref=f1e136]: "160119"
+          - cell "南方中证500ETF联接" [ref=f1e137]
+          - cell "A股" [ref=f1e138]:
+            - generic [ref=f1e139]: A股
+          - cell "2009-09-25" [ref=f1e140]
+          - cell "2026-07" [ref=f1e141]
+          - cell "3945" [ref=f1e142]
+          - cell "中证500指数合成" [ref=f1e143]
+        - row "512500 华夏中证500ETF A股 2015-05-05 2026-07 2590 中证500指数合成" [ref=f1e144]:
+          - cell "512500" [ref=f1e145]:
+            - code [ref=f1e146]: "512500"
+          - cell "华夏中证500ETF" [ref=f1e147]
+          - cell "A股" [ref=f1e148]:
+            - generic [ref=f1e149]: A股
+          - cell "2015-05-05" [ref=f1e150]
+          - cell "2026-07" [ref=f1e151]
+          - cell "2590" [ref=f1e152]
+          - cell "中证500指数合成" [ref=f1e153]
+        - row "096001 大成标普500等权重 美股 2011-03-23 2026-07 3532 标普500指数合成" [ref=f1e154]:
+          - cell "096001" [ref=f1e155]:
+            - code [ref=f1e156]: "096001"
+          - cell "大成标普500等权重" [ref=f1e157]
+          - cell "美股" [ref=f1e158]:
+            - generic [ref=f1e159]: 美股
+          - cell "2011-03-23" [ref=f1e160]
+          - cell "2026-07" [ref=f1e161]
+          - cell "3532" [ref=f1e162]
+          - cell "标普500指数合成" [ref=f1e163]
+        - row "513500 博时标普500ETF 美股 2013-12-05 2026-07 2841 标普500指数合成" [ref=f1e164]:
+          - cell "513500" [ref=f1e165]:
+            - code [ref=f1e166]: "513500"
+          - cell "博时标普500ETF" [ref=f1e167]
+          - cell "美股" [ref=f1e168]:
+            - generic [ref=f1e169]: 美股
+          - cell "2013-12-05" [ref=f1e170]
+          - cell "2026-07" [ref=f1e171]
+          - cell "2841" [ref=f1e172]
+          - cell "标普500指数合成" [ref=f1e173]
+        - row "513650 南方标普500ETF 美股 2023-03-23 2026-07 674 标普500指数合成" [ref=f1e174]:
+          - cell "513650" [ref=f1e175]:
+            - code [ref=f1e176]: "513650"
+          - cell "南方标普500ETF" [ref=f1e177]
+          - cell "美股" [ref=f1e178]:
+            - generic [ref=f1e179]: 美股
+          - cell "2023-03-23" [ref=f1e180]
+          - cell "2026-07" [ref=f1e181]
+          - cell "674" [ref=f1e182]
+          - cell "标普500指数合成" [ref=f1e183]
+        - row "160706 嘉实沪深300ETF联接 A股 2009-09-02 2026-07 3980 沪深300指数合成" [ref=f1e184]:
+          - cell "160706" [ref=f1e185]:
+            - code [ref=f1e186]: "160706"
+          - cell "嘉实沪深300ETF联接" [ref=f1e187]
+          - cell "A股" [ref=f1e188]:
+            - generic [ref=f1e189]: A股
+          - cell "2009-09-02" [ref=f1e190]
+          - cell "2026-07" [ref=f1e191]
+          - cell "3980" [ref=f1e192]
+          - cell "沪深300指数合成" [ref=f1e193]
+        - row "510300 华泰柏瑞沪深300ETF A股 2012-05-04 2026-07 3323 沪深300指数合成" [ref=f1e194]:
+          - cell "510300" [ref=f1e195]:
+            - code [ref=f1e196]: "510300"
+          - cell "华泰柏瑞沪深300ETF" [ref=f1e197]
+          - cell "A股" [ref=f1e198]:
+            - generic [ref=f1e199]: A股
+          - cell "2012-05-04" [ref=f1e200]
+          - cell "2026-07" [ref=f1e201]
+          - cell "3323" [ref=f1e202]
+          - cell "沪深300指数合成" [ref=f1e203]
+        - row "159659 招商纳斯达克100ETF 美股 2023-04-12 2026-07 660 纳斯达克100指数合成" [ref=f1e204]:
+          - cell "159659" [ref=f1e205]:
+            - code [ref=f1e206]: "159659"
+          - cell "招商纳斯达克100ETF" [ref=f1e207]
+          - cell "美股" [ref=f1e208]:
+            - generic [ref=f1e209]: 美股
+          - cell "2023-04-12" [ref=f1e210]
+          - cell "2026-07" [ref=f1e211]
+          - cell "660" [ref=f1e212]
+          - cell "纳斯达克100指数合成" [ref=f1e213]
+        - row "270042 广发纳斯达克100ETF 美股 2012-08-15 2026-07 3223 纳斯达克100指数合成" [ref=f1e214]:
+          - cell "270042" [ref=f1e215]:
+            - code [ref=f1e216]: "270042"
+          - cell "广发纳斯达克100ETF" [ref=f1e217]
+          - cell "美股" [ref=f1e218]:
+            - generic [ref=f1e219]: 美股
+          - cell "2012-08-15" [ref=f1e220]
+          - cell "2026-07" [ref=f1e221]
+          - cell "3223" [ref=f1e222]
+          - cell "纳斯达克100指数合成" [ref=f1e223]
+        - row "513100 国泰纳斯达克100ETF 美股 2013-04-25 2026-07 3045 纳斯达克100指数合成" [ref=f1e224]:
+          - cell "513100" [ref=f1e225]:
+            - code [ref=f1e226]: "513100"
+          - cell "国泰纳斯达克100ETF" [ref=f1e227]
+          - cell "美股" [ref=f1e228]:
+            - generic [ref=f1e229]: 美股
+          - cell "2013-04-25" [ref=f1e230]
+          - cell "2026-07" [ref=f1e231]
+          - cell "3045" [ref=f1e232]
+          - cell "纳斯达克100指数合成" [ref=f1e233]
+        - row "320013 诺安全球黄金 黄金 2011-01-13 2026-07 3565 黄金指数合成" [ref=f1e234]:
+          - cell "320013" [ref=f1e235]:
+            - code [ref=f1e236]: "320013"
+          - cell "诺安全球黄金" [ref=f1e237]
+          - cell "黄金" [ref=f1e238]:
+            - generic [ref=f1e239]: 黄金
+          - cell "2011-01-13" [ref=f1e240]
+          - cell "2026-07" [ref=f1e241]
+          - cell "3565" [ref=f1e242]
+          - cell "黄金指数合成" [ref=f1e243]
+        - row "518660 工银黄金ETF 黄金 2020-04-24 2026-07 1369 黄金指数合成" [ref=f1e244]:
+          - cell "518660" [ref=f1e245]:
+            - code [ref=f1e246]: "518660"
+          - cell "工银黄金ETF" [ref=f1e247]
+          - cell "黄金" [ref=f1e248]:
+            - generic [ref=f1e249]: 黄金
+          - cell "2020-04-24" [ref=f1e250]
+          - cell "2026-07" [ref=f1e251]
+          - cell "1369" [ref=f1e252]
+          - cell "黄金指数合成" [ref=f1e253]
+        - row "518880 华安黄金ETF 黄金 2013-07-18 2026-07 3037 黄金指数合成" [ref=f1e254]:
+          - cell "518880" [ref=f1e255]:
+            - code [ref=f1e256]: "518880"
+          - cell "华安黄金ETF" [ref=f1e257]
+          - cell "黄金" [ref=f1e258]:
+            - generic [ref=f1e259]: 黄金
+          - cell "2013-07-18" [ref=f1e260]
+          - cell "2026-07" [ref=f1e261]
+          - cell "3037" [ref=f1e262]
+          - cell "黄金指数合成" [ref=f1e263]
+    - generic [ref=f1e264]:
+      - generic [ref=f1e265]: 📡
+      - generic [ref=f1e266]:
+        - paragraph [ref=f1e267]:
+          - strong [ref=f1e268]: 数据来源：
+          - text: 天天基金网（eastmoney）净值API（用于基金筛选）+ 新浪财经（Sina Finance）前复权月度K线数据（用于回测）
+        - paragraph [ref=f1e269]:
+          - strong [ref=f1e270]: 回测时间跨度：
+          - text: 2015年8月 — 2026年7月，共
+          - strong [ref=f1e271]: 131个月
+          - text: （约11年），覆盖2015年股灾、2018年熊市、2020年疫情、2022年回调等完整市场周期
+        - paragraph [ref=f1e272]:
+          - strong [ref=f1e273]: 数据处理：
+          - text: 前复权价格已包含分红再投资；货币基金使用万份收益折算日收益率；多基金同类资产按规模加权合成指数；QDII ETF 溢价率已做 3%/8% 分档预警
+        - paragraph [ref=f1e274]:
+          - strong [ref=f1e275]: 回测引擎：
+          - text: 滚动回测（10个不同历史起点）+ 一次建仓版（数据最早月全仓买入），恒市值法月度再平衡 ±5% 阈值，交易费率 0.1%
+  - generic [ref=f1e277]:
+    - generic [ref=f1e278]:
+      - generic [ref=f1e279]: ⭐ 核心功能
+      - heading "交互式回测分析" [level=2] [ref=f1e280]
+      - paragraph [ref=f1e281]: 拖拽滑块调整配置，实时查看回测结果变化。支持锁定对比模式。
+      - generic [ref=f1e282]:
+        - text: ⚠️ 基于预计算模型插值估算，非逐月真实回测。精确回测结果请查看下方
+        - link "滚动回测板块" [ref=f1e283] [cursor=pointer]:
+          - /url: "#rolling-backtest"
+    - generic [ref=f1e284]:
+      - generic [ref=f1e285]:
+        - generic [ref=f1e286]:
+          - generic [ref=f1e287]: 🎚️ 资产配置调节
+          - generic [ref=f1e288]: "合计: 100%"
+        - generic [ref=f1e289]:
+          - generic [ref=f1e290]:
+            - generic [ref=f1e291]:
+              - generic [ref=f1e292]: ● 沪深300 （510300｜510310）
+              - generic [ref=f1e293]:
+                - spinbutton [ref=f1e294]: "15"
+                - text: "%"
+            - slider [ref=f1e295] [cursor=pointer]: "15"
+          - generic [ref=f1e296]:
+            - generic [ref=f1e297]:
+              - generic [ref=f1e298]: ● 中证500 （512500｜510500）
+              - generic [ref=f1e299]:
+                - spinbutton [ref=f1e300]: "5"
+                - text: "%"
+            - slider [ref=f1e301] [cursor=pointer]: "5"
+          - generic [ref=f1e302]:
+            - generic [ref=f1e303]:
+              - generic [ref=f1e304]: ● 标普500 （513500｜513650）
+              - generic [ref=f1e305]:
+                - spinbutton [ref=f1e306]: "15"
+                - text: "%"
+            - slider [ref=f1e307] [cursor=pointer]: "15"
+          - generic [ref=f1e308]:
+            - generic [ref=f1e309]:
+              - generic [ref=f1e310]: ● 纳斯达克100 （513100｜159659）
+              - generic [ref=f1e311]:
+                - spinbutton [ref=f1e312]: "20"
+                - text: "%"
+            - slider [ref=f1e313] [cursor=pointer]: "20"
+          - generic [ref=f1e314]:
+            - generic [ref=f1e315]:
+              - generic [ref=f1e316]: ● 黄金 （518880｜518660）
+              - generic [ref=f1e317]:
+                - spinbutton [ref=f1e318]: "20"
+                - text: "%"
+            - slider [ref=f1e319] [cursor=pointer]: "20"
+          - generic [ref=f1e320]:
+            - generic [ref=f1e321]:
+              - generic [ref=f1e322]: ● 现金·货币基金 （余额宝｜逆回购）
+              - generic [ref=f1e323]:
+                - spinbutton [ref=f1e324]: "25"
+                - text: "%"
+            - slider [ref=f1e325] [cursor=pointer]: "25"
+          - generic [ref=f1e326]:
+            - button "↺ 恢复默认" [ref=f1e327] [cursor=pointer]
+            - button "🔒 锁定对比" [ref=f1e328] [cursor=pointer]
+          - generic [ref=f1e329]: 精确匹配
+          - paragraph [ref=f1e330]: 💡 缺额视为未投资（活期0收益），始终恒市值法
+      - generic [ref=f1e331]:
+        - generic [ref=f1e332]:
+          - generic [ref=f1e333]:
+            - generic [ref=f1e334]: 年化收益
+            - generic [ref=f1e335]: 7.60%
+          - generic [ref=f1e336]:
+            - generic [ref=f1e337]: 最大回撤
+            - generic [ref=f1e338]: "-6.09%"
+          - generic [ref=f1e339]:
+            - generic [ref=f1e340]: Sharpe比率
+            - generic [ref=f1e341]: "1.2484"
+          - generic [ref=f1e342]:
+            - generic [ref=f1e343]: 总收益（131个月）
+            - generic [ref=f1e344]: 122.4%
+        - generic [ref=f1e345]:
+          - generic [ref=f1e347]: 📈 累计收益曲线
+          - generic [ref=f1e352]: 📉 回撤曲线
+  - generic [ref=f1e357]:
+    - generic [ref=f1e358]:
+      - generic [ref=f1e359]: 方案对比
+      - heading "三档方案的深度对比" [level=2] [ref=f1e360]
+      - paragraph [ref=f1e361]: 保守型、稳健型（推荐）与进取型的全维度比较
+    - generic [ref=f1e362]:
+      - generic [ref=f1e363]:
+        - generic [ref=f1e364]:
+          - generic [ref=f1e365]: 保守型
+          - heading "🛡️ 保守型" [level=3] [ref=f1e366]
+          - paragraph [ref=f1e367]: A股13% + 美股17% + 黄金20% + 现金50%
+        - generic [ref=f1e368]: 5.60%
+        - generic [ref=f1e369]:
+          - generic [ref=f1e370]:
+            - generic [ref=f1e371]: 沪深300
+            - generic [ref=f1e374]: 10%
+          - generic [ref=f1e375]:
+            - generic [ref=f1e376]: 中证500
+            - generic [ref=f1e379]: 3%
+          - generic [ref=f1e380]:
+            - generic [ref=f1e381]: 标普500
+            - generic [ref=f1e384]: 7%
+          - generic [ref=f1e385]:
+            - generic [ref=f1e386]: 纳斯达克100
+            - generic [ref=f1e389]: 10%
+          - generic [ref=f1e390]:
+            - generic [ref=f1e391]: 黄金
+            - generic [ref=f1e394]: 20%
+          - generic [ref=f1e395]:
+            - generic [ref=f1e396]: 现金·货币基金
+            - generic [ref=f1e399]: 50%
+        - generic [ref=f1e400]:
+          - generic [ref=f1e401]:
+            - generic [ref=f1e402]: 最大回撤
+            - generic [ref=f1e403]: "-3.53%"
+          - generic [ref=f1e404]:
+            - generic [ref=f1e405]: Sharpe比率
+            - generic [ref=f1e406]: "1.4078"
+          - generic [ref=f1e407]:
+            - generic [ref=f1e408]: Sortino比率
+            - generic [ref=f1e409]: "2.0719"
+          - generic [ref=f1e410]:
+            - generic [ref=f1e411]: 总收益
+            - generic [ref=f1e412]: 81.3%
+      - generic [ref=f1e413]:
+        - generic [ref=f1e414]:
+          - generic [ref=f1e415]: ⭐ 推荐方案
+          - heading "🔧 稳健型" [level=3] [ref=f1e416]
+          - paragraph [ref=f1e417]: A股20% + 美股35% + 黄金20% + 现金25%
+        - generic [ref=f1e418]: 7.60%
+        - generic [ref=f1e419]:
+          - generic [ref=f1e420]:
+            - generic [ref=f1e421]: 沪深300
+            - generic [ref=f1e424]: 15%
+          - generic [ref=f1e425]:
+            - generic [ref=f1e426]: 中证500
+            - generic [ref=f1e429]: 5%
+          - generic [ref=f1e430]:
+            - generic [ref=f1e431]: 标普500
+            - generic [ref=f1e434]: 15%
+          - generic [ref=f1e435]:
+            - generic [ref=f1e436]: 纳斯达克100
+            - generic [ref=f1e439]: 20%
+          - generic [ref=f1e440]:
+            - generic [ref=f1e441]: 黄金
+            - generic [ref=f1e444]: 20%
+          - generic [ref=f1e445]:
+            - generic [ref=f1e446]: 现金·货币基金
+            - generic [ref=f1e449]: 25%
+        - generic [ref=f1e450]:
+          - generic [ref=f1e451]:
+            - generic [ref=f1e452]: 最大回撤
+            - generic [ref=f1e453]: "-6.09%"
+          - generic [ref=f1e454]:
+            - generic [ref=f1e455]: Sharpe比率
+            - generic [ref=f1e456]: "1.2484"
+          - generic [ref=f1e457]:
+            - generic [ref=f1e458]: Sortino比率
+            - generic [ref=f1e459]: "1.6565"
+          - generic [ref=f1e460]:
+            - generic [ref=f1e461]: 总收益
+            - generic [ref=f1e462]: 122.4%
+      - generic [ref=f1e463]:
+        - generic [ref=f1e464]:
+          - generic [ref=f1e465]: 进取型
+          - heading "🚀 进取型" [level=3] [ref=f1e466]
+          - paragraph [ref=f1e467]: 美股92% + 黄金8%（无A股/现金）
+        - generic [ref=f1e468]: 11.67%
+        - generic [ref=f1e469]:
+          - generic [ref=f1e470]:
+            - generic [ref=f1e471]: 沪深300
+            - generic [ref=f1e473]: 0%
+          - generic [ref=f1e474]:
+            - generic [ref=f1e475]: 中证500
+            - generic [ref=f1e477]: 0%
+          - generic [ref=f1e478]:
+            - generic [ref=f1e479]: 标普500
+            - generic [ref=f1e482]: 10%
+          - generic [ref=f1e483]:
+            - generic [ref=f1e484]: 纳斯达克100
+            - generic [ref=f1e487]: 82%
+          - generic [ref=f1e488]:
+            - generic [ref=f1e489]: 黄金
+            - generic [ref=f1e492]: 8%
+          - generic [ref=f1e493]:
+            - generic [ref=f1e494]: 现金·货币基金
+            - generic [ref=f1e496]: 0%
+        - generic [ref=f1e497]:
+          - generic [ref=f1e498]:
+            - generic [ref=f1e499]: 最大回撤
+            - generic [ref=f1e500]: "-10.17%"
+          - generic [ref=f1e501]:
+            - generic [ref=f1e502]: Sharpe比率
+            - generic [ref=f1e503]: "1.1834"
+          - generic [ref=f1e504]:
+            - generic [ref=f1e505]: Sortino比率
+            - generic [ref=f1e506]: "1.9573"
+          - generic [ref=f1e507]:
+            - generic [ref=f1e508]: 总收益
+            - generic [ref=f1e509]: 233.7%
+    - generic [ref=f1e510]:
+      - generic [ref=f1e511]: 🎯 三方案多维对比
+      - generic [ref=f1e516]:
+        - generic [ref=f1e518]: 年化收益(%)
+        - generic [ref=f1e526]: 最大回撤(%)
+        - generic [ref=f1e534]: Sharpe比率
+        - generic [ref=f1e542]: 赚钱月占比(%)
+    - generic [ref=f1e549]:
+      - strong [ref=f1e550]: 📊 数据说明：
+      - text: 以上三档方案基于 2015年8月 ~ 2026年7月（131个月）真实市场数据回测。 数据来源为新浪财经前复权K线（已做除权修正），回测采用恒市值法月度再平衡 ±5%阈值策略。 保守型年化 5.60%（回撤 -3.53%）， 稳健型年化 7.60%（回撤 -6.09%）， 进取型年化 11.67%（回撤 -10.17%）。
+    - generic [ref=f1e551]:
+      - strong [ref=f1e552]: 📋 红利ETF与国债ETF评估：
+      - text: 我们对华泰柏瑞红利ETF（510880）和国泰5年国债ETF（511010）进行了独立回测。红利ETF单独年化约4.09%，国债ETF约2.64%。由于恒市值法的超额收益来源于
+      - strong [ref=f1e553]: 高波动资产的再平衡α
+      - text: ，低波动资产（红利/国债）的加入反而稀释了组合的整体收益。结论：
+      - strong [ref=f1e554]: 在现金比例已高达25%的情况下，红利和国债ETF不增加边际价值。
+  - generic [ref=f1e555]:
+    - generic [ref=f1e556]:
+      - generic [ref=f1e557]:
+        - generic [ref=f1e558]: 最终方案
+        - heading "⭐ 推荐配置：稳健型" [level=2] [ref=f1e559]
+        - paragraph [ref=f1e560]: 基于35,000+条基金净值记录与131个月回测验证的最优配置 · 年化7.60% · 回撤-6.09% · 夏普1.25
+      - generic [ref=f1e561]:
+        - generic [ref=f1e562]:
+          - generic [ref=f1e563]: 🍩 资产配置比例
+          - generic [ref=f1e567]:
+            - generic [ref=f1e860]:
+              - generic [ref=f1e862]: 沪深300
+              - generic [ref=f1e863]: 15%
+            - generic [ref=f1e864]:
+              - generic [ref=f1e866]: 中证500
+              - generic [ref=f1e867]: 5%
+            - generic [ref=f1e868]:
+              - generic [ref=f1e870]: 标普500
+              - generic [ref=f1e871]: 15%
+            - generic [ref=f1e872]:
+              - generic [ref=f1e874]: 纳斯达克100
+              - generic [ref=f1e875]: 20%
+            - generic [ref=f1e876]:
+              - generic [ref=f1e878]: 黄金
+              - generic [ref=f1e879]: 20%
+            - generic [ref=f1e880]:
+              - generic [ref=f1e882]: 现金·货币基金
+              - generic [ref=f1e883]: 25%
+        - generic [ref=f1e592]:
+          - heading "📋 操作指南" [level=3] [ref=f1e593]
+          - generic [ref=f1e594]:
+            - generic [ref=f1e595]:
+              - generic [ref=f1e596]: "1"
+              - generic [ref=f1e597]:
+                - heading "确定初始资金" [level=4] [ref=f1e598]
+                - paragraph [ref=f1e599]: 建议初始资金 ¥50万。在概览表 B2 单元格修改总额，所有子表自动更新目标市值。
+            - generic [ref=f1e600]:
+              - generic [ref=f1e601]: "2"
+              - generic [ref=f1e602]:
+                - heading "分批建仓" [level=4] [ref=f1e603]
+                - paragraph [ref=f1e604]: 默认12个月建仓期。每月初按子表C列目标市值买入，实际交易金额填入F列（G列自动计算期末市值）。
+            - generic [ref=f1e605]:
+              - generic [ref=f1e606]: "3"
+              - generic [ref=f1e607]:
+                - heading "月度再平衡" [level=4] [ref=f1e608]
+                - paragraph [ref=f1e609]: 每月底查看概览表F列偏离度。偏离超过±5%时按G列建议交易金额调仓，实际金额填入子表F列。
+            - generic [ref=f1e610]:
+              - generic [ref=f1e611]: "4"
+              - generic [ref=f1e612]:
+                - heading "监控溢价率" [level=4] [ref=f1e613]
+                - paragraph [ref=f1e614]: QDII ETF（标普500、纳指100）可能存在3-10%溢价。概览表J/K/L列自动监控，溢价≥8%切换备选基金。
+      - generic [ref=f1e615]:
+        - heading "⚠️ QDII ETF 溢价率提醒" [level=4] [ref=f1e616]
+        - paragraph [ref=f1e617]:
+          - text: 由于外汇额度限制，QDII ETF可能出现较大溢价（通常3-10%）。概览表已内置溢价率监控：
+          - strong [ref=f1e618]: 溢价 < 3% ✅ 正常交易
+          - text: ，溢价 3%-8% ⚠️ 暂缓买入，溢价 ≥ 8% 🔴 切换备选ETF。
+      - generic [ref=f1e619]:
+        - heading "📥 下载完整操作表" [level=3] [ref=f1e620]
+        - paragraph [ref=f1e621]: 包含6个子表、618个公式、溢价率监控、自动再平衡建议
+        - generic [ref=f1e622]:
+          - link "下载 Excel 操作表 (.xlsx)" [ref=f1e623] [cursor=pointer]:
+            - /url: 恒市值法理财操作表（稳健型）.xlsx
+          - button "📸 生成分享图" [ref=f1e624] [cursor=pointer]
+    - paragraph [ref=f1e625]: "* 历史回测不代表未来表现。投资有风险，入市需谨慎。"
+  - contentinfo [ref=f1e626]:
+    - generic [ref=f1e627]:
+      - paragraph [ref=f1e628]:
+        - strong [ref=f1e629]: 恒市值法智能理财助手
+        - text: — 基于11年历史数据回测的资产配置优化平台
+      - paragraph [ref=f1e630]: 数据来源：天天基金网 · 新浪财经 | 回测引擎：Python · 前端：纯静态 Web
+      - paragraph [ref=f1e631]: ⚠️ 免责声明：本工具仅供学习和研究参考，不构成任何投资建议。历史回测结果不代表未来表现。 投资有风险，入市需谨慎。请根据自身风险承受能力做出独立判断。
+  - generic [ref=f1e632]:
+    - heading [level=1] [ref=f1e633]: hdszf 恒市值法资产配置回测工具 — hdszftools
+    - paragraph [ref=f1e634]: 恒市值法（Constant Market Value Method）是一种科学的资产配置策略，每项资产设定固定目标市值，偏离±5%时触发再平衡。hdszftools 是基于该方法的在线回测工具，由 hdszf 开发和维护。
+    - heading [level=2] [ref=f1e635]: 核心功能
+    - list [ref=f1e636]:
+      - listitem [ref=f1e637]: 滚动回测：12个不同历史起点，验证策略在不同市场环境下的表现
+      - listitem [ref=f1e638]: 一次建仓 vs 分批建仓对比：公平比较不同入场方式的收益差异
+      - listitem [ref=f1e639]: 多维度指标：年化收益、夏普比率、索提诺比率、最大回撤、月胜率、年胜率
+      - listitem [ref=f1e640]: 交互式参数调节：拖拽滑块实时查看资产配置变化对回测结果的影响
+      - listitem [ref=f1e641]: 13只真实基金净值追踪：覆盖沪深300、中证500、标普500、纳斯达克100、黄金、货币基金
+      - listitem [ref=f1e642]: 三档方案对比：保守型、稳健型（推荐）、进取型全维度比较
+      - listitem [ref=f1e643]: 免费下载 Excel 操作表：包含618个公式、溢价率监控、自动再平衡建议
+    - heading [level=2] [ref=f1e644]: 资产配置
+    - paragraph [ref=f1e645]: 稳健型推荐配置：沪深300（15%）、中证500（5%）、标普500（15%）、纳斯达克100（20%）、黄金（20%）、现金货币基金（25%）。初始资金50万，11年回测年化收益7.6%，最大回撤仅6.1%。
+    - heading [level=2] [ref=f1e646]: 数据来源
+    - paragraph [ref=f1e647]: 天天基金网净值API（13只基金，35,784条记录）+ 新浪财经前复权月度K线数据，覆盖2015年8月至2026年7月共131个月（约11年），涵盖2015年股灾、2018年熊市、2020年疫情、2022年回调等完整市场周期。
+    - heading [level=2] [ref=f1e648]: 关键词
+    - paragraph [ref=f1e649]: 恒市值法 恒定市值法 资产配置 回测工具 投资组合优化 理财工具 基金回测 沪深300 标普500 黄金配置 hdszf hdszftools hdszftools-ujpzw01zm
+  - generic [ref=f1e885]:
+    - generic [ref=f1e886]:
+      - heading "📸 恒市值法宣传海报" [level=3] [ref=f1e887]
+      - button "✕" [ref=f1e888] [cursor=pointer]
+    - generic [ref=f1e889]:
+      - img [ref=f1e890]
+      - paragraph [ref=f1e891]: 💡 图中二维码可扫码访问在线工具
+    - generic [ref=f1e892]:
+      - button "📥 下载图片" [ref=f1e893] [cursor=pointer]
+      - button "关闭" [ref=f1e894] [cursor=pointer]

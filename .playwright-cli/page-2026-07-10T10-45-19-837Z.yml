@@ -1,0 +1,600 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - button "切换主题" [ref=e3] [cursor=pointer]: 🎨
+    - button "生成分享图" [ref=e4] [cursor=pointer]: 📸
+  - navigation [ref=e5]:
+    - generic [ref=e6]:
+      - link "📊 恒市值助手" [ref=e7] [cursor=pointer]:
+        - /url: "#hero"
+        - generic [ref=e8]: 📊
+        - generic [ref=e9]: 恒市值助手
+      - list [ref=e10]:
+        - listitem [ref=e11]:
+          - link "方法论" [ref=e12] [cursor=pointer]:
+            - /url: "#methodology"
+        - listitem [ref=e13]:
+          - link "数据选型" [ref=e14] [cursor=pointer]:
+            - /url: "#data-selection"
+        - listitem [ref=e15]:
+          - link "回测分析" [ref=e16] [cursor=pointer]:
+            - /url: "#backtest"
+        - listitem [ref=e17]:
+          - link "方案对比" [ref=e18] [cursor=pointer]:
+            - /url: "#comparison"
+        - listitem [ref=e19]:
+          - link "最终方案" [ref=e20] [cursor=pointer]:
+            - /url: "#final-solution"
+        - listitem [ref=e21]:
+          - link "滚动回测" [ref=e22] [cursor=pointer]:
+            - /url: "#rolling-backtest"
+  - generic [ref=e25]:
+    - generic [ref=e26]:
+      - generic [ref=e27]: 35,000+条基金净值记录 · 131个月真实数据验证
+      - heading "恒市值法 智能资产配置" [level=1] [ref=e29]:
+        - text: 恒市值法
+        - text: 智能资产配置
+      - paragraph [ref=e30]: 不盯盘 · 不择时 · 每月5分钟 · 50万变111万
+      - paragraph [ref=e31]: 覆盖A股、美股、黄金、现金四大类资产，按表格每月操作一次。 回撤控制在6%以内，近7成月份正收益，睡得着觉的理财方式。
+      - generic [ref=e32]:
+        - link "📥 下载稳健型操作表" [ref=e33] [cursor=pointer]:
+          - /url: 恒市值法理财操作表（稳健型）.xlsx
+        - button "🔍 开始探索" [ref=e34] [cursor=pointer]
+    - generic [ref=e35]:
+      - generic [ref=e36]:
+        - generic [ref=e37]: 💰 50万 → 最终变成
+        - generic [ref=e38]: 111.2万
+        - generic [ref=e39]: 11年翻倍 · 年化7.6%
+      - generic [ref=e40]:
+        - generic [ref=e41]: 📅 月胜率 67.9%
+        - generic [ref=e42]: 89 / 131月
+        - generic [ref=e43]: 10年仅2年亏损 · 最多亏3.7%
+      - generic [ref=e44]:
+        - generic [ref=e45]: 🛡️ 最大回撤
+        - generic [ref=e46]: "-6.1%"
+        - generic [ref=e47]: 50万最多浮亏约3万
+      - generic [ref=e48]:
+        - generic [ref=e49]: 🏦 现金储备比例
+        - generic [ref=e50]: 25%
+        - generic [ref=e51]: 随时可取 · 睡得着觉
+      - generic [ref=e52]:
+        - generic [ref=e53]: ⏱️ 每月操作时间
+        - generic [ref=e54]: 5分钟
+        - generic [ref=e55]: 打开表格看一眼就行
+      - generic [ref=e56]:
+        - generic [ref=e57]: 📊 实盘验证时长
+        - generic [ref=e58]: 11年
+        - generic [ref=e59]: 穿越牛熊的真实回测
+      - generic "生成宣传海报分享到朋友圈/微博" [ref=e60] [cursor=pointer]:
+        - generic [ref=e61]: 📸 分享工具
+        - generic [ref=e62]: 生成海报
+        - generic [ref=e63]: 一键分享给朋友
+    - paragraph [ref=e64]: "* 历史回测不代表未来表现。投资有风险，入市需谨慎。"
+  - generic [ref=e66]:
+    - generic [ref=e67]:
+      - generic [ref=e68]: 方法论
+      - heading "恒市值法的核心逻辑" [level=2] [ref=e69]
+      - paragraph [ref=e70]: 一种纪律严明的资产配置策略，通过定期再平衡实现被动择时
+    - generic [ref=e71]:
+      - generic [ref=e72]:
+        - generic [ref=e73]: ⚖️
+        - heading "恒定目标市值" [level=3] [ref=e74]
+        - paragraph [ref=e75]:
+          - text: 设定每类资产的
+          - strong [ref=e76]: 目标市值
+          - text: （而非目标比例），每月检查偏离度。当某类资产上涨超出阈值，自动卖出获利部分；下跌时则补仓买入，实现"低买高卖"的纪律性操作。
+      - generic [ref=e77]:
+        - generic [ref=e78]: 🏗️
+        - heading "分批建仓机制" [level=3] [ref=e79]
+        - paragraph [ref=e80]:
+          - text: 初始资金不一次性投入，而是按
+          - strong [ref=e81]: 月度等额
+          - text: 逐步建仓（默认12个月）。避免在极端高点全仓买入，降低择时风险，让成本均匀分布在市场周期中。
+      - generic [ref=e82]:
+        - generic [ref=e83]: 🎯
+        - heading "再平衡阈值" [level=3] [ref=e84]
+        - paragraph [ref=e85]:
+          - text: 设置
+          - strong [ref=e86]: ±5%偏离阈值
+          - text: ，只有当实际比例与目标比例偏差超过阈值时才触发交易。避免频繁小额调仓，降低交易成本，同时保留足够的灵活性应对市场变化。
+  - generic [ref=e88]:
+    - generic [ref=e89]:
+      - generic [ref=e90]: 🔬 深度测试
+      - heading "滚动回测：不同起点入场效果对比" [level=2] [ref=e91]
+      - paragraph [ref=e92]: 使用稳健型配置（15/5/15/20/20/25），初始资金50万，分别从10年前到1年前共10个不同起点入场，验证策略在不同市场环境下的表现
+    - generic [ref=e93]:
+      - generic [ref=e94]: 📊 滚动回测汇总 · 稳健型配置 · 初始资金50万
+      - table [ref=e96]:
+        - rowgroup [ref=e97]:
+          - row "起点 回测周期 最终市值 总收益率 年化收益 最大回撤 Sharpe 胜率 月/年 交易 次/月 仓位 期末 数据 详情" [ref=e98]:
+            - columnheader "起点" [ref=e99]
+            - columnheader "回测周期" [ref=e100]
+            - columnheader "最终市值" [ref=e101]
+            - columnheader "总收益率" [ref=e102]
+            - columnheader "年化收益" [ref=e103]
+            - columnheader "最大回撤" [ref=e104]
+            - columnheader "Sharpe" [ref=e105]
+            - columnheader "胜率 月/年" [ref=e106]:
+              - text: 胜率
+              - text: 月/年
+            - columnheader "交易 次/月" [ref=e107]:
+              - text: 交易
+              - text: 次/月
+            - columnheader "仓位 期末" [ref=e108]:
+              - text: 仓位
+              - text: 期末
+            - columnheader "数据" [ref=e109]
+            - columnheader "详情" [ref=e110]
+        - rowgroup [ref=e111]:
+          - row "⏳ 正在运行滚动回测..." [ref=e112]:
+            - cell "⏳ 正在运行滚动回测..." [ref=e113]
+    - generic [ref=e116]: 📈 不同起点的累计收益曲线对比
+  - paragraph [ref=e118]: "* 历史回测不代表未来表现。投资有风险，入市需谨慎。"
+  - generic [ref=e120]:
+    - generic [ref=e121]:
+      - generic [ref=e122]: 数据选型
+      - heading "基金筛选与数据源" [level=2] [ref=e123]
+      - paragraph [ref=e124]: 覆盖6大资产类别、15只候选基金、131个月（约11年）历史回测数据
+    - table [ref=e126]:
+      - rowgroup [ref=e127]:
+        - row "基金代码 基金名称 资产类型 数据起始 数据截止 记录数 用途" [ref=e128]:
+          - columnheader "基金代码" [ref=e129]
+          - columnheader "基金名称" [ref=e130]
+          - columnheader "资产类型" [ref=e131]
+          - columnheader "数据起始" [ref=e132]
+          - columnheader "数据截止" [ref=e133]
+          - columnheader "记录数" [ref=e134]
+          - columnheader "用途" [ref=e135]
+      - rowgroup [ref=e136]:
+        - row "160119 南方中证500ETF联接 A股 2009-09-25 2026-07 3945 中证500指数合成" [ref=e137]:
+          - cell "160119" [ref=e138]:
+            - code [ref=e139]: "160119"
+          - cell "南方中证500ETF联接" [ref=e140]
+          - cell "A股" [ref=e141]:
+            - generic [ref=e142]: A股
+          - cell "2009-09-25" [ref=e143]
+          - cell "2026-07" [ref=e144]
+          - cell "3945" [ref=e145]
+          - cell "中证500指数合成" [ref=e146]
+        - row "512500 华夏中证500ETF A股 2015-05-05 2026-07 2590 中证500指数合成" [ref=e147]:
+          - cell "512500" [ref=e148]:
+            - code [ref=e149]: "512500"
+          - cell "华夏中证500ETF" [ref=e150]
+          - cell "A股" [ref=e151]:
+            - generic [ref=e152]: A股
+          - cell "2015-05-05" [ref=e153]
+          - cell "2026-07" [ref=e154]
+          - cell "2590" [ref=e155]
+          - cell "中证500指数合成" [ref=e156]
+        - row "096001 大成标普500等权重 美股 2011-03-23 2026-07 3532 标普500指数合成" [ref=e157]:
+          - cell "096001" [ref=e158]:
+            - code [ref=e159]: "096001"
+          - cell "大成标普500等权重" [ref=e160]
+          - cell "美股" [ref=e161]:
+            - generic [ref=e162]: 美股
+          - cell "2011-03-23" [ref=e163]
+          - cell "2026-07" [ref=e164]
+          - cell "3532" [ref=e165]
+          - cell "标普500指数合成" [ref=e166]
+        - row "513500 博时标普500ETF 美股 2013-12-05 2026-07 2841 标普500指数合成" [ref=e167]:
+          - cell "513500" [ref=e168]:
+            - code [ref=e169]: "513500"
+          - cell "博时标普500ETF" [ref=e170]
+          - cell "美股" [ref=e171]:
+            - generic [ref=e172]: 美股
+          - cell "2013-12-05" [ref=e173]
+          - cell "2026-07" [ref=e174]
+          - cell "2841" [ref=e175]
+          - cell "标普500指数合成" [ref=e176]
+        - row "513650 南方标普500ETF 美股 2023-03-23 2026-07 674 标普500指数合成" [ref=e177]:
+          - cell "513650" [ref=e178]:
+            - code [ref=e179]: "513650"
+          - cell "南方标普500ETF" [ref=e180]
+          - cell "美股" [ref=e181]:
+            - generic [ref=e182]: 美股
+          - cell "2023-03-23" [ref=e183]
+          - cell "2026-07" [ref=e184]
+          - cell "674" [ref=e185]
+          - cell "标普500指数合成" [ref=e186]
+        - row "160706 嘉实沪深300ETF联接 A股 2009-09-02 2026-07 3980 沪深300指数合成" [ref=e187]:
+          - cell "160706" [ref=e188]:
+            - code [ref=e189]: "160706"
+          - cell "嘉实沪深300ETF联接" [ref=e190]
+          - cell "A股" [ref=e191]:
+            - generic [ref=e192]: A股
+          - cell "2009-09-02" [ref=e193]
+          - cell "2026-07" [ref=e194]
+          - cell "3980" [ref=e195]
+          - cell "沪深300指数合成" [ref=e196]
+        - row "510300 华泰柏瑞沪深300ETF A股 2012-05-04 2026-07 3323 沪深300指数合成" [ref=e197]:
+          - cell "510300" [ref=e198]:
+            - code [ref=e199]: "510300"
+          - cell "华泰柏瑞沪深300ETF" [ref=e200]
+          - cell "A股" [ref=e201]:
+            - generic [ref=e202]: A股
+          - cell "2012-05-04" [ref=e203]
+          - cell "2026-07" [ref=e204]
+          - cell "3323" [ref=e205]
+          - cell "沪深300指数合成" [ref=e206]
+        - row "159659 招商纳斯达克100ETF 美股 2023-04-12 2026-07 660 纳斯达克100指数合成" [ref=e207]:
+          - cell "159659" [ref=e208]:
+            - code [ref=e209]: "159659"
+          - cell "招商纳斯达克100ETF" [ref=e210]
+          - cell "美股" [ref=e211]:
+            - generic [ref=e212]: 美股
+          - cell "2023-04-12" [ref=e213]
+          - cell "2026-07" [ref=e214]
+          - cell "660" [ref=e215]
+          - cell "纳斯达克100指数合成" [ref=e216]
+        - row "270042 广发纳斯达克100ETF 美股 2012-08-15 2026-07 3223 纳斯达克100指数合成" [ref=e217]:
+          - cell "270042" [ref=e218]:
+            - code [ref=e219]: "270042"
+          - cell "广发纳斯达克100ETF" [ref=e220]
+          - cell "美股" [ref=e221]:
+            - generic [ref=e222]: 美股
+          - cell "2012-08-15" [ref=e223]
+          - cell "2026-07" [ref=e224]
+          - cell "3223" [ref=e225]
+          - cell "纳斯达克100指数合成" [ref=e226]
+        - row "513100 国泰纳斯达克100ETF 美股 2013-04-25 2026-07 3045 纳斯达克100指数合成" [ref=e227]:
+          - cell "513100" [ref=e228]:
+            - code [ref=e229]: "513100"
+          - cell "国泰纳斯达克100ETF" [ref=e230]
+          - cell "美股" [ref=e231]:
+            - generic [ref=e232]: 美股
+          - cell "2013-04-25" [ref=e233]
+          - cell "2026-07" [ref=e234]
+          - cell "3045" [ref=e235]
+          - cell "纳斯达克100指数合成" [ref=e236]
+        - row "320013 诺安全球黄金 黄金 2011-01-13 2026-07 3565 黄金指数合成" [ref=e237]:
+          - cell "320013" [ref=e238]:
+            - code [ref=e239]: "320013"
+          - cell "诺安全球黄金" [ref=e240]
+          - cell "黄金" [ref=e241]:
+            - generic [ref=e242]: 黄金
+          - cell "2011-01-13" [ref=e243]
+          - cell "2026-07" [ref=e244]
+          - cell "3565" [ref=e245]
+          - cell "黄金指数合成" [ref=e246]
+        - row "518660 工银黄金ETF 黄金 2020-04-24 2026-07 1369 黄金指数合成" [ref=e247]:
+          - cell "518660" [ref=e248]:
+            - code [ref=e249]: "518660"
+          - cell "工银黄金ETF" [ref=e250]
+          - cell "黄金" [ref=e251]:
+            - generic [ref=e252]: 黄金
+          - cell "2020-04-24" [ref=e253]
+          - cell "2026-07" [ref=e254]
+          - cell "1369" [ref=e255]
+          - cell "黄金指数合成" [ref=e256]
+        - row "518880 华安黄金ETF 黄金 2013-07-18 2026-07 3037 黄金指数合成" [ref=e257]:
+          - cell "518880" [ref=e258]:
+            - code [ref=e259]: "518880"
+          - cell "华安黄金ETF" [ref=e260]
+          - cell "黄金" [ref=e261]:
+            - generic [ref=e262]: 黄金
+          - cell "2013-07-18" [ref=e263]
+          - cell "2026-07" [ref=e264]
+          - cell "3037" [ref=e265]
+          - cell "黄金指数合成" [ref=e266]
+    - generic [ref=e267]:
+      - generic [ref=e268]: 📡
+      - generic [ref=e269]:
+        - paragraph [ref=e270]:
+          - strong [ref=e271]: 数据来源：
+          - text: 天天基金网（eastmoney）净值API（用于基金筛选）+ 新浪财经（Sina Finance）前复权月度K线数据（用于回测）
+        - paragraph [ref=e272]:
+          - strong [ref=e273]: 回测时间跨度：
+          - text: 2015年8月 — 2026年7月，共
+          - strong [ref=e274]: 131个月
+          - text: （约11年），覆盖2015年股灾、2018年熊市、2020年疫情、2022年回调等完整市场周期
+        - paragraph [ref=e275]:
+          - strong [ref=e276]: 数据处理：
+          - text: 前复权价格已包含分红再投资；货币基金使用万份收益折算日收益率；多基金同类资产按规模加权合成指数；QDII ETF 溢价率已做 3%/8% 分档预警
+        - paragraph [ref=e277]:
+          - strong [ref=e278]: 回测引擎：
+          - text: 滚动回测（10个不同历史起点）+ 一次建仓版（数据最早月全仓买入），恒市值法月度再平衡 ±5% 阈值，交易费率 0.1%
+  - generic [ref=e280]:
+    - generic [ref=e281]:
+      - generic [ref=e282]: ⭐ 核心功能
+      - heading "交互式回测分析" [level=2] [ref=e283]
+      - paragraph [ref=e284]: 拖拽滑块调整配置，实时查看回测结果变化。支持锁定对比模式。
+      - generic [ref=e285]:
+        - text: ⚠️ 基于预计算模型插值估算，非逐月真实回测。精确回测结果请查看下方
+        - link "滚动回测板块" [ref=e286] [cursor=pointer]:
+          - /url: "#rolling-backtest"
+    - generic [ref=e287]:
+      - generic [ref=e288]:
+        - generic [ref=e289]:
+          - generic [ref=e290]: 🎚️ 资产配置调节
+          - generic [ref=e291]: "合计: 100%"
+        - generic [ref=e292]:
+          - generic [ref=e293]:
+            - generic [ref=e294]:
+              - generic [ref=e295]: ● 沪深300 （510300｜510310）
+              - generic [ref=e296]:
+                - spinbutton [ref=e297]: "15"
+                - text: "%"
+            - slider [ref=e298] [cursor=pointer]: "15"
+          - generic [ref=e299]:
+            - generic [ref=e300]:
+              - generic [ref=e301]: ● 中证500 （512500｜510500）
+              - generic [ref=e302]:
+                - spinbutton [ref=e303]: "5"
+                - text: "%"
+            - slider [ref=e304] [cursor=pointer]: "5"
+          - generic [ref=e305]:
+            - generic [ref=e306]:
+              - generic [ref=e307]: ● 标普500 （513500｜513650）
+              - generic [ref=e308]:
+                - spinbutton [ref=e309]: "15"
+                - text: "%"
+            - slider [ref=e310] [cursor=pointer]: "15"
+          - generic [ref=e311]:
+            - generic [ref=e312]:
+              - generic [ref=e313]: ● 纳斯达克100 （513100｜159659）
+              - generic [ref=e314]:
+                - spinbutton [ref=e315]: "20"
+                - text: "%"
+            - slider [ref=e316] [cursor=pointer]: "20"
+          - generic [ref=e317]:
+            - generic [ref=e318]:
+              - generic [ref=e319]: ● 黄金 （518880｜518660）
+              - generic [ref=e320]:
+                - spinbutton [ref=e321]: "20"
+                - text: "%"
+            - slider [ref=e322] [cursor=pointer]: "20"
+          - generic [ref=e323]:
+            - generic [ref=e324]:
+              - generic [ref=e325]: ● 现金·货币基金 （余额宝｜逆回购）
+              - generic [ref=e326]:
+                - spinbutton [ref=e327]: "25"
+                - text: "%"
+            - slider [ref=e328] [cursor=pointer]: "25"
+          - generic [ref=e329]:
+            - button "↺ 恢复默认" [ref=e330] [cursor=pointer]
+            - button "🔒 锁定对比" [ref=e331] [cursor=pointer]
+          - generic [ref=e332]: 精确匹配
+          - paragraph [ref=e333]: 💡 缺额视为未投资（活期0收益），始终恒市值法
+      - generic [ref=e334]:
+        - generic [ref=e335]:
+          - generic [ref=e336]:
+            - generic [ref=e337]: 年化收益
+            - generic [ref=e338]: 7.60%
+          - generic [ref=e339]:
+            - generic [ref=e340]: 最大回撤
+            - generic [ref=e341]: "-6.09%"
+          - generic [ref=e342]:
+            - generic [ref=e343]: Sharpe比率
+            - generic [ref=e344]: "1.2484"
+          - generic [ref=e345]:
+            - generic [ref=e346]: 总收益（131个月）
+            - generic [ref=e347]: 122.4%
+        - button "📸 生成我的回测分享图" [ref=e349] [cursor=pointer]
+        - generic [ref=e350]:
+          - generic [ref=e352]: 📈 累计收益曲线
+          - generic [ref=e357]: 📉 回撤曲线
+  - generic [ref=e362]:
+    - generic [ref=e363]:
+      - generic [ref=e364]: 方案对比
+      - heading "三档方案的深度对比" [level=2] [ref=e365]
+      - paragraph [ref=e366]: 保守型、稳健型（推荐）与进取型的全维度比较
+    - generic [ref=e367]:
+      - generic [ref=e368]:
+        - generic [ref=e369]:
+          - generic [ref=e370]: 保守型
+          - heading "🛡️ 保守型" [level=3] [ref=e371]
+          - paragraph [ref=e372]: A股13% + 美股17% + 黄金20% + 现金50%
+        - generic [ref=e373]: 5.60%
+        - generic [ref=e374]:
+          - generic [ref=e375]:
+            - generic [ref=e376]: 沪深300
+            - generic [ref=e379]: 10%
+          - generic [ref=e380]:
+            - generic [ref=e381]: 中证500
+            - generic [ref=e384]: 3%
+          - generic [ref=e385]:
+            - generic [ref=e386]: 标普500
+            - generic [ref=e389]: 7%
+          - generic [ref=e390]:
+            - generic [ref=e391]: 纳斯达克100
+            - generic [ref=e394]: 10%
+          - generic [ref=e395]:
+            - generic [ref=e396]: 黄金
+            - generic [ref=e399]: 20%
+          - generic [ref=e400]:
+            - generic [ref=e401]: 现金·货币基金
+            - generic [ref=e404]: 50%
+        - generic [ref=e405]:
+          - generic [ref=e406]:
+            - generic [ref=e407]: 最大回撤
+            - generic [ref=e408]: "-3.53%"
+          - generic [ref=e409]:
+            - generic [ref=e410]: Sharpe比率
+            - generic [ref=e411]: "1.4078"
+          - generic [ref=e412]:
+            - generic [ref=e413]: Sortino比率
+            - generic [ref=e414]: "2.0719"
+          - generic [ref=e415]:
+            - generic [ref=e416]: 总收益
+            - generic [ref=e417]: 81.3%
+      - generic [ref=e418]:
+        - generic [ref=e419]:
+          - generic [ref=e420]: ⭐ 推荐方案
+          - heading "🔧 稳健型" [level=3] [ref=e421]
+          - paragraph [ref=e422]: A股20% + 美股35% + 黄金20% + 现金25%
+        - generic [ref=e423]: 7.60%
+        - generic [ref=e424]:
+          - generic [ref=e425]:
+            - generic [ref=e426]: 沪深300
+            - generic [ref=e429]: 15%
+          - generic [ref=e430]:
+            - generic [ref=e431]: 中证500
+            - generic [ref=e434]: 5%
+          - generic [ref=e435]:
+            - generic [ref=e436]: 标普500
+            - generic [ref=e439]: 15%
+          - generic [ref=e440]:
+            - generic [ref=e441]: 纳斯达克100
+            - generic [ref=e444]: 20%
+          - generic [ref=e445]:
+            - generic [ref=e446]: 黄金
+            - generic [ref=e449]: 20%
+          - generic [ref=e450]:
+            - generic [ref=e451]: 现金·货币基金
+            - generic [ref=e454]: 25%
+        - generic [ref=e455]:
+          - generic [ref=e456]:
+            - generic [ref=e457]: 最大回撤
+            - generic [ref=e458]: "-6.09%"
+          - generic [ref=e459]:
+            - generic [ref=e460]: Sharpe比率
+            - generic [ref=e461]: "1.2484"
+          - generic [ref=e462]:
+            - generic [ref=e463]: Sortino比率
+            - generic [ref=e464]: "1.6565"
+          - generic [ref=e465]:
+            - generic [ref=e466]: 总收益
+            - generic [ref=e467]: 122.4%
+      - generic [ref=e468]:
+        - generic [ref=e469]:
+          - generic [ref=e470]: 进取型
+          - heading "🚀 进取型" [level=3] [ref=e471]
+          - paragraph [ref=e472]: 美股92% + 黄金8%（无A股/现金）
+        - generic [ref=e473]: 11.67%
+        - generic [ref=e474]:
+          - generic [ref=e475]:
+            - generic [ref=e476]: 沪深300
+            - generic [ref=e478]: 0%
+          - generic [ref=e479]:
+            - generic [ref=e480]: 中证500
+            - generic [ref=e482]: 0%
+          - generic [ref=e483]:
+            - generic [ref=e484]: 标普500
+            - generic [ref=e487]: 10%
+          - generic [ref=e488]:
+            - generic [ref=e489]: 纳斯达克100
+            - generic [ref=e492]: 82%
+          - generic [ref=e493]:
+            - generic [ref=e494]: 黄金
+            - generic [ref=e497]: 8%
+          - generic [ref=e498]:
+            - generic [ref=e499]: 现金·货币基金
+            - generic [ref=e501]: 0%
+        - generic [ref=e502]:
+          - generic [ref=e503]:
+            - generic [ref=e504]: 最大回撤
+            - generic [ref=e505]: "-10.17%"
+          - generic [ref=e506]:
+            - generic [ref=e507]: Sharpe比率
+            - generic [ref=e508]: "1.1834"
+          - generic [ref=e509]:
+            - generic [ref=e510]: Sortino比率
+            - generic [ref=e511]: "1.9573"
+          - generic [ref=e512]:
+            - generic [ref=e513]: 总收益
+            - generic [ref=e514]: 233.7%
+    - generic [ref=e515]:
+      - generic [ref=e516]: 🎯 三方案多维对比
+      - generic [ref=e521]:
+        - generic [ref=e523]: 年化收益(%)
+        - generic [ref=e531]: 最大回撤(%)
+        - generic [ref=e539]: Sharpe比率
+        - generic [ref=e547]: 赚钱月占比(%)
+    - generic [ref=e554]:
+      - strong [ref=e555]: 📊 数据说明：
+      - text: 以上三档方案基于 2015年8月 ~ 2026年7月（131个月）真实市场数据回测。 数据来源为新浪财经前复权K线（已做除权修正），回测采用恒市值法月度再平衡 ±5%阈值策略。 保守型年化 5.60%（回撤 -3.53%）， 稳健型年化 7.60%（回撤 -6.09%）， 进取型年化 11.67%（回撤 -10.17%）。
+    - generic [ref=e556]:
+      - strong [ref=e557]: 📋 红利ETF与国债ETF评估：
+      - text: 我们对华泰柏瑞红利ETF（510880）和国泰5年国债ETF（511010）进行了独立回测。红利ETF单独年化约4.09%，国债ETF约2.64%。由于恒市值法的超额收益来源于
+      - strong [ref=e558]: 高波动资产的再平衡α
+      - text: ，低波动资产（红利/国债）的加入反而稀释了组合的整体收益。结论：
+      - strong [ref=e559]: 在现金比例已高达25%的情况下，红利和国债ETF不增加边际价值。
+  - generic [ref=e560]:
+    - generic [ref=e561]:
+      - generic [ref=e562]:
+        - generic [ref=e563]: 最终方案
+        - heading "⭐ 推荐配置：稳健型" [level=2] [ref=e564]
+        - paragraph [ref=e565]: 基于35,000+条基金净值记录与131个月回测验证的最优配置 · 年化7.60% · 回撤-6.09% · 夏普1.25
+      - generic [ref=e566]:
+        - generic [ref=e567]:
+          - generic [ref=e568]: 🍩 资产配置比例
+          - generic [ref=e572]:
+            - generic [ref=e573]:
+              - generic [ref=e575]: 沪深300
+              - generic [ref=e576]: 15%
+            - generic [ref=e577]:
+              - generic [ref=e579]: 中证500
+              - generic [ref=e580]: 5%
+            - generic [ref=e581]:
+              - generic [ref=e583]: 标普500
+              - generic [ref=e584]: 15%
+            - generic [ref=e585]:
+              - generic [ref=e587]: 纳斯达克100
+              - generic [ref=e588]: 20%
+            - generic [ref=e589]:
+              - generic [ref=e591]: 黄金
+              - generic [ref=e592]: 20%
+            - generic [ref=e593]:
+              - generic [ref=e595]: 现金·货币基金
+              - generic [ref=e596]: 25%
+        - generic [ref=e597]:
+          - heading "📋 操作指南" [level=3] [ref=e598]
+          - generic [ref=e599]:
+            - generic [ref=e600]:
+              - generic [ref=e601]: "1"
+              - generic [ref=e602]:
+                - heading "确定初始资金" [level=4] [ref=e603]
+                - paragraph [ref=e604]: 建议初始资金 ¥50万。在概览表 B2 单元格修改总额，所有子表自动更新目标市值。
+            - generic [ref=e605]:
+              - generic [ref=e606]: "2"
+              - generic [ref=e607]:
+                - heading "分批建仓" [level=4] [ref=e608]
+                - paragraph [ref=e609]: 默认12个月建仓期。每月初按子表C列目标市值买入，实际交易金额填入F列（G列自动计算期末市值）。
+            - generic [ref=e610]:
+              - generic [ref=e611]: "3"
+              - generic [ref=e612]:
+                - heading "月度再平衡" [level=4] [ref=e613]
+                - paragraph [ref=e614]: 每月底查看概览表F列偏离度。偏离超过±5%时按G列建议交易金额调仓，实际金额填入子表F列。
+            - generic [ref=e615]:
+              - generic [ref=e616]: "4"
+              - generic [ref=e617]:
+                - heading "监控溢价率" [level=4] [ref=e618]
+                - paragraph [ref=e619]: QDII ETF（标普500、纳指100）可能存在3-10%溢价。概览表J/K/L列自动监控，溢价≥8%切换备选基金。
+      - generic [ref=e620]:
+        - heading "⚠️ QDII ETF 溢价率提醒" [level=4] [ref=e621]
+        - paragraph [ref=e622]:
+          - text: 由于外汇额度限制，QDII ETF可能出现较大溢价（通常3-10%）。概览表已内置溢价率监控：
+          - strong [ref=e623]: 溢价 < 3% ✅ 正常交易
+          - text: ，溢价 3%-8% ⚠️ 暂缓买入，溢价 ≥ 8% 🔴 切换备选ETF。
+      - generic [ref=e624]:
+        - heading "📥 下载完整操作表" [level=3] [ref=e625]
+        - paragraph [ref=e626]: 包含6个子表、618个公式、溢价率监控、自动再平衡建议
+        - generic [ref=e627]:
+          - link "下载 Excel 操作表 (.xlsx)" [ref=e628] [cursor=pointer]:
+            - /url: 恒市值法理财操作表（稳健型）.xlsx
+          - button "📸 生成分享图" [ref=e629] [cursor=pointer]
+    - paragraph [ref=e630]: "* 历史回测不代表未来表现。投资有风险，入市需谨慎。"
+  - contentinfo [ref=e631]:
+    - generic [ref=e632]:
+      - paragraph [ref=e633]:
+        - strong [ref=e634]: 恒市值法智能理财助手
+        - text: — 基于11年历史数据回测的资产配置优化平台
+      - paragraph [ref=e635]: 数据来源：天天基金网 · 新浪财经 | 回测引擎：Python · 前端：纯静态 Web
+      - paragraph [ref=e636]: ⚠️ 免责声明：本工具仅供学习和研究参考，不构成任何投资建议。历史回测结果不代表未来表现。 投资有风险，入市需谨慎。请根据自身风险承受能力做出独立判断。
+  - generic [ref=e637]:
+    - heading [level=1] [ref=e638]: hdszf 恒市值法资产配置回测工具 — hdszftools
+    - paragraph [ref=e639]: 恒市值法（Constant Market Value Method）是一种科学的资产配置策略，每项资产设定固定目标市值，偏离±5%时触发再平衡。hdszftools 是基于该方法的在线回测工具，由 hdszf 开发和维护。
+    - heading [level=2] [ref=e640]: 核心功能
+    - list [ref=e641]:
+      - listitem [ref=e642]: 滚动回测：12个不同历史起点，验证策略在不同市场环境下的表现
+      - listitem [ref=e643]: 一次建仓 vs 分批建仓对比：公平比较不同入场方式的收益差异
+      - listitem [ref=e644]: 多维度指标：年化收益、夏普比率、索提诺比率、最大回撤、月胜率、年胜率
+      - listitem [ref=e645]: 交互式参数调节：拖拽滑块实时查看资产配置变化对回测结果的影响
+      - listitem [ref=e646]: 13只真实基金净值追踪：覆盖沪深300、中证500、标普500、纳斯达克100、黄金、货币基金
+      - listitem [ref=e647]: 三档方案对比：保守型、稳健型（推荐）、进取型全维度比较
+      - listitem [ref=e648]: 免费下载 Excel 操作表：包含618个公式、溢价率监控、自动再平衡建议
+    - heading [level=2] [ref=e649]: 资产配置
+    - paragraph [ref=e650]: 稳健型推荐配置：沪深300（15%）、中证500（5%）、标普500（15%）、纳斯达克100（20%）、黄金（20%）、现金货币基金（25%）。初始资金50万，11年回测年化收益7.6%，最大回撤仅6.1%。
+    - heading [level=2] [ref=e651]: 数据来源
+    - paragraph [ref=e652]: 天天基金网净值API（13只基金，35,784条记录）+ 新浪财经前复权月度K线数据，覆盖2015年8月至2026年7月共131个月（约11年），涵盖2015年股灾、2018年熊市、2020年疫情、2022年回调等完整市场周期。
+    - heading [level=2] [ref=e653]: 关键词
+    - paragraph [ref=e654]: 恒市值法 恒定市值法 资产配置 回测工具 投资组合优化 理财工具 基金回测 沪深300 标普500 黄金配置 hdszf hdszftools hdszftools-ujpzw01zm
