@@ -32,10 +32,17 @@ investment-advisor/
 │   ├── rolling.js          # 滚动回测引擎（逐月真实回测，无前视偏差）✅ 可审计
 │   ├── charts.js           # ECharts 图表（含雷达图三色图例）
 │   ├── sliders.js          # 滑块交互
-│   ├── share-image.js      # 分享图生成（Canvas 绑制，Hero海报 + 回测结果卡）
+│   ├── share-image.js      # 分享图生成（Canvas 绑制，含站点二维码）
+│   ├── vendor/
+│   │   └── qrcode.min.js   # qrcode-generator 1.4.4（本地 vendor，免 CDN 依赖）
 │   └── main.js             # 主入口（UI渲染、事件、授权弹窗、主题切换）
 ├── images/
-│   └── douyin-card.jpg     # 抖音名片图（1125×1680，授权弹窗用）
+│   ├── douyin-card.jpg     # 抖音名片图（1125×1680，授权弹窗用）
+│   └── og-preview.png      # OG 社交分享预览图（1200×630）
+├── scripts/
+│   └── generate_og_image.py # OG 预览图生成脚本（Python+Pillow）
+├── sitemap.xml             # 站点地图（提交到 Google/Bing）
+├── robots.txt              # 爬虫规则
 ├── wrangler.jsonc          # Cloudflare Workers+Assets 部署配置
 └── 恒市值法理财操作表（稳健型）.xlsx  # 下载用 Excel
 ```

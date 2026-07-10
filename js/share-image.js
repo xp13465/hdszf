@@ -1,6 +1,6 @@
 /**
  * 分享图生成模块
- * 使用 Canvas 生成带水印的回测结果分享图，用户可下载/分享
+ * 使用 Canvas 生成带水印和二维码的回测结果分享图，用户可下载/分享
  */
 
 const ShareImage = (() => {
@@ -9,6 +9,9 @@ const ShareImage = (() => {
   // 画布尺寸（3:4 竖版，适合社交媒体）
   const WIDTH = 750;
   const HEIGHT = 1000;
+
+  // 网站 URL（用于生成二维码）
+  const SITE_URL = 'https://hdszftools-ujpzw01zm.maozi.io/';
 
   // 品牌色
   const COLORS = {
@@ -22,9 +25,69 @@ const ShareImage = (() => {
     textSecondary: '#666666',
     textMuted: '#999999',
     border: '#e8e8ed',
-    goldGradient: ['#b8860b', '#d4a843'],
-    blueGradient: ['#1a3555', '#2a4a7f'],
   };
+
+  /**
+   * 生成站点 URL 的二维码 DataURL
+   */
+  function generateQRCode(url) {
+    try {
+      // qrcode-generator API: typeNumber=0 (auto), errorCorrectionLevel='M'
+      const qr = qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+      return qr.createDataURL(6, 0);  // cellSize=6, margin=0
+    } catch (e) {
+      console.error('二维码生成失败:', e);
+      return null;
+    }
+  }
+
+  /**
+   * 在 Canvas 上绘制二维码
+   */
+  function drawQRCode(ctx, x, y, size, url) {
+    const dataUrl = generateQRCode(url);
+    if (!dataUrl) {
+      // 失败时绘制占位
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.fillRect(x, y, size, size);
+      ctx.fillStyle = COLORS.white;
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('QR 错误', x + size/2, y + size/2);
+      return;
+    }
+
+    // 用 Image 对象加载 dataURL 并绘制
+    const img = new Image();
+    img.onload = function() {
+      ctx.drawImage(img, x, y, size, size);
+    };
+    img.src = dataUrl;
+    // 同步绘制无法等待 onload，使用 createPattern 的替代方案：直接绘制像素
+    return img;
+  }
+
+  /**
+   * 同步绘制二维码（基于 qrcode.createSvgTag + 转 Canvas）
+   * 实际更稳的做法：直接用 createImgTag 拿到 img 元素，然后 drawImage
+   * 但 createImgTag 是同步返回 dataURL 的
+   */
+  function drawQRSync(ctx, x, y, size, url) {
+    try {
+      const qr = qrcode(0, 'M');
+      qr.addData(url);
+      qr.make();
+      const dataUrl = qr.createDataURL(6, 0);
+      const img = new Image();
+      img.src = dataUrl;
+      // 由于 img 是同步缓存，drawImage 不会等待
+      ctx.drawImage(img, x, y, size, size);
+    } catch (e) {
+      console.error('二维码绘制失败:', e);
+    }
+  }
 
   /**
    * 绘制圆角矩形
@@ -47,7 +110,6 @@ const ShareImage = (() => {
    * 绘制指标卡片
    */
   function drawMetricCard(ctx, x, y, w, h, label, value, color, isHighlight) {
-    // 卡片背景
     ctx.fillStyle = isHighlight ? '#fef9e7' : '#f8f9fa';
     roundRect(ctx, x, y, w, h, 8);
     ctx.fill();
@@ -59,13 +121,11 @@ const ShareImage = (() => {
       ctx.stroke();
     }
 
-    // 标签
     ctx.fillStyle = COLORS.textMuted;
     ctx.font = '13px -apple-system, "Noto Sans SC", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(label, x + w / 2, y + 28);
 
-    // 数值
     ctx.fillStyle = color || COLORS.text;
     ctx.font = `bold ${isHighlight ? '26' : '22'}px -apple-system, "Noto Sans SC", sans-serif`;
     ctx.fillText(value, x + w / 2, y + h - 18);
@@ -74,29 +134,25 @@ const ShareImage = (() => {
   /**
    * 绘制资产分配条
    */
-  function drawAllocBar(ctx, x, y, w, name, pct, color, targetPct) {
+  function drawAllocBar(ctx, x, y, w, name, pct, color) {
     const barH = 22;
     const barY = y;
 
-    // 资产名称
     ctx.fillStyle = COLORS.textSecondary;
     ctx.font = '14px -apple-system, "Noto Sans SC", sans-serif';
     ctx.textAlign = 'left';
     ctx.fillText(name, x, barY + barH / 2 + 5);
 
-    // 进度条背景
     const barX = x + 130;
     const barW = w - 200;
     ctx.fillStyle = '#e8e8ed';
     roundRect(ctx, barX, barY + 4, barW, barH - 8, 4);
     ctx.fill();
 
-    // 进度条填充
     ctx.fillStyle = color;
     roundRect(ctx, barX, barY + 4, Math.max(barW * pct / 100, 4), barH - 8, 4);
     ctx.fill();
 
-    // 百分比
     ctx.fillStyle = COLORS.text;
     ctx.font = 'bold 13px -apple-system, "Noto Sans SC", sans-serif';
     ctx.textAlign = 'right';
@@ -104,7 +160,28 @@ const ShareImage = (() => {
   }
 
   /**
-   * 生成 Hero 区域分享图（宣传用）
+   * 在分享图右下角绘制二维码区
+   */
+  function drawQRBlock(ctx, x, y, size, url, label) {
+    // 背景卡片
+    ctx.fillStyle = 'rgba(255,255,255,0.95)';
+    roundRect(ctx, x - 8, y - 8, size + 16, size + 28, 10);
+    ctx.fill();
+
+    // 绘制二维码
+    drawQRSync(ctx, x, y, size, url);
+
+    // 文字说明
+    if (label) {
+      ctx.fillStyle = COLORS.textSecondary;
+      ctx.font = '10px -apple-system, "Noto Sans SC", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(label, x + size/2, y + size + 14);
+    }
+  }
+
+  /**
+   * 生成 Hero 宣传海报
    */
   function generateHeroCard() {
     const canvas = document.createElement('canvas');
@@ -176,7 +253,7 @@ const ShareImage = (() => {
     const highlights = [
       { label: '回测周期', value: '11年 (2015-2026)' },
       { label: '初始资金', value: '50万 → 111.2万' },
-      { label: '数据来源', value: '35,000+条基金净值记录' },
+      { label: '数据来源', value: '35,000+条基金净值' },
       { label: '覆盖资产', value: 'A股·美股·黄金·现金' },
     ];
 
@@ -216,28 +293,39 @@ const ShareImage = (() => {
       drawAllocBar(ctx, 60, configY + 20 + i * 38, WIDTH - 120, a.name, a.pct, a.color);
     });
 
-    // 底部 CTA
-    const ctaY = 810;
-    ctx.fillStyle = 'rgba(255,255,255,0.15)';
-    roundRect(ctx, 60, ctaY, WIDTH - 120, 60, 10);
-    ctx.fill();
+    // ── 底部：二维码 + CTA ──
+    const qrSize = 110;
+    const qrX = 50;
+    const qrY = 780;
+    drawQRBlock(ctx, qrX, qrY, qrSize, SITE_URL, '扫码体验');
+
+    // 右侧 CTA 文字
+    const ctaX = qrX + qrSize + 30;
+    let ctaY = qrY + 5;
 
     ctx.fillStyle = COLORS.white;
     ctx.font = 'bold 18px -apple-system, "Noto Sans SC", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('免费在线回测你的资产配置方案', WIDTH / 2, ctaY + 28);
+    ctx.textAlign = 'left';
+    ctx.fillText('免费在线回测', ctaX, ctaY + 18);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
+    ctx.font = '14px -apple-system, "Noto Sans SC", sans-serif';
+    ctx.fillText('科学配置你的投资组合', ctaX, ctaY + 42);
 
     ctx.fillStyle = COLORS.accent;
-    ctx.font = 'bold 16px -apple-system, "Noto Sans SC", sans-serif';
-    ctx.fillText('hdszftools-ujpzw01zm.maozi.io', WIDTH / 2, ctaY + 52);
+    ctx.font = 'bold 14px -apple-system, "Noto Sans SC", sans-serif';
+    ctx.fillText('hdszftools-ujpzw01zm', ctaX, ctaY + 70);
 
-    // 底部信息
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '12px -apple-system, "Noto Sans SC", sans-serif';
+    ctx.fillText('.maozi.io', ctaX, ctaY + 88);
+
+    // 底部品牌
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '12px -apple-system, "Noto Sans SC", sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('hdszf 恒市值法智能理财助手 | hdszftools', WIDTH / 2, HEIGHT - 50);
 
-    // 免责声明
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.font = '11px -apple-system, "Noto Sans SC", sans-serif';
     ctx.fillText('历史回测不代表未来表现 · 投资有风险 入市需谨慎', WIDTH / 2, HEIGHT - 28);
@@ -250,7 +338,7 @@ const ShareImage = (() => {
   }
 
   /**
-   * 生成回测结果分享图（当前配置）
+   * 生成回测结果分享图
    */
   function generateResultCard() {
     const canvas = document.createElement('canvas');
@@ -290,7 +378,7 @@ const ShareImage = (() => {
     ctx.font = '16px -apple-system, "Noto Sans SC", sans-serif';
     ctx.fillText('131个月真实数据验证 · 恒市值法月度再平衡', WIDTH / 2, 105);
 
-    // 核心指标（2行×3列）
+    // 核心指标
     const metricCards = [
       { label: '年化收益', value: m.annual.toFixed(2) + '%', color: m.annual >= 0 ? COLORS.red : COLORS.green, hl: true },
       { label: '总收益率', value: m.total.toFixed(1) + '%', color: m.total >= 0 ? COLORS.red : COLORS.green },
@@ -338,17 +426,37 @@ const ShareImage = (() => {
       drawAllocBar(ctx, 50, allocY + 18 + i * 38, WIDTH - 100, name, pct, assetColors[name] || '#ccc');
     });
 
-    // 底部信息
-    const footerY = allocY + 18 + assetOrder.length * 38 + 40;
-    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+    // ── 底部：二维码 + 引导 ──
+    const qrSize = 100;
+    const qrX = 55;
+    const qrY = 800;
+    drawQRBlock(ctx, qrX, qrY, qrSize, SITE_URL, '扫码体验');
+
+    // 右侧引导
+    const txtX = qrX + qrSize + 30;
+    let txtY = qrY;
+
+    ctx.fillStyle = COLORS.white;
+    ctx.font = 'bold 18px -apple-system, "Noto Sans SC", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText('免费在线回测', txtX, txtY + 24);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
     ctx.font = '13px -apple-system, "Noto Sans SC", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('扫码访问 hdszftools 在线回测你的配置', WIDTH / 2, footerY);
-    ctx.fillText('hdszftools-ujpzw01zm.maozi.io', WIDTH / 2, footerY + 25);
+    ctx.fillText('动手调整你的资产配置', txtX, txtY + 48);
+
+    ctx.fillStyle = COLORS.accent;
+    ctx.font = 'bold 14px -apple-system, "Noto Sans SC", sans-serif';
+    ctx.fillText('hdszftools-ujpzw01zm', txtX, txtY + 78);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.font = '12px -apple-system, "Noto Sans SC", sans-serif';
+    ctx.fillText('.maozi.io', txtX, txtY + 96);
 
     // 免责
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.font = '11px -apple-system, "Noto Sans SC", sans-serif';
+    ctx.textAlign = 'center';
     ctx.fillText('历史回测不代表未来表现 · 投资有风险', WIDTH / 2, HEIGHT - 50);
 
     // 品牌
@@ -378,7 +486,6 @@ const ShareImage = (() => {
    * 创建分享图预览弹窗
    */
   function showPreview(canvas, title) {
-    // 移除旧弹窗
     const old = document.getElementById('share-preview-modal');
     if (old) old.remove();
 
@@ -402,7 +509,7 @@ const ShareImage = (() => {
     header.appendChild(closeBtn);
     content.appendChild(header);
 
-    // 预览图（缩放）
+    // 预览图
     const body = document.createElement('div');
     body.className = 'modal-body';
     body.style.cssText = 'text-align:center;padding:1rem;';
@@ -412,6 +519,12 @@ const ShareImage = (() => {
     img.style.cssText = 'width:100%;max-width:375px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.15);';
     body.appendChild(img);
     content.appendChild(body);
+
+    // 提示
+    const hint = document.createElement('p');
+    hint.style.cssText = 'text-align:center;font-size:0.78rem;color:var(--color-text-muted);margin:0 0 0.5rem;';
+    hint.textContent = '💡 图中二维码可扫码访问在线工具';
+    body.appendChild(hint);
 
     // 底部按钮
     const footer = document.createElement('div');
@@ -434,7 +547,6 @@ const ShareImage = (() => {
     overlay.appendChild(content);
     document.body.appendChild(overlay);
 
-    // 点击遮罩关闭
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) overlay.remove();
     });
@@ -442,24 +554,44 @@ const ShareImage = (() => {
 
   /**
    * 初始化分享按钮
+   * 注意：不在 Hero 区域加按钮（那里空间紧凑，会挤压其他按钮）
+   * 按钮位置：① 下载区（最终方案板块） ② 交互式回测板块
    */
   function init() {
-    // 1. Hero 区域：在下载按钮旁边添加"生成分享图"
-    const heroActions = document.querySelector('.hero-actions');
-    if (heroActions) {
+    // 1. 在最终方案的「下载完整操作表」区加按钮
+    const downloadArea = document.querySelector('.download-area');
+    if (downloadArea) {
+      // 把单个 .btn-accent 链接包成一个 button-group
+      let btnGroup = downloadArea.querySelector('.btn-group');
+      if (!btnGroup) {
+        btnGroup = document.createElement('div');
+        btnGroup.className = 'btn-group';
+        btnGroup.style.cssText = 'display:flex;gap:1rem;justify-content:center;align-items:center;flex-wrap:wrap;';
+
+        const existingBtn = downloadArea.querySelector('a.btn, .btn');
+        if (existingBtn) {
+          existingBtn.parentNode.insertBefore(btnGroup, existingBtn);
+          btnGroup.appendChild(existingBtn);
+        } else {
+          btnGroup.style.justifyContent = 'center';
+          downloadArea.appendChild(btnGroup);
+        }
+      }
+
       const shareBtn = document.createElement('button');
       shareBtn.id = 'btn-share-hero';
       shareBtn.className = 'btn btn-outline';
+      shareBtn.style.cssText = 'font-size:1.0625rem;padding:0.875rem 2rem;';
       shareBtn.textContent = '📸 生成分享图';
       shareBtn.title = '生成宣传海报分享到朋友圈/微博';
       shareBtn.addEventListener('click', () => {
         const canvas = generateHeroCard();
         showPreview(canvas, '📸 恒市值法宣传海报');
       });
-      heroActions.appendChild(shareBtn);
+      btnGroup.appendChild(shareBtn);
     }
 
-    // 2. 回测结果区（交互式回测板块）：指标卡片下方添加分享按钮
+    // 2. 交互式回测板块：指标卡片下方加分享按钮
     const metricsRow = document.querySelector('#backtest .metrics-row');
     if (metricsRow) {
       const shareWrap = document.createElement('div');
@@ -477,7 +609,6 @@ const ShareImage = (() => {
       });
       shareWrap.appendChild(shareBtn);
 
-      // 插入到指标卡片后面
       metricsRow.insertAdjacentElement('afterend', shareWrap);
     }
   }
