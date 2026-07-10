@@ -1,7 +1,4 @@
-# CSS 和 JS 文件：浏览器缓存 5 分钟（300 秒）
 /css/*
   Cache-Control: public, max-age=300
 /js/*
   Cache-Control: public, max-age=300
-
-# 其他静态资源：默认 Cloudflare 策略
