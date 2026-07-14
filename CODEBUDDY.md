@@ -207,7 +207,7 @@ investment-advisor/
 | charts.js | v=16 | index.html |
 | rolling.js | v=11 | index.html |
 | share-image.js | v=3 | index.html |
-| main.js | v=34 | index.html |
+| main.js | v=35 | index.html |
 
 ### 版本号修改规则
 - **每次修改 CSS/JS 后必须 +1**

@@ -995,7 +995,7 @@
     const unlocked = isAuthUnlocked();
     setAuthUI(unlocked);
     if (!unlocked) {
-      if (input) { input.value = ''; input.classList.remove('auth-shake'); }
+      if (input) { input.value = '377162882@sugas'; input.classList.remove('auth-shake'); }
       if (errEl) { errEl.style.display = 'none'; errEl.textContent = ''; }
     }
     modal.style.display = 'flex';
