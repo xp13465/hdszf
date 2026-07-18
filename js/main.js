@@ -1171,3 +1171,19 @@
     initAuthGate();
   }
 })();
+
+/**
+ * 显示隐私政策弹窗（全局函数，供 Footer 链接调用）
+ */
+function showPrivacyPolicy() {
+  const modal = document.getElementById('privacy-policy-modal');
+  if (modal) modal.style.display = 'flex';
+}
+
+/**
+ * 显示用户协议弹窗（全局函数，供 Footer 链接调用）
+ */
+function showUserAgreement() {
+  const modal = document.getElementById('user-agreement-modal');
+  if (modal) modal.style.display = 'flex';
+}

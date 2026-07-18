@@ -9,6 +9,8 @@
   <meta name="author" content="恒市值助手">
   <link rel="canonical" href="https://h.sugas.site/">
   <meta name="robots" content="index, follow">
+  <meta name="rating" content="general">
+  <meta name="format-detection" content="telephone=no">
 
   <!-- Open Graph / 社交分享 -->
   <meta property="og:title" content="恒市值助手 — 11年数据验证的资产配置策略 | 恒市值助手">
@@ -147,6 +149,14 @@
       .auth-prompt h3 { font-size: 1rem; }
       .auth-prompt p { font-size: 0.8rem; }
     }
+    /* === 合规弹窗：隐私政策 & 用户协议 === */
+    .compliance-modal { max-width: 680px; max-height: 80vh; }
+    .compliance-modal .modal-body { max-height: 55vh; overflow-y: auto; font-size: 0.875rem; line-height: 1.8; color: var(--color-text, #333); }
+    .compliance-modal .modal-body h2 { font-size: 1.1rem; margin: 1.2rem 0 0.5rem; color: var(--color-primary, #1a3555); }
+    .compliance-modal .modal-body h2:first-child { margin-top: 0; }
+    .compliance-modal .modal-body p { margin: 0.5rem 0; }
+    .compliance-modal .modal-body ul { padding-left: 1.2rem; margin: 0.5rem 0; }
+    .compliance-modal .modal-body li { margin: 0.25rem 0; }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <script src="js/vendor/qrcode.min.js"></script>
@@ -206,10 +216,10 @@
           <h1 class="hero-title">
             恒市值助手<br><span>智能资产配置</span>
           </h1>
-          <p class="hero-slogan">不盯盘 · 不择时 · 每月5分钟 · 50万变111万</p>
+          <p class="hero-slogan">不盯盘 · 不择时 · 每月5分钟 · 11年回测验证</p>
           <p class="hero-desc">
             覆盖A股、美股、黄金、现金四大类资产，按表格每月操作一次。
-            回撤控制在6%以内，近7成月份正收益，睡得着觉的理财方式。
+            历史最大回撤约6%，近7成月份正收益。历史数据回测，不构成投资建议。
           </p>
           <div class="hero-actions">
             <a href="恒市值法理财操作表（稳健型）.xlsx" class="btn btn-primary" download>📥 下载稳健型操作表</a>
@@ -619,7 +629,7 @@
       <div class="section-header fade-in">
         <div class="section-tag">最终方案</div>
         <h2 class="section-title">⭐ 推荐配置：稳健型</h2>
-        <p class="section-subtitle">基于35,000+条基金净值记录与131个月回测验证的最优配置 · 年化7.60% · 回撤-6.09% · 夏普1.25</p>
+        <p class="section-subtitle">基于35,000+条基金净值记录与131个月回测验证的推荐配置 · 年化7.60% · 回撤-6.09% · 夏普1.25</p>
       </div>
 
       <div class="final-grid">
@@ -691,9 +701,18 @@
     <div class="container">
       <p><strong>恒市值助手</strong> — 基于11年历史数据回测的资产配置优化平台</p>
       <p>数据来源：天天基金网 · 新浪财经 | 回测引擎：Python · 前端：纯静态 Web</p>
-      <p class="disclaimer">
-        ⚠️ 免责声明：本工具仅供学习和研究参考，不构成任何投资建议。历史回测结果不代表未来表现。
-        投资有风险，入市需谨慎。请根据自身风险承受能力做出独立判断。
+      <p class="disclaimer" style="max-width:800px;margin:0.75rem auto;line-height:1.8;">
+        ⚠️ <strong>风险提示：</strong>本工具仅供学习和研究参考，<strong>不构成任何投资建议</strong>。所有回测数据基于历史市场表现，
+        历史回测结果<strong>不代表未来表现</strong>，不保证任何收益。投资有风险，入市需谨慎。
+        请根据自身风险承受能力做出独立判断，必要时咨询专业金融顾问。
+      </p>
+      <div class="footer-links" style="margin-top:1rem;display:flex;gap:1.5rem;justify-content:center;flex-wrap:wrap;font-size:0.8rem;color:var(--color-text-muted);">
+        <a href="#" onclick="showPrivacyPolicy();return false;" style="color:inherit;">隐私政策</a>
+        <a href="#" onclick="showUserAgreement();return false;" style="color:inherit;">用户协议</a>
+        <span>联系邮箱：sugas@sugas.site</span>
+      </div>
+      <p style="font-size:0.7rem;color:var(--color-text-muted);opacity:0.6;margin-top:0.75rem;">
+        本站为非商业个人工具站点 | 如涉及侵权请联系删除
       </p>
     </div>
   </footer>
@@ -705,7 +724,7 @@
   <script src="js/charts.js?v=16"></script>
   <script src="js/rolling.js?v=11"></script>
   <script src="js/share-image.js?v=4"></script>
-  <script src="js/main.js?v=36"></script>
+  <script src="js/main.js?v=37"></script>
 
 
   <!-- ===== SEO 静态文本（爬虫可见） ===== -->
@@ -780,6 +799,102 @@
     </div>
     <div class="auth-hint" id="auth-hint-unlock" style="display:none;">
       已解锁 · 5分钟后自动失效，点击下载按钮即可获取文件
+    </div>
+  </div>
+</div>
+
+<!-- ===== 隐私政策弹窗 ===== -->
+<div class="modal-overlay" id="privacy-policy-modal" style="display:none;">
+  <div class="modal-content compliance-modal">
+    <div class="modal-header">
+      <h3>隐私政策</h3>
+      <button class="modal-close" onclick="document.getElementById('privacy-policy-modal').style.display='none'">✕</button>
+    </div>
+    <div class="modal-body">
+      <p><strong>最后更新日期：</strong>2026年7月10日</p>
+
+      <h2>一、信息收集</h2>
+      <p>恒市值助手（以下简称"本站"）是一个纯前端静态工具网站，<strong>不主动收集、存储或传输用户的任何个人信息</strong>。所有回测计算、资产配置调整均在您的浏览器本地完成，不会上传至任何服务器。</p>
+      <p>本站仅在以下场景使用浏览器本地存储（localStorage）：</p>
+      <ul>
+        <li><strong>主题偏好：</strong>记录您选择的界面主题风格（商务风/现代风/科技风）</li>
+        <li><strong>授权状态：</strong>记录下载授权码的验证状态及有效期（5分钟）</li>
+      </ul>
+      <p>以上数据<strong>仅存储在您的浏览器中</strong>，本站不会读取、收集或传输这些数据。</p>
+
+      <h2>二、Cookie 使用</h2>
+      <p>本站<strong>不使用任何 Cookie</strong>。上述本地存储均通过浏览器 localStorage API 实现，不会随 HTTP 请求发送至服务器。</p>
+
+      <h2>三、第三方服务</h2>
+      <p>本站使用了以下第三方资源，其隐私政策请参阅对应平台：</p>
+      <ul>
+        <li><strong>ECharts（Apache 开源项目）：</strong>图表渲染库，通过 jsdelivr CDN 加载</li>
+        <li><strong>天天基金网 API：</strong>基金净值数据来源（仅数据引用，不涉及用户信息）</li>
+        <li><strong>新浪财经：</strong>月度K线数据来源（仅数据引用，不涉及用户信息）</li>
+      </ul>
+
+      <h2>四、信息安全</h2>
+      <p>由于本站不收集用户数据，因此不存在用户数据泄露、滥用或未经授权访问的风险。</p>
+
+      <h2>五、免责声明</h2>
+      <p>本站提供的回测结果、资产配置建议等全部内容仅供学习和研究参考，<strong>不构成任何形式的投资建议</strong>。历史数据回测结果不代表未来表现，投资者应独立判断并自行承担投资风险。</p>
+
+      <h2>六、政策更新</h2>
+      <p>我们可能不时更新本隐私政策，更新后的政策将在本站发布。建议您定期查阅。</p>
+
+      <h2>七、联系我们</h2>
+      <p>如对本隐私政策有任何疑问，请联系：<strong>sugas@sugas.site</strong></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="document.getElementById('privacy-policy-modal').style.display='none'">我已了解</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== 用户协议弹窗 ===== -->
+<div class="modal-overlay" id="user-agreement-modal" style="display:none;">
+  <div class="modal-content compliance-modal">
+    <div class="modal-header">
+      <h3>用户协议</h3>
+      <button class="modal-close" onclick="document.getElementById('user-agreement-modal').style.display='none'">✕</button>
+    </div>
+    <div class="modal-body">
+      <p><strong>最后更新日期：</strong>2026年7月10日</p>
+
+      <h2>一、服务说明</h2>
+      <p>恒市值助手（以下简称"本站"）是一个基于恒市值法（Constant Market Value Method）的资产配置回测工具，提供历史数据回测、资产配置方案对比等功能。本站为<strong>非商业个人工具站点</strong>，所有功能免费开放使用。</p>
+
+      <h2>二、使用规则</h2>
+      <ul>
+        <li>您承诺不会利用本站从事任何违法违规活动</li>
+        <li>您理解本站的回测结果基于历史数据，不代表对未来收益的任何保证</li>
+        <li>下载的 Excel 操作表仅供个人参考使用，不得用于商业分发</li>
+        <li>授权码仅供个人使用，请勿分享给他人</li>
+      </ul>
+
+      <h2>三、知识产权</h2>
+      <p>本站的代码、设计、文字内容等知识产权归本站运营者所有。数据来源于公开的金融数据平台，其版权归原始数据提供方所有。</p>
+
+      <h2>四、免责声明</h2>
+      <p><strong>重要提示：</strong></p>
+      <ul>
+        <li>本站所有内容仅供<strong>学习和研究</strong>目的，不构成投资建议</li>
+        <li>历史回测数据<strong>不能保证</strong>未来投资结果</li>
+        <li>投资决策应基于个人风险承受能力和财务状况，建议咨询专业金融顾问</li>
+        <li>本站运营者不对因使用本站信息而产生的任何投资损失承担责任</li>
+      </ul>
+
+      <h2>五、服务变更</h2>
+      <p>本站保留随时修改或中断服务（包括但不限于回测算法、数据源、功能模块）的权利，恕不另行通知。</p>
+
+      <h2>六、适用法律</h2>
+      <p>本协议适用中华人民共和国法律。因本协议产生的争议，双方应友好协商解决。</p>
+
+      <h2>七、联系我们</h2>
+      <p>如对本协议有任何疑问，请联系：<strong>sugas@sugas.site</strong></p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="document.getElementById('user-agreement-modal').style.display='none'">我已了解</button>
     </div>
   </div>
 </div>
