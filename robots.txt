@@ -4,4 +4,4 @@ Disallow: /node_modules/
 Disallow: /.git/
 Disallow: /CODEBUDDY.md
 
-Sitemap: https://hdszftools-ujpzw01zm.maozi.io/sitemap.xml
+Sitemap: https://h.sugas.site/sitemap.xml

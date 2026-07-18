@@ -1,15 +1,14 @@
-# 恒市值法智能理财助手 — 项目记忆文件
+# 恒市值助手 — 项目记忆文件
 
-> 最后更新: 2026-07-10 19:30 | 维护者: CodeBuddy AI + @sugas
-> 本次会话任务总数: 15个（全部完成）
+> 最后更新: 2026-07-10 | 维护者: CodeBuddy AI + @sugas
 
 ---
 
 ## 一、项目概览
 
-**名称**: 恒市值法智能理财助手  
+**名称**: 恒市值助手  
 **GitHub**: `xp13465/hdszf`  
-**线上地址**: `https://hdszftools-ujpzw01zm.maozi.io/`  
+**线上地址**: `https://h.sugas.site/`  
 **部署架构**: GitHub → Cloudflare Workers + Assets（`wrangler.jsonc`），推送即自动发布  
 **CDN 链**: 浏览器 → 毛子云 CDN（MaoziYun, max-age=1200）→ Cloudflare Worker → 静态资源  
 **技术栈**: 纯静态 HTML/CSS/JS + ECharts 5.5 + qrcode-generator 1.4.4  
@@ -147,13 +146,13 @@ investment-advisor/
 ## 八、SEO 基础设施
 
 ### 元标签（index.html `<head>`）
-- **Title**: `恒市值法回测工具 — 11年数据验证的资产配置策略 | hdszf`
-- **Description**: 含 hdszftools、11年数据、资产范围等关键词
-- **Keywords**: 恒市值法, 恒定市值法, 资产配置, 回测工具, hdszf, hdszftools, hdszftools-ujpzw01zm
-- **Canonical URL**: `https://hdszftools-ujpzw01zm.maozi.io/`
+- **Title**: `恒市值助手 — 11年数据验证的资产配置策略 | 恒市值助手`
+- **Description**: 含恒市值助手、11年数据、资产范围等关键词
+- **Keywords**: 恒市值法, 恒定市值法, 资产配置, 回测工具, 恒市值助手, h.sugas.site
+- **Canonical URL**: `https://h.sugas.site/`
 - **OG 标签**: og:title, og:description, og:image (1200×630), og:url, og:type, og:site_name, og:locale
 - **Twitter Card**: summary_large_image + twitter:image
-- **JSON-LD**: Schema.org WebApplication + Offer (免费) + Thing (恒市值法)
+- **JSON-LD**: Schema.org WebApplication + Offer (免费) + Thing (恒市值法)，品牌名恒市值助手
 
 ### 静态 SEO 文案
 - 位于 `</body>` 前，`position:absolute;left:-9999px` 隐藏（爬虫可见、用户不可见）
@@ -198,16 +197,16 @@ investment-advisor/
 ### 当前版本号
 | 文件 | 版本 | 位置 |
 |------|------|------|
-| style.css | v=17 | index.html line 58 |
-| modern.css | v=17 | main.js themeMap |
-| tech.css | v=17 | main.js themeMap |
+| style.css | v=18 | index.html line 58 |
+| modern.css | v=18 | main.js themeMap |
+| tech.css | v=18 | main.js themeMap |
 | data.js | v=16 | index.html line ~702 |
 | engine.js | v=17 | index.html |
 | sliders.js | v=9 | index.html |
 | charts.js | v=16 | index.html |
 | rolling.js | v=11 | index.html |
-| share-image.js | v=3 | index.html |
-| main.js | v=35 | index.html |
+| share-image.js | v=4 | index.html |
+| main.js | v=36 | index.html |
 
 ### 版本号修改规则
 - **每次修改 CSS/JS 后必须 +1**
@@ -244,7 +243,7 @@ investment-advisor/
 ## 十二、本次会话完成工作
 
 ### SEO 优化（3 项）
-- 增强 title/description/keywords（含 hdszf/hdszftools/hdszftools-ujpzw01zm）
+- 增强 title/description/keywords（含恒市值助手/h.sugas.site）
 - 新增 canonical、author、robots、OG、Twitter Card 标签
 - 新增 JSON-LD 结构化数据（Schema.org WebApplication）
 - 新增静态 SEO 文案区块（爬虫可见）

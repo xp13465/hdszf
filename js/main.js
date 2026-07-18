@@ -356,9 +356,9 @@
     const optionsPanel = document.getElementById('theme-options');
 
     const themeMap = {
-      business: 'css/style.css?v=17',
-      modern: 'css/modern.css?v=17',
-      tech: 'css/tech.css?v=17'
+      business: 'css/style.css?v=18',
+      modern: 'css/modern.css?v=18',
+      tech: 'css/tech.css?v=18'
     };
 
     // 优先级：URL 参数 > localStorage > 默认值

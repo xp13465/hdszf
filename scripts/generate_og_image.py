@@ -104,7 +104,7 @@ draw.text((btn_x + btn_w//2, btn_y + btn_h//2), '免费在线回测你的配置 
 
 # URL
 draw.text((btn_x + btn_w + 20, btn_y + btn_h//2), 
-          'hdszftools-ujpzw01zm.maozi.io',
+          'h.sugas.site',
           fill=(150, 170, 200), font=font_regular(15), anchor='lm')
 
 # ── 右侧装饰：模拟一个小图表 ──
@@ -152,7 +152,7 @@ draw.line([chart_x + 30, zero_y, chart_x + chart_w - 20, zero_y],
 
 # ── 底部 ──
 # 品牌信息
-draw.text((W//2, H - 55), 'hdszf · 恒市值法智能理财助手 · hdszftools', 
+draw.text((W//2, H - 55), '恒市值助手 · h.sugas.site', 
           fill=(130, 150, 180), font=font_regular(16), anchor='mt')
 
 # 免责

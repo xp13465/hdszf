@@ -11,7 +11,7 @@ const ShareImage = (() => {
   const HEIGHT = 1000;
 
   // 网站 URL（用于生成二维码）
-  const SITE_URL = 'https://hdszftools-ujpzw01zm.maozi.io/';
+  const SITE_URL = 'https://h.sugas.site/';
 
   // 品牌色
   const COLORS = {
@@ -189,7 +189,7 @@ const ShareImage = (() => {
     ctx.fillStyle = COLORS.white;
     ctx.font = 'bold 38px -apple-system, "Noto Sans SC", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('恒市值法', WIDTH / 2, 100);
+    ctx.fillText('恒市值助手', WIDTH / 2, 100);
 
     ctx.font = 'bold 36px -apple-system, "Noto Sans SC", sans-serif';
     ctx.fillText('智能资产配置', WIDTH / 2, 150);
@@ -298,17 +298,17 @@ const ShareImage = (() => {
 
     ctx.fillStyle = COLORS.accent;
     ctx.font = 'bold 14px -apple-system, "Noto Sans SC", sans-serif';
-    ctx.fillText('hdszftools-ujpzw01zm', ctaX, ctaY + 70);
+    ctx.fillText('h.sugas.site', ctaX, ctaY + 70);
 
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.font = '12px -apple-system, "Noto Sans SC", sans-serif';
-    ctx.fillText('.maozi.io', ctaX, ctaY + 88);
+    ctx.fillText('恒市值助手 · 免费在线回测', ctaX, ctaY + 88);
 
     // 底部品牌
     ctx.fillStyle = 'rgba(255,255,255,0.4)';
     ctx.font = '12px -apple-system, "Noto Sans SC", sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('hdszf 恒市值法智能理财助手 | hdszftools', WIDTH / 2, HEIGHT - 50);
+    ctx.fillText('恒市值助手 | 恒市值法智能资产配置', WIDTH / 2, HEIGHT - 50);
 
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
     ctx.font = '11px -apple-system, "Noto Sans SC", sans-serif';
@@ -360,7 +360,7 @@ const ShareImage = (() => {
 
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.font = '16px -apple-system, "Noto Sans SC", sans-serif';
-    ctx.fillText('131个月真实数据验证 · 恒市值法月度再平衡', WIDTH / 2, 105);
+    ctx.fillText('131个月真实数据验证 · 恒市值助手月度再平衡', WIDTH / 2, 105);
 
     // 核心指标
     const metricCards = [
@@ -431,11 +431,11 @@ const ShareImage = (() => {
 
     ctx.fillStyle = COLORS.accent;
     ctx.font = 'bold 14px -apple-system, "Noto Sans SC", sans-serif';
-    ctx.fillText('hdszftools-ujpzw01zm', txtX, txtY + 78);
+    ctx.fillText('h.sugas.site', txtX, txtY + 78);
 
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.font = '12px -apple-system, "Noto Sans SC", sans-serif';
-    ctx.fillText('.maozi.io', txtX, txtY + 96);
+    ctx.fillText('恒市值助手 · 免费在线回测', txtX, txtY + 96);
 
     // 免责
     ctx.fillStyle = 'rgba(255,255,255,0.25)';
@@ -446,7 +446,7 @@ const ShareImage = (() => {
     // 品牌
     ctx.fillStyle = 'rgba(255,255,255,0.35)';
     ctx.font = '12px -apple-system, "Noto Sans SC", sans-serif';
-    ctx.fillText('hdszf · 恒市值法智能理财助手 · hdszftools', WIDTH / 2, HEIGHT - 28);
+    ctx.fillText('恒市值助手 · 恒市值法智能资产配置', WIDTH / 2, HEIGHT - 28);
 
     ctx.fillStyle = COLORS.accent;
     ctx.fillRect(0, HEIGHT - 3, WIDTH, 3);
@@ -517,7 +517,7 @@ const ShareImage = (() => {
     const downloadBtn = document.createElement('button');
     downloadBtn.className = 'btn btn-primary';
     downloadBtn.textContent = '📥 下载图片';
-    downloadBtn.onclick = () => downloadImage(canvas, '恒市值法回测结果.png');
+    downloadBtn.onclick = () => downloadImage(canvas, '恒市值助手回测结果.png');
 
     const closeBtn2 = document.createElement('button');
     closeBtn2.className = 'btn btn-outline';
@@ -554,7 +554,7 @@ const ShareImage = (() => {
       shareBtn.title = '生成宣传海报分享到朋友圈/微博';
       shareBtn.addEventListener('click', () => {
         const canvas = generateHeroCard();
-        showPreview(canvas, '📸 恒市值法宣传海报');
+        showPreview(canvas, '📸 恒市值助手宣传海报');
       });
       heroActions.appendChild(shareBtn);
     }
@@ -572,7 +572,7 @@ const ShareImage = (() => {
       shareFloatBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         const canvas = generateHeroCard();
-        showPreview(canvas, '📸 恒市值法宣传海报');
+        showPreview(canvas, '📸 恒市值助手宣传海报');
       });
       themeSwitcher.appendChild(shareFloatBtn);
     }
@@ -603,7 +603,7 @@ const ShareImage = (() => {
       shareBtn.title = '生成宣传海报分享到朋友圈/微博';
       shareBtn.addEventListener('click', () => {
         const canvas = generateHeroCard();
-        showPreview(canvas, '📸 恒市值法宣传海报');
+        showPreview(canvas, '📸 恒市值助手宣传海报');
       });
       btnGroup.appendChild(shareBtn);
     }
