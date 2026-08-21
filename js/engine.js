@@ -15,6 +15,7 @@ const BacktestEngine = (() => {
   };
 
   const ASSETS = ['沪深300', '中证500', '标普500', '纳斯达克100', '黄金', '现金·货币基金'];
+  const CASH_ASSET = '现金·货币基金';
 
   // 距离阈值：6维欧氏距离超过此值不再信任 trendData 匹配
   const MATCH_THRESHOLD = 0.15;
@@ -174,6 +175,153 @@ const BacktestEngine = (() => {
   }
 
   /**
+   * 真实恒市值法回测（含建仓期 + 月度再平衡 ±阈值 + 交易费率）
+   * 直接读取 APP_DATA.realReturns 全量真实数据，无前视偏差。
+   * 这是回测引擎的主路径，替代 trendData 插值；trendData 仅作
+   * realReturns 缺失时的兜底（覆盖回测范围外的极端配置估算）。
+   *
+   * @param {Object} alloc - 资产配置（小数比例，如 {'沪深300':0.15}），缺额自动补现金
+   * @param {Object} opts  - {buildMonths, threshold, feeRate, totalCapital}
+   * @returns {Object|null} 指标对象；realReturns 缺失时返回 null
+   */
+  function simulateCMV(alloc, opts) {
+    opts = opts || {};
+    const rr = APP_DATA.realReturns;
+    if (!rr || !rr.asset_returns || !rr.asset_returns['沪深300']) return null;
+
+    const totalCapital = opts.totalCapital || 500000;
+    const buildMonths  = opts.buildMonths != null ? opts.buildMonths : 1;
+    const threshold    = opts.threshold != null ? opts.threshold : 0.05;
+    const feeRate      = opts.feeRate != null ? opts.feeRate : 0.001;
+    const cashMonthly  = rr.cash_monthly || 0.00083;
+
+    // 归一化为小数，缺额补现金
+    const a = {};
+    let sum = 0;
+    for (const asset of ASSETS) { a[asset] = alloc[asset] || 0; sum += a[asset]; }
+    if (sum < 0.999) a[CASH_ASSET] += (1 - sum);
+
+    const months = rr.months;
+    const n = months.length;
+
+    // 状态初始化（恒定市值法：目标市值永远不变）
+    const holdings = {};
+    const targetValues = {};
+    for (const asset of ASSETS) {
+      holdings[asset] = 0;
+      targetValues[asset] = totalCapital * a[asset];
+    }
+    let cashBalance = totalCapital;
+    let totalValue = totalCapital;
+    let peakValue = totalCapital;
+    let maxDrawdown = 0;
+    let prevTotalValue = totalCapital;
+    const monthlyReturns = [];
+
+    for (let t = 0; t < n; t++) {
+      const idx = t;            // 从最早真实数据月开始，覆盖全期
+      const isBuild = t < buildMonths;
+
+      // 月初：把现金余额并入现金持仓，统一处理
+      holdings[CASH_ASSET] += cashBalance;
+      cashBalance = 0;
+
+      // 本月资产收益（按各资产当月真实收益率变动）
+      for (const asset of ASSETS) {
+        let ret;
+        if (asset === CASH_ASSET) {
+          ret = cashMonthly;
+        } else {
+          const arr = rr.asset_returns[asset];
+          ret = (arr && idx < arr.length) ? arr[idx] : 0;
+        }
+        holdings[asset] *= (1 + ret);
+      }
+
+      // 建仓期：将各资产推向「目标市值 × 进度」
+      const buildFraction = Math.min(1, (t + 1) / buildMonths);
+      if (isBuild) {
+        for (const asset of ASSETS) {
+          if (asset === CASH_ASSET) continue;
+          const currentTarget = targetValues[asset] * buildFraction;
+          const diff = currentTarget - holdings[asset];
+          if (Math.abs(diff) <= 1) continue;
+          const fee = Math.abs(diff) * feeRate;
+          if (diff > 0) {
+            const needed = diff + fee;
+            const available = Math.min(holdings[CASH_ASSET], needed);
+            if (available > 1) { holdings[CASH_ASSET] -= available; holdings[asset] += (available - fee); }
+          } else {
+            holdings[CASH_ASSET] += (Math.abs(diff) - fee);
+            holdings[asset] = currentTarget;
+          }
+        }
+      }
+
+      // 再平衡期：偏离目标市值超过 ±阈值触发
+      if (!isBuild) {
+        for (const asset of ASSETS) {
+          if (asset === CASH_ASSET) continue;
+          const tv = targetValues[asset];
+          const ch = holdings[asset];
+          if (tv <= 0) continue;
+          const dev = (ch - tv) / tv;
+          if (Math.abs(dev) > threshold) {
+            const diff = tv - ch;
+            const fee = Math.abs(diff) * feeRate;
+            if (diff > 0) {
+              const needed = diff + fee;
+              const available = Math.min(holdings[CASH_ASSET], needed);
+              if (available > 1) { holdings[CASH_ASSET] -= available; holdings[asset] += (available - fee); }
+            } else {
+              holdings[CASH_ASSET] += (Math.abs(diff) - fee);
+              holdings[asset] = tv;
+            }
+          }
+        }
+      }
+
+      totalValue = ASSETS.reduce((s, asset) => s + holdings[asset], 0);
+      if (totalValue > peakValue) peakValue = totalValue;
+      const dd = (totalValue / peakValue - 1) * 100;
+      if (dd < maxDrawdown) maxDrawdown = dd;
+      const mr = prevTotalValue > 0 ? (totalValue / prevTotalValue - 1) : 0;
+      prevTotalValue = totalValue;
+      monthlyReturns.push(mr);
+    }
+
+    // 指标计算
+    const finalValue = totalValue;
+    const totalReturn = (finalValue / totalCapital - 1) * 100;
+    const nYears = n / 12;
+    const annual = (Math.pow(finalValue / totalCapital, 1 / nYears) - 1) * 100;
+    const meanR = monthlyReturns.length ? monthlyReturns.reduce((x, y) => x + y, 0) / monthlyReturns.length : 0;
+    const variance = monthlyReturns.length > 1
+      ? monthlyReturns.reduce((s, r) => s + (r - meanR) ** 2, 0) / (monthlyReturns.length - 1) : 0;
+    const annVol = Math.sqrt(Math.max(0, variance)) * Math.sqrt(12);
+    const sharpe = annVol > 0 ? (annual / 100 - 0.02) / annVol : 0;
+    const neg = monthlyReturns.filter(r => r < 0);
+    const downVar = neg.length > 1
+      ? neg.reduce((s, r) => s + r ** 2, 0) / (neg.length - 1)
+      : (neg.length === 1 ? neg[0] ** 2 : 0);
+    const annDown = Math.sqrt(Math.max(0, downVar)) * Math.sqrt(12);
+    const sortino = annDown > 0 ? (annual / 100 - 0.02) / annDown : 0;
+    const posMonths = monthlyReturns.filter(r => r > 0).length;
+    const winRate = monthlyReturns.length ? posMonths / monthlyReturns.length : 0;
+
+    return {
+      annual,
+      maxDd: maxDrawdown,
+      sharpe: Math.max(0, Math.min(sharpe, 10)),
+      sortino: Math.max(0, Math.min(sortino, 10)),
+      total: totalReturn,
+      finalValue,
+      monthlyWinRate: winRate,
+      annVol
+    };
+  }
+
+  /**
    * 主计算函数
    */
   function compute(sliders) {
@@ -184,6 +332,22 @@ const BacktestEngine = (() => {
       normalized['现金·货币基金'] = (normalized['现金·货币基金'] || 0) + (100 - sum);
     }
 
+    // 主路径：基于全量真实数据的恒市值法回测（反映最新月份，无前视偏差）
+    const alloc = {};
+    for (const asset of ASSETS) alloc[asset] = (normalized[asset] || 0) / 100;
+    const realResult = simulateCMV(alloc);
+    if (realResult) {
+      return {
+        sliders: { ...sliders },
+        match: getMatchLevel(0), // 基于真实数据精确计算
+        alloc: Object.fromEntries(
+          Object.entries(sliders).map(([k, v]) => [k, v / 100])
+        ),
+        metrics: realResult
+      };
+    }
+
+    // 兜底：真实收益数据缺失时，回退到 trendData 插值（覆盖回测范围外估算）
     const { best, second } = findNearest6D(normalized);
     const match = getMatchLevel(best.distance);
 
@@ -202,17 +366,17 @@ const BacktestEngine = (() => {
 
     // 线性插值：最近邻和次近邻之间平滑过渡
     const interp = interpolateMetrics(best, second);
-    const alloc = best.item.alloc || {};
+    const alloc2 = best.item.alloc || {};
     return {
       sliders: { ...sliders },
       match,
       alloc: {
-        '沪深300': alloc['沪深300'] || 0,
-        '中证500': alloc['中证500'] || 0,
-        '标普500': alloc['标普500'] || 0,
-        '纳斯达克100': alloc['纳斯达克100'] || 0,
-        '黄金': alloc['黄金'] || 0,
-        '现金·货币基金': alloc['现金·货币基金'] || 0
+        '沪深300': alloc2['沪深300'] || 0,
+        '中证500': alloc2['中证500'] || 0,
+        '标普500': alloc2['标普500'] || 0,
+        '纳斯达克100': alloc2['纳斯达克100'] || 0,
+        '黄金': alloc2['黄金'] || 0,
+        '现金·货币基金': alloc2['现金·货币基金'] || 0
       },
       metrics: {
         annual: interp.annual,
@@ -278,6 +442,7 @@ const BacktestEngine = (() => {
   return {
     compute,
     getDefaultResult,
+    simulateCMV,
     generateMonthlyReturns,
     DEFAULT_CONFIG,
     getMatchLevel,

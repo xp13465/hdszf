@@ -238,7 +238,7 @@ investment-advisor/
 - **数据源**：回测月收益来自**新浪财经前复权日K线**（`money.finance.sina.com.cn` getKLineData scale=240 adj=qfq），月末close/上月末close-1；不是 eastmoney 基金净值。取数脚本见 `scripts/fetch_returns.py`。
 - **基金代码**（xlsx 主选ETF ≈ `js/data.js` funds 数组）：沪深300=510300、中证500=512500、标普500=513650、纳斯达克100=159659、黄金=518660。
 - **月份标签偏移**：项目 month 标签比真实日历早 1 个月（项目`2026-05`=日历6月收益）。日历YM收益写入项目标签(YM-1)。
-- **派生指标需原管线重算**：`finalConfig.backtest`（推荐方案）与 `comparisons`（三档方案）由 `engine.js` 经硬编码 `trendData`（205条）插值生成，非滚动引擎直接算；新增月份后这两项仍用旧 trendData，需原生成步骤重建，勿用 rolling.js 数字硬覆盖。
+- **回测引擎架构（2026-08-21 修正）**：`engine.js.compute` 主路径已切到自包含的恒市值法回测 `simulateCMV`（含建仓+±阈值再平衡+费率，直读 `APP_DATA.realReturns` 全量真实月收益，无前视偏差）。`trendData`（205条硬编码表）降级为 `realReturns` 缺失时的兜底，不再驱动主展示。此前"数据更新了页面却不变"的根因正是主路径走 trendData 插值、未读最新月份。`comparisons`（三档方案）与 `finalConfig.backtest` 已用 `simulateCMV` 重算回填（反映最新月份）；未来每月补数据后，这两项需重跑重算，或改 `main.js` 的 `initComparisonCards` 改用 `simulateCMV` 动态取值。
 
 ### 🟢 改进建议
 - [ ] 回测结果分享图（generateResultCard）已从 UI 移除但代码保留，如需恢复可在 init() 加回来
