@@ -201,12 +201,12 @@ investment-advisor/
 | modern.css | v=18 | main.js themeMap |
 | tech.css | v=18 | main.js themeMap |
 | data.js | v=16 | index.html line ~702 |
-| engine.js | v=17 | index.html |
+| engine.js | v=19 | index.html |
 | sliders.js | v=9 | index.html |
 | charts.js | v=16 | index.html |
 | rolling.js | v=11 | index.html |
 | share-image.js | v=4 | index.html |
-| main.js | v=38 | index.html |
+| main.js | v=39 | index.html |
 
 ### 版本号修改规则
 - **每次修改 CSS/JS 后必须 +1**
@@ -239,6 +239,8 @@ investment-advisor/
 - **基金代码**（xlsx 主选ETF ≈ `js/data.js` funds 数组）：沪深300=510300、中证500=512500、标普500=513650、纳斯达克100=159659、黄金=518660。
 - **月份标签偏移**：项目 month 标签比真实日历早 1 个月（项目`2026-05`=日历6月收益）。日历YM收益写入项目标签(YM-1)。
 - **回测引擎架构（2026-08-21 修正）**：`engine.js.compute` 主路径已切到自包含的恒市值法回测 `simulateCMV`（含建仓+±阈值再平衡+费率，直读 `APP_DATA.realReturns` 全量真实月收益，无前视偏差）。`trendData`（205条硬编码表）降级为 `realReturns` 缺失时的兜底，不再驱动主展示。此前"数据更新了页面却不变"的根因正是主路径走 trendData 插值、未读最新月份。`comparisons`（三档方案）与 `finalConfig.backtest` 已用 `simulateCMV` 重算回填（反映最新月份）。`main.js` 的 `initComparisonCards` 已于 2026-08-21 改为动态调用 `simulateCMV`（三档配置内联于函数内），真实数据缺失时回退 `APP_DATA.comparisons` 静态值。至此三档对比卡片随数据更新自动生效，不再需要手工回填 `comparisons`。
+- **首屏 Hero 卡片（2026-08-21 修正）**：此前 `index.html` 首屏 4 张统计卡（50万→终值/月胜率/最大回撤/现金比例）是**写死的静态 HTML**，改数据后永不变。现 `main.js` 新增 `updateHeroStats(result)`，在 init 里用 `getDefaultResult()`（=simulateCMV 稳健型）实时填充 8 个 ID 元素（`hero-final-value/sub`、`hero-winrate-label/value/sub`、`hero-dd-value/sub`、`hero-cash-value`）。`simulateCMV` 返回值扩展了 `monthlyReturns/positiveMonths/totalMonths/yearly{fullYears,negativeYears,worstYear}`，供"月胜率 x/y 月"和"10年仅N年亏损·最多亏Z%"动态展示。更新后的文案（og:description、三档说明 insight-box、最终方案副标题、SEO 隐藏文本）仍为静态，需随数据更新手工刷新，位置见 RELEASE_CHECKLIST 阶段4。
+- **发布前自检**：`node scripts/smoke_check.js` 一键校验引擎一致性、Hero ID 齐全性、三档动态≈静态（退出码 0=通过）。
 
 ### 🟢 改进建议
 - [ ] 回测结果分享图（generateResultCard）已从 UI 移除但代码保留，如需恢复可在 init() 加回来

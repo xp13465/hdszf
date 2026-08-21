@@ -309,6 +309,20 @@ const BacktestEngine = (() => {
     const posMonths = monthlyReturns.filter(r => r > 0).length;
     const winRate = monthlyReturns.length ? posMonths / monthlyReturns.length : 0;
 
+    // 年度统计：按月份标签年份聚合，仅计满 12 个月的完整年
+    const byYear = {};
+    for (let i = 0; i < monthlyReturns.length; i++) {
+      const m = months[i];
+      const y = m ? String(m).slice(0, 4) : '?';
+      (byYear[y] = byYear[y] || []).push(monthlyReturns[i]);
+    }
+    const fullYears = Object.keys(byYear)
+      .filter(y => byYear[y].length === 12)
+      .map(y => ({ year: y, ret: byYear[y].reduce((a, r) => a * (1 + r), 1) - 1 }));
+    const negativeYears = fullYears.filter(x => x.ret < 0).length;
+    const worstYear = fullYears.length
+      ? fullYears.reduce((m, x) => (x.ret < m ? x.ret : m), 0) : 0;
+
     return {
       annual,
       maxDd: maxDrawdown,
@@ -317,7 +331,11 @@ const BacktestEngine = (() => {
       total: totalReturn,
       finalValue,
       monthlyWinRate: winRate,
-      annVol
+      annVol,
+      monthlyReturns,
+      positiveMonths: posMonths,
+      totalMonths: monthlyReturns.length,
+      yearly: { fullYears: fullYears.length, negativeYears, worstYear }
     };
   }
 

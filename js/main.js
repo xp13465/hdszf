@@ -104,6 +104,42 @@
     }
   }
 
+  // --- 首屏 Hero 统计卡片（动态，随回测数据自动更新）---
+  function updateHeroStats(result) {
+    if (!result || !result.metrics) return;
+    const m = result.metrics;
+    const capital = APP_DATA.finalConfig?.total_capital || 500000;
+
+    const elFinal = document.getElementById('hero-final-value');
+    const elFinalSub = document.getElementById('hero-final-sub');
+    if (elFinal) elFinal.textContent = (m.finalValue / 10000).toFixed(1) + '万';
+    if (elFinalSub && m.totalMonths != null) {
+      const ratio = m.finalValue / capital;
+      const gainLabel = ratio >= 2 ? '翻倍' : (ratio >= 1 ? '增长' : '亏损');
+      elFinalSub.textContent = `${Math.round(m.totalMonths / 12)}年${gainLabel} · 年化${m.annual.toFixed(1)}%`;
+    }
+
+    const elWinLabel = document.getElementById('hero-winrate-label');
+    const elWinValue = document.getElementById('hero-winrate-value');
+    if (elWinLabel && m.monthlyWinRate != null) elWinLabel.textContent = `📅 月胜率 ${(m.monthlyWinRate * 100).toFixed(1)}%`;
+    if (elWinValue && m.positiveMonths != null && m.totalMonths != null) {
+      elWinValue.textContent = `${m.positiveMonths} / ${m.totalMonths}月`;
+    }
+
+    const elWinSub = document.getElementById('hero-winrate-sub');
+    if (elWinSub && m.yearly) {
+      elWinSub.textContent = `${m.yearly.fullYears}年仅${m.yearly.negativeYears}年亏损 · 最多亏${Math.abs(m.yearly.worstYear * 100).toFixed(1)}%`;
+    }
+
+    const elDd = document.getElementById('hero-dd-value');
+    const elDdSub = document.getElementById('hero-dd-sub');
+    if (elDd) elDd.textContent = m.maxDd.toFixed(1) + '%';
+    if (elDdSub) elDdSub.textContent = `50万最多浮亏约${Math.abs(capital * m.maxDd / 100 / 10000).toFixed(1)}万`;
+
+    const elCash = document.getElementById('hero-cash-value');
+    if (elCash) elCash.textContent = Math.round((result.alloc?.['现金·货币基金'] || 0) * 100) + '%';
+  }
+
   // --- 回测回调 ---
   function onBacktestChange(currentValues, lockedValues) {
     const currentResult = BacktestEngine.compute(currentValues);
@@ -302,6 +338,7 @@
     // 初始回测
     const defaultResult = BacktestEngine.getDefaultResult();
     updateMetrics(defaultResult, null);
+    updateHeroStats(defaultResult);
     ChartManager.updateEquityCurve(defaultResult, null);
     ChartManager.updateDrawdownCurve(defaultResult, null);
 

@@ -14,6 +14,9 @@
 > - 交互式回测区 / 默认结果：引擎主路径 `BacktestEngine.simulateCMV` 直读真实数据实时算。
 > - **三档方案对比卡片**：`js/main.js` 的 `initComparisonCards` 于 2026-08-21 改为内联三档配置并调用
 >   `simulateCMV` 实时计算，页面展示随数据更新**自动生效**，不再依赖 `data.js` 里写死的 `comparisons`。
+> - **首屏 Hero 4 张统计卡**（终值/年化、月胜率 x/y月、10年仅N年亏损·最多亏Z%、最大回撤、现金比例）：
+>   `main.js` 的 `updateHeroStats` 于 2026-08-21 接入 `getDefaultResult()` 实时填充，随数据更新自动生效。
+>   其中"月胜率 x/y 月"和年度亏损统计来自 `simulateCMV` 新增的 `positiveMonths/totalMonths/yearly` 字段。
 >
 > **哪些仍是写死、需随数据窗口延伸重算**（`js/data.js`）：
 > - `finalConfig.backtest`、`goldSweep`（15 组）、`trendData`（约 30+ 行）。
@@ -62,7 +65,12 @@
 
 ## 阶段 4 · 文案与「最后更新」戳（多文件同步）
 
+> 首屏 Hero 卡片与三档卡片已动态化，**不需要**手工改；以下**静态文案**仍要手工刷：
+> `index.html` 里写死的回测数字（og:description 年化、`insight-box` 三档年化/回撤、最终方案副标题
+> 年化/夏普、SEO 隐藏文本段落）。每月补数后按下列清单核对并替换为新值。
+
 - [ ] `index.html`：L395 / L612 / L747（131个月→132个月；2026年7月→8月）；L814 / L862 更新日期戳
+- [ ] `index.html` 静态文案中的年化/回撤/夏普数字（og:description、insight-box 三档、section-subtitle、SEO 隐藏段落）
 - [ ] `README.md`：数据缺口说明、回测表数字、数据范围指向新月份
 - [ ] `CODEBUDDY.md`：日期、数据缺口、数组长度注释
 - [ ] `PROJECT_SPEC.md`：日期与数据范围
@@ -70,9 +78,11 @@
 
 ## 阶段 5 · 验证与上线
 
+- [ ] `node scripts/smoke_check.js`（引擎一致性 + Hero ID 齐全 + 三档动态≈静态，退出码 0）
 - [ ] 本地 `python -m http.server` 或 `wrangler dev` 起服务，肉眼核对：
   - [ ] 滚动汇总表新增 `2025-08` 起点行且无 NaN/∞/负终值
   - [ ] 三档方案数字与 `data.js` 一致
+  - [ ] 首屏 4 张 Hero 卡数字与引擎一致（无 "undefined"、无双负号）
   - [ ] 主题切换（三套）数字同步
 - [ ] `git add -A && git commit -m "data: 滚动回测更新至 2026-08"`
 - [ ] `git push origin main`（SSH，本仓库既定传输方式）→ 触发 Cloudflare 自动部署
