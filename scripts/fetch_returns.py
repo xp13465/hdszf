@@ -14,8 +14,9 @@
   python fetch_returns.py --target 2026-07     # 计算日历2026-07(7月)收益，打印对应项目标签与值
   python fetch_returns.py --target 2026-07 --write   # 真正写回 js/data.js 与 js/real_returns.json（先备份.bak）
 
-注意：本脚本只负责“取数+对齐”，不重算 finalConfig/goldSweep/trendData/三档方案等派生字段，
-      那些写死在 data.js 的汇总数字需另行重跑回测引擎回填（见 RELEASE_CHECKLIST.md）。
+注意：本脚本只负责“取数+对齐”，不重算 finalConfig/goldSweep/trendData 等写死在 data.js 的派生字段，
+      需另行重跑回测引擎回填（见 RELEASE_CHECKLIST.md）。
+      三档方案对比卡片已在前端动态计算（main.js initComparisonCards -> simulateCMV），无需手工回填页面展示。
 """
 import json, os, sys, urllib.request, argparse
 
