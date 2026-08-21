@@ -188,7 +188,7 @@ const BacktestEngine = (() => {
    * realReturns 缺失时的兜底（覆盖回测范围外的极端配置估算）。
    *
    * @param {Object} alloc - 资产配置（小数比例，如 {'沪深300':0.15}），缺额自动补现金
-   * @param {Object} opts  - {buildMonths, threshold, feeRate, totalCapital}
+   * @param {Object} opts  - {buildMonths, threshold, feeRate, totalCapital, rebalanceEveryMonths}
    * @returns {Object|null} 指标对象；realReturns 缺失时返回 null
    */
   function simulateCMV(alloc, opts) {
@@ -200,6 +200,7 @@ const BacktestEngine = (() => {
     const buildMonths  = opts.buildMonths != null ? opts.buildMonths : 1;
     const threshold    = opts.threshold != null ? opts.threshold : 0.05;
     const feeRate      = opts.feeRate != null ? opts.feeRate : 0.001;
+    const rebalanceEvery = opts.rebalanceEveryMonths != null ? opts.rebalanceEveryMonths : 1;  // N 月再平衡一次，1=每月
     const cashMonthly  = rr.cash_monthly || 0.00083;
 
     // 归一化为小数，缺额补现金
@@ -266,8 +267,8 @@ const BacktestEngine = (() => {
         }
       }
 
-      // 再平衡期：偏离目标市值超过 ±阈值触发
-      if (!isBuild) {
+      // 再平衡期：偏离目标市值超过 ±阈值触发（按 rebalanceEveryMonths 间隔检查）
+      if (!isBuild && rebalanceEvery > 0 && (t % rebalanceEvery === 0)) {
         for (const asset of ASSETS) {
           if (asset === CASH_ASSET) continue;
           const tv = targetValues[asset];
