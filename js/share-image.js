@@ -199,15 +199,22 @@ const ShareImage = (() => {
     ctx.font = '18px -apple-system, "Noto Sans SC", sans-serif';
     ctx.fillText('不盯盘 · 不择时 · 每月5分钟', WIDTH / 2, 190);
 
-    // 核心数据卡片
+    // 核心数据卡片（动态：直读默认稳健型 simulateCMV 结果）
+    let hm = null;
+    try { hm = BacktestEngine.getDefaultResult().metrics; } catch (e) { hm = null; }
+    const heroAnnual = hm ? hm.annual : 7.49;
+    const heroDd = hm ? hm.maxDd : -6.09;
+    const heroWin = hm ? hm.monthlyWinRate * 100 : 67.9;
+    const heroFinalWan = hm ? hm.finalValue / 10000 : 110.1;
+
     const cardY = 230;
     const cardW = 200;
     const cardH = 80;
     const cardGap = 20;
     const cards = [
-      { label: '年化收益', value: '7.60%', color: COLORS.red },
-      { label: '最大回撤', value: '-6.09%', color: COLORS.green },
-      { label: '月胜率', value: '67.9%', color: COLORS.red },
+      { label: '年化收益', value: heroAnnual.toFixed(2) + '%', color: COLORS.red },
+      { label: '最大回撤', value: heroDd.toFixed(2) + '%', color: COLORS.green },
+      { label: '月胜率', value: heroWin.toFixed(1) + '%', color: COLORS.red },
     ];
     const totalCardsW = cards.length * cardW + (cards.length - 1) * cardGap;
     const startX = (WIDTH - totalCardsW) / 2;
@@ -236,7 +243,7 @@ const ShareImage = (() => {
 
     const highlights = [
       { label: '回测周期', value: '11年 (2015-2026)' },
-      { label: '初始资金', value: '50万 → 111.2万' },
+      { label: '初始资金', value: `50万 → ${heroFinalWan.toFixed(1)}万` },
       { label: '数据来源', value: '35,000+条基金净值' },
       { label: '覆盖资产', value: 'A股·美股·黄金·现金' },
     ];
@@ -360,7 +367,7 @@ const ShareImage = (() => {
 
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.font = '16px -apple-system, "Noto Sans SC", sans-serif';
-    ctx.fillText('131个月真实数据验证 · 恒市值助手月度再平衡', WIDTH / 2, 105);
+    ctx.fillText(`${m.totalMonths || 131}个月真实数据验证 · 恒市值助手月度再平衡`, WIDTH / 2, 105);
 
     // 核心指标
     const metricCards = [
@@ -369,7 +376,7 @@ const ShareImage = (() => {
       { label: '最大回撤', value: m.maxDd.toFixed(2) + '%', color: COLORS.green },
       { label: 'Sharpe比率', value: m.sharpe.toFixed(4), color: COLORS.text },
       { label: 'Sortino比率', value: m.sortino.toFixed(4), color: COLORS.text },
-      { label: '月胜率', value: m.winRate ? m.winRate.toFixed(1) + '%' : '67.9%', color: COLORS.red },
+      { label: '月胜率', value: (m.monthlyWinRate != null ? m.monthlyWinRate * 100 : 67.9).toFixed(1) + '%', color: COLORS.red },
     ];
 
     const mCardW = 210;

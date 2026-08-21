@@ -58,6 +58,10 @@ const assetLen = Object.values(rr.asset_returns)[0].length;
 check('数据窗口一致 (months=资产条数+1)', rr.months.length === assetLen + 1,
   `months=${rr.months.length} asset=${assetLen}`);
 
+// 引擎回测窗口 = 真实数据条数（排除占位月，与 rolling 口径一致）
+check('simulateCMV 窗口=真实数据条数', m.totalMonths === assetLen,
+  `totalMonths=${m.totalMonths} asset=${assetLen}`);
+
 // ---- 2) index.html 首屏 ID ----
 const html = read('index.html');
 const heroIds = ['hero-final-value', 'hero-final-sub', 'hero-winrate-label', 'hero-winrate-value',
@@ -74,13 +78,8 @@ for (const id of heroIds) {
 
 // ---- 4) 三档卡片动态口径与静态 comparisons 对照（应基本吻合）----
 const comp = ctx.APP_DATA.comparisons['三档方案对比'];
-const plans = {
-  conservative: { '沪深300': 0.1, '中证500': 0.03, '标普500': 0.07, '纳斯达克100': 0.1, '黄金': 0.2, '现金·货币基金': 0.5 },
-  balanced: { '沪深300': 0.15, '中证500': 0.05, '标普500': 0.15, '纳斯达克100': 0.2, '黄金': 0.2, '现金·货币基金': 0.25 },
-  aggressive: { '沪深300': 0, '中证500': 0, '标普500': 0.1, '纳斯达克100': 0.82, '黄金': 0.08, '现金·货币基金': 0 }
-};
-for (const id of Object.keys(plans)) {
-  const dyn = B.simulateCMV(plans[id]);
+for (const id of Object.keys(B.PLANS)) {
+  const dyn = B.simulateCMV(B.PLANS[id]);
   const stat = comp[id];
   const ok = dyn && stat && Math.abs(dyn.annual - stat.annual) < 0.01;
   check(`三档[${id}] 动态≈静态`, ok,

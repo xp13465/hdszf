@@ -274,16 +274,38 @@ const ChartManager = (() => {
   }
 
   /**
+   * 三档方案实时指标（统一事实来源：BacktestEngine.PLANS + simulateCMV）
+   */
+  function getPlansMetrics() {
+    const out = {};
+    for (const id of ['conservative', 'balanced', 'aggressive']) {
+      const r = BacktestEngine.simulateCMV(BacktestEngine.PLANS[id]);
+      if (r) {
+        out[id] = {
+          annual: r.annual,
+          dd: r.maxDd,
+          sharpe: r.sharpe,
+          sortino: r.sortino,
+          win_rate: r.monthlyWinRate * 100,
+          total_return: r.total,
+          final_value: r.finalValue
+        };
+      }
+    }
+    return out;
+  }
+
+  /**
    * 更新雷达图（板块5对比）
    */
   function updateRadarChart() {
     if (!radarChart) return;
 
-    const comp = APP_DATA.comparisons?.['三档方案对比'];
-    if (!comp) return;
-    const cons = comp.conservative;
-    const bal = comp.balanced;
-    const agg = comp.aggressive;
+    const plans = getPlansMetrics();
+    const cons = plans.conservative;
+    const bal = plans.balanced;
+    const agg = plans.aggressive;
+    if (!cons || !bal || !agg) return;
 
     const maxAnnual = Math.max(cons.annual || 0, bal.annual || 0, agg.annual || 0);
     const maxSharpe = Math.max(cons.sharpe || 0, bal.sharpe || 0, agg.sharpe || 0);
@@ -364,11 +386,11 @@ const ChartManager = (() => {
    * 更新对比柱状图
    */
   function updateCompareBarChart() {
-    const comp = APP_DATA.comparisons?.['三档方案对比'];
-    if (!comp) return;
-    const cons = comp.conservative;
-    const bal = comp.balanced;
-    const agg = comp.aggressive;
+    const plans = getPlansMetrics();
+    const cons = plans.conservative;
+    const bal = plans.balanced;
+    const agg = plans.aggressive;
+    if (!cons || !bal || !agg) return;
 
     const colors = ['#3B82F6', '#10B981', '#EF4444'];
     const names = ['保守型', '稳健型 ★', '进取型'];

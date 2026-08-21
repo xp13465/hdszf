@@ -17,6 +17,13 @@ const BacktestEngine = (() => {
   const ASSETS = ['沪深300', '中证500', '标普500', '纳斯达克100', '黄金', '现金·货币基金'];
   const CASH_ASSET = '现金·货币基金';
 
+  // 三档方案配置（唯一事实来源：对比卡片/雷达图/柱状图/README 均由此驱动）
+  const PLANS = {
+    conservative: { '沪深300': 0.10, '中证500': 0.03, '标普500': 0.07, '纳斯达克100': 0.10, '黄金': 0.20, '现金·货币基金': 0.50 },
+    balanced:     { '沪深300': 0.15, '中证500': 0.05, '标普500': 0.15, '纳斯达克100': 0.20, '黄金': 0.20, '现金·货币基金': 0.25 },
+    aggressive:   { '沪深300': 0.00, '中证500': 0.00, '标普500': 0.10, '纳斯达克100': 0.82, '黄金': 0.08, '现金·货币基金': 0.00 }
+  };
+
   // 距离阈值：6维欧氏距离超过此值不再信任 trendData 匹配
   const MATCH_THRESHOLD = 0.15;
 
@@ -202,7 +209,8 @@ const BacktestEngine = (() => {
     if (sum < 0.999) a[CASH_ASSET] += (1 - sum);
 
     const months = rr.months;
-    const n = months.length;
+    // 回测窗口 = 有真实收益数据的月份数（排除 months 末位“下月占位”标签，与 rolling 口径一致）
+    const n = rr.asset_returns['沪深300'].length;
 
     // 状态初始化（恒定市值法：目标市值永远不变）
     const holdings = {};
@@ -409,31 +417,17 @@ const BacktestEngine = (() => {
   }
 
   /**
-   * 用真实历史月度收益率 + 用户配置权重，生成累计收益和回撤曲线
+   * 生成累计收益和回撤曲线
+   * 统一走 simulateCMV（恒市值法），保证曲线终点/回撤与指标卡数值一致。
    */
-  function generateMonthlyReturns(alloc, _unused1, _unused2) {
+  function generateMonthlyReturns(alloc) {
     const rr = APP_DATA.realReturns;
-    if (!rr || !rr.asset_returns) {
-      return { equityCurve: [0], drawdownCurve: [0], months: 0 };
+    const sim = simulateCMV(alloc);
+    if (!rr || !sim) {
+      return { equityCurve: [0], drawdownCurve: [0], months: 0, monthLabels: [] };
     }
 
-    const cashMonthly = rr.cash_monthly || 0.00083;
-    const n = rr.asset_returns['沪深300'].length;
-    const monthlyReturns = [];
-
-    for (let i = 0; i < n; i++) {
-      let r = 0;
-      for (const [asset, pct] of Object.entries(alloc)) {
-        if (pct === 0) continue;
-        if (asset === '现金·货币基金') {
-          r += pct * cashMonthly;
-        } else if (rr.asset_returns[asset]) {
-          r += pct * rr.asset_returns[asset][i];
-        }
-      }
-      monthlyReturns.push(r);
-    }
-
+    const monthlyReturns = sim.monthlyReturns;
     let cumulative = 1;
     const equityCurve = [0];
     for (const r of monthlyReturns) {
@@ -450,7 +444,7 @@ const BacktestEngine = (() => {
       drawdownCurve.push((c / peak - 1) * 100);
     }
 
-    return { equityCurve, drawdownCurve, months: n, monthLabels: rr.months };
+    return { equityCurve, drawdownCurve, months: monthlyReturns.length, monthLabels: rr.months.slice(0, monthlyReturns.length) };
   }
 
   function getDefaultResult() {
@@ -463,6 +457,7 @@ const BacktestEngine = (() => {
     simulateCMV,
     generateMonthlyReturns,
     DEFAULT_CONFIG,
+    PLANS,
     getMatchLevel,
     MATCH_THRESHOLD
   };

@@ -217,23 +217,11 @@
   }
 
   // --- 方案对比卡片填充（动态：直算 simulateCMV，数据更新即反映）---
+  // 三档配置的唯一事实来源在 engine.js 的 BacktestEngine.PLANS
   function initComparisonCards() {
-    const planDefs = {
-      conservative: {
-        alloc: {'沪深300':0.10, '中证500':0.03, '标普500':0.07, '纳斯达克100':0.10, '黄金':0.20, '现金·货币基金':0.50}
-      },
-      balanced: {
-        alloc: {'沪深300':0.15, '中证500':0.05, '标普500':0.15, '纳斯达克100':0.20, '黄金':0.20, '现金·货币基金':0.25},
-        featured: true
-      },
-      aggressive: {
-        alloc: {'沪深300':0.0, '中证500':0.0, '标普500':0.10, '纳斯达克100':0.82, '黄金':0.08, '现金·货币基金':0.0}
-      }
-    };
-
     for (const id of ['conservative', 'balanced', 'aggressive']) {
-      const def = planDefs[id];
-      const res = BacktestEngine.simulateCMV(def.alloc);
+      const alloc = BacktestEngine.PLANS[id];
+      const res = BacktestEngine.simulateCMV(alloc);
 
       // 真实数据缺失时回退到静态 comparisons，保证页面不空白
       if (!res) {
@@ -253,8 +241,8 @@
         sharpe: res.sharpe,
         sortino: res.sortino,
         total: res.total,
-        alloc: def.alloc,
-        featured: def.featured
+        alloc,
+        featured: id === 'balanced'
       });
     }
   }

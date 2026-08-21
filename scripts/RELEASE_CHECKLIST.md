@@ -14,13 +14,18 @@
 > - 交互式回测区 / 默认结果：引擎主路径 `BacktestEngine.simulateCMV` 直读真实数据实时算。
 > - **三档方案对比卡片**：`js/main.js` 的 `initComparisonCards` 于 2026-08-21 改为内联三档配置并调用
 >   `simulateCMV` 实时计算，页面展示随数据更新**自动生效**，不再依赖 `data.js` 里写死的 `comparisons`。
+>   三档配置的唯一事实来源是 `BacktestEngine.PLANS`（engine.js）。
 > - **首屏 Hero 4 张统计卡**（终值/年化、月胜率 x/y月、10年仅N年亏损·最多亏Z%、最大回撤、现金比例）：
 >   `main.js` 的 `updateHeroStats` 于 2026-08-21 接入 `getDefaultResult()` 实时填充，随数据更新自动生效。
 >   其中"月胜率 x/y 月"和年度亏损统计来自 `simulateCMV` 新增的 `positiveMonths/totalMonths/yearly` 字段。
+> - **三档雷达图 / 4 个对比柱状图**：`charts.js` 经 `getPlansMetrics` 用 `BacktestEngine.PLANS`+`simulateCMV` 实时算。
+> - **分享图（Hero 海报 + 回测结果卡）**：`share-image.js` 动态取 `getDefaultResult()`，无需回填。
+> - **收益/回撤曲线**：统一走 `simulateCMV` 月度序列，与指标卡数值一致。
+> - **回测窗口**：`simulateCMV` 按真实收益条数自动迭代（排除 months 末位占位标签），补数据后自动延伸，无需改引擎。
 >
 > **哪些仍是写死、需随数据窗口延伸重算**（`js/data.js`）：
 > - `finalConfig.backtest`、`goldSweep`（15 组）、`trendData`（约 30+ 行）。
-> - `comparisons`（三档方案）静态值：页面已不读它渲染卡片，但 README 表与 `data.js` 内该对象仍可同步更新，
+> - `comparisons`（三档方案）静态值：页面已不读它渲染卡片/图表（均动态），但 README 表与 `data.js` 内该对象仍可同步更新，
 >   以便「静态对照」和离线兜底（`initComparisonCards` 真实数据缺失时回退到此）。
 > - 这些写死数字多一个月后会轻微漂移，漏重算会导致「汇总表新、方案数字旧」的表面矛盾。
 
