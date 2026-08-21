@@ -206,7 +206,7 @@ investment-advisor/
 | charts.js | v=16 | index.html |
 | rolling.js | v=11 | index.html |
 | share-image.js | v=4 | index.html |
-| main.js | v=36 | index.html |
+| main.js | v=38 | index.html |
 
 ### 版本号修改规则
 - **每次修改 CSS/JS 后必须 +1**
@@ -238,7 +238,7 @@ investment-advisor/
 - **数据源**：回测月收益来自**新浪财经前复权日K线**（`money.finance.sina.com.cn` getKLineData scale=240 adj=qfq），月末close/上月末close-1；不是 eastmoney 基金净值。取数脚本见 `scripts/fetch_returns.py`。
 - **基金代码**（xlsx 主选ETF ≈ `js/data.js` funds 数组）：沪深300=510300、中证500=512500、标普500=513650、纳斯达克100=159659、黄金=518660。
 - **月份标签偏移**：项目 month 标签比真实日历早 1 个月（项目`2026-05`=日历6月收益）。日历YM收益写入项目标签(YM-1)。
-- **回测引擎架构（2026-08-21 修正）**：`engine.js.compute` 主路径已切到自包含的恒市值法回测 `simulateCMV`（含建仓+±阈值再平衡+费率，直读 `APP_DATA.realReturns` 全量真实月收益，无前视偏差）。`trendData`（205条硬编码表）降级为 `realReturns` 缺失时的兜底，不再驱动主展示。此前"数据更新了页面却不变"的根因正是主路径走 trendData 插值、未读最新月份。`comparisons`（三档方案）与 `finalConfig.backtest` 已用 `simulateCMV` 重算回填（反映最新月份）；未来每月补数据后，这两项需重跑重算，或改 `main.js` 的 `initComparisonCards` 改用 `simulateCMV` 动态取值。
+- **回测引擎架构（2026-08-21 修正）**：`engine.js.compute` 主路径已切到自包含的恒市值法回测 `simulateCMV`（含建仓+±阈值再平衡+费率，直读 `APP_DATA.realReturns` 全量真实月收益，无前视偏差）。`trendData`（205条硬编码表）降级为 `realReturns` 缺失时的兜底，不再驱动主展示。此前"数据更新了页面却不变"的根因正是主路径走 trendData 插值、未读最新月份。`comparisons`（三档方案）与 `finalConfig.backtest` 已用 `simulateCMV` 重算回填（反映最新月份）。`main.js` 的 `initComparisonCards` 已于 2026-08-21 改为动态调用 `simulateCMV`（三档配置内联于函数内），真实数据缺失时回退 `APP_DATA.comparisons` 静态值。至此三档对比卡片随数据更新自动生效，不再需要手工回填 `comparisons`。
 
 ### 🟢 改进建议
 - [ ] 回测结果分享图（generateResultCard）已从 UI 移除但代码保留，如需恢复可在 init() 加回来

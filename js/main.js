@@ -180,44 +180,47 @@
     });
   }
 
-  // --- 方案对比卡片填充 ---
+  // --- 方案对比卡片填充（动态：直算 simulateCMV，数据更新即反映）---
   function initComparisonCards() {
-    const comp = APP_DATA.comparisons?.['三档方案对比'];
-    if (!comp) return;
+    const planDefs = {
+      conservative: {
+        alloc: {'沪深300':0.10, '中证500':0.03, '标普500':0.07, '纳斯达克100':0.10, '黄金':0.20, '现金·货币基金':0.50}
+      },
+      balanced: {
+        alloc: {'沪深300':0.15, '中证500':0.05, '标普500':0.15, '纳斯达克100':0.20, '黄金':0.20, '现金·货币基金':0.25},
+        featured: true
+      },
+      aggressive: {
+        alloc: {'沪深300':0.0, '中证500':0.0, '标普500':0.10, '纳斯达克100':0.82, '黄金':0.08, '现金·货币基金':0.0}
+      }
+    };
 
-    // 保守型
-    setCompareCard('conservative', {
-      name: '保守型',
-      annual: comp.conservative.annual,
-      dd: comp.conservative.dd,
-      sharpe: comp.conservative.sharpe,
-      sortino: comp.conservative.sortino,
-      total: comp.conservative.total_return,
-      alloc: comp.conservative.alloc
-    });
+    for (const id of ['conservative', 'balanced', 'aggressive']) {
+      const def = planDefs[id];
+      const res = BacktestEngine.simulateCMV(def.alloc);
 
-    // 稳健型 ★推荐
-    setCompareCard('balanced', {
-      name: '稳健型',
-      annual: comp.balanced.annual,
-      dd: comp.balanced.dd,
-      sharpe: comp.balanced.sharpe,
-      sortino: comp.balanced.sortino,
-      total: comp.balanced.total_return,
-      alloc: comp.balanced.alloc,
-      featured: true
-    });
+      // 真实数据缺失时回退到静态 comparisons，保证页面不空白
+      if (!res) {
+        const comp = APP_DATA.comparisons?.['三档方案对比']?.[id];
+        if (!comp) continue;
+        setCompareCard(id, {
+          annual: comp.annual, dd: comp.dd, sharpe: comp.sharpe,
+          sortino: comp.sortino, total: comp.total_return,
+          alloc: comp.alloc, featured: id === 'balanced'
+        });
+        continue;
+      }
 
-    // 进取型
-    setCompareCard('aggressive', {
-      name: '进取型',
-      annual: comp.aggressive.annual,
-      dd: comp.aggressive.dd,
-      sharpe: comp.aggressive.sharpe,
-      sortino: comp.aggressive.sortino,
-      total: comp.aggressive.total_return,
-      alloc: comp.aggressive.alloc
-    });
+      setCompareCard(id, {
+        annual: res.annual,
+        dd: res.maxDd,
+        sharpe: res.sharpe,
+        sortino: res.sortino,
+        total: res.total,
+        alloc: def.alloc,
+        featured: def.featured
+      });
+    }
   }
 
   function setCompareCard(id, data) {
