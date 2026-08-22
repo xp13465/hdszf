@@ -20,5 +20,5 @@ Thumbs.db
 .playwright-cli/
 
 # 研究脚本生成的临时产物（重新跑会覆盖，不入库）
+# 日K线缓存约十几MB且可重拉，不入库；研究报告是脚本的产出/验证物，与脚本配套入库
 scripts/_daily_cache.json
-scripts/_rebalance_study_report.md
