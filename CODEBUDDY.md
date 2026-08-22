@@ -201,7 +201,7 @@ investment-advisor/
 | modern.css | v=18 | main.js themeMap |
 | tech.css | v=18 | main.js themeMap |
 | data.js | v=19 | index.html line ~721 |
-| engine.js | v=20 | index.html |
+| engine.js | v=21 | index.html |
 | sliders.js | v=9 | index.html |
 | charts.js | v=17 | index.html |
 | rolling.js | v=11 | index.html |
@@ -247,6 +247,20 @@ investment-advisor/
   - **分享图**：`share-image.js` Hero 海报动态取 `getDefaultResult()`；结果卡月胜率改用 `monthlyWinRate`（原用不存在的 `winRate` 恒回退 67.9%）。
   - **口径刷新**：`data.js` comparisons/finalConfig.backtest、`index.html` 静态文案（og:description、insight-box 三档、section-subtitle、SEO 隐藏文本、Hero 静态回退值）、README 三档表全部同步到 131 月口径（稳健年化 7.49%、Sharpe 0.91、终值 110.1万、月胜率 67.9%）。
 - **发布前自检**：`node scripts/smoke_check.js` 一键校验引擎一致性、Hero ID 齐全性、回测窗口=真实数据条数、三档动态≈静态（退出码 0=通过）。
+
+### 日频回测与再平衡深度研究（2026-08-22）
+- **新增能力**：`engine.js.simulateCMV_daily` — 基于日 K 线的恒市值法回测（与月频 `simulateCMV` 同口径，仅频率细化为日）。读 `scripts/_daily_cache.json`，支持 `schedule: 'weekly-mon' | 'biweekly-mon' | 'monthly-eom' | 'every-N-months-eom' | 'every-1-months-cal-N'`（alias `monthly-day-N` → `every-1-months-cal-N`，遇周末顺延下个交易日）。
+- **新增脚本**：
+  - `scripts/fetch_daily.py` — 拉 5 资产日 K 线（datalen=3000 qfq），优先用 backup 老 ETF 代码（sh513500/sh513100/sh518880/sh510310/sh510500）以获 12 年历史。
+  - `scripts/rebalance_study.js` — 重写后跑「研究1：1周/2周/1月/2月/3月」5 档 + 「研究2：1~31 号」31 档，每档产 13 行滚动回测表（与生产线格式对齐）。
+  - `scripts/_smoke_daily.js` — 日频引擎冒烟测试。
+- **关键发现（研究报告 `scripts/_rebalance_study_report.md`，1279 行）**：
+  - **频率**：5 档年化差异 < 0.4pct（+8.38%~+8.74%），1 月 1 次（当前默认）排第 3，回撤第 2 小（-13.03%）。**结论：当前策略接近最优，无需折腾频率。**
+  - **日号**：31 档差异 < 0.02pct（+8.59%~+8.61%），稳健型 25% 现金缓冲下 ±5% 阈值几乎不触发再平衡。**结论：再平衡日无显著影响。**
+  - **入场时机影响 >> 再平衡参数影响**（同一档频率下不同起点年化差 4-7pct）。
+- **生产口径**：日频 maxDd ≈ -20%（vs 月频 -6%）因捕捉月内极端值，横向对比依然有效。
+- **引擎版本**：v20 → v21（新增 `simulateCMV_daily` / `buildRebalanceSet`，未影响月频主路径）。
+- **浏览器兼容性**：日频函数检测不到 `require` 时返回 null，浏览器加载零风险（仅 Node 研究脚本调用）。
 
 ### 再平衡策略研究（2026-08-22）
 - **动机**：用户对照滚动回测表，问「1月1次再平衡是否为最优？」、「再平衡日（每月 1~31 号）哪天最优？」

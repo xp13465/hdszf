@@ -1,6 +1,9 @@
 /**
  * 回测计算引擎
  * 6维资产权重直接匹配 + 降级估算
+ *
+ * 月频回测：simulateCMV（直接读 APP_DATA.realReturns 月收益）
+ * 日频回测：simulateCMV_daily（读 scripts/_daily_cache.json 日K线，支持周/月/日级别再平衡）
  */
 
 const BacktestEngine = (() => {
@@ -448,6 +451,347 @@ const BacktestEngine = (() => {
     return { equityCurve, drawdownCurve, months: monthlyReturns.length, monthLabels: rr.months.slice(0, monthlyReturns.length) };
   }
 
+  /**
+   * 加载日K线缓存（scripts/_daily_cache.json），供日频回测用
+   * Node 环境（脚本）：用 fs.readFileSync；浏览器环境：无 fs 时返回 null。
+   */
+  function loadDailyCache() {
+    if (typeof require !== 'undefined' && typeof fs !== 'undefined') {
+      try {
+        const p = require('path').resolve(__dirname || '.', 'scripts/_daily_cache.json');
+        if (typeof require !== 'undefined') {
+          return JSON.parse(require('fs').readFileSync(p, 'utf8'));
+        }
+      } catch (e) { return null; }
+    }
+    return null;
+  }
+
+  /**
+   * 日频恒市值法回测（基于日K线）
+   *
+   * @param {Object} alloc 资产配置小数比例
+   * @param {Object} opts
+   *   - schedule: 'weekly-mon' | 'biweekly-mon' | 'monthly-eom' | 'monthly-day-N'（N=1..31，遇非交易日顺延下一交易日）
+   *   - threshold: ±阈值（默认 0.05）
+   *   - feeRate, buildMonths, totalCapital
+   *   - dailyCache: 可直接传入 _daily_cache.json 内容（避免 require）
+   * @returns {Object|null} {monthlyReturns, monthlyWinRate, ...}，同 simulateCMV 字段
+   */
+  function simulateCMV_daily(alloc, opts) {
+    opts = opts || {};
+    const cache = opts.dailyCache || loadDailyCache();
+    if (!cache) return null;
+
+    const totalCapital = opts.totalCapital || 500000;
+    const buildMonths  = opts.buildMonths != null ? opts.buildMonths : 1;
+    const threshold    = opts.threshold != null ? opts.threshold : 0.05;
+    const feeRate      = opts.feeRate != null ? opts.feeRate : 0.001;
+    const schedule     = opts.schedule || 'monthly-eom';
+
+    // 归一化为小数
+    const a = {};
+    let sum = 0;
+    for (const asset of ASSETS) { a[asset] = alloc[asset] || 0; sum += a[asset]; }
+    if (sum < 0.999) a[CASH_ASSET] += (1 - sum);
+
+    // 5 资产对齐：取公共日期集合（按 ISO 日期字符串交集 + 升序）
+    const dateSets = {};
+    for (const asset of ASSETS) {
+      const arr = cache[asset] || [];
+      dateSets[asset] = new Set(arr.map(r => r.day));
+    }
+    const referenceDates = (cache['沪深300'] || []).map(r => r.day).sort();
+    const commonDates = referenceDates.filter(d =>
+      ASSETS.every(asset => asset === CASH_ASSET || dateSets[asset].has(d))
+    );
+    if (commonDates.length < 60) return null;
+
+    // 按 startDate 裁剪（默认 '2015-08-01'，对齐月频 realReturns 起点）
+    const startDate = opts.startDate || '2015-08-01';
+    const startIdx = commonDates.findIndex(d => d >= startDate);
+    const alignedDates = startIdx >= 0 ? commonDates.slice(startIdx) : commonDates.slice();
+
+    // 建立日索引到 close 的映射
+    const closeMap = {};
+    for (const asset of ASSETS) {
+      closeMap[asset] = {};
+      for (const r of (cache[asset] || [])) closeMap[asset][r.day] = +r.close;
+    }
+
+    // 现金用月收益近似（与月频引擎口径一致）：每日按月收益/30 复利
+    const cashDaily = Math.pow(1 + (APP_DATA.realReturns && APP_DATA.realReturns.cash_monthly ? APP_DATA.realReturns.cash_monthly : 0.00083), 1/30) - 1;
+
+    // 持仓状态
+    const holdings = {};
+    const targetValues = {};
+    for (const asset of ASSETS) {
+      holdings[asset] = 0;
+      targetValues[asset] = totalCapital * a[asset];
+    }
+    let cashBalance = totalCapital;
+
+    // 预计算再平衡检查日
+    const rebalanceSet = buildRebalanceSet(alignedDates, schedule);
+
+    // 按日循环
+    const monthlyReturns = [];
+    let curMonth = null;
+    let prevMonthTotal = totalCapital;  // 上月末净值（首月用 totalCapital）
+    let totalValue = totalCapital;
+    let peakValue = totalCapital;
+    let maxDrawdown = 0;
+    let buildMonthCount = 0;
+
+    for (let dayIdx = 0; dayIdx < alignedDates.length; dayIdx++) {
+      const date = alignedDates[dayIdx];
+      const m = date.slice(0, 7); // YYYY-MM
+
+      // 新月份首日：收尾上月 + 现金并入
+      if (m !== curMonth) {
+        if (curMonth !== null) {
+          // 收尾上一月
+          const r = prevMonthTotal > 0 ? (totalValue / prevMonthTotal - 1) : 0;
+          monthlyReturns.push(r);
+          if (totalValue > peakValue) peakValue = totalValue;
+          const dd = (totalValue / peakValue - 1) * 100;
+          if (dd < maxDrawdown) maxDrawdown = dd;
+        }
+        curMonth = m;
+        prevMonthTotal = totalValue;
+        // 月初：现金余额并入现金持仓
+        holdings[CASH_ASSET] = (holdings[CASH_ASSET] || 0) + cashBalance;
+        cashBalance = 0;
+      }
+
+      // 每日按 close 累乘更新持仓
+      for (const asset of ASSETS) {
+        let ret;
+        if (asset === CASH_ASSET) {
+          ret = cashDaily;
+        } else {
+          const prev = closeMap[asset][alignedDates[Math.max(0, dayIdx - 1)]] || closeMap[asset][date];
+          const cur = closeMap[asset][date];
+          ret = prev > 0 ? (cur / prev - 1) : 0;
+        }
+        holdings[asset] = (holdings[asset] || 0) * (1 + ret);
+      }
+
+      // 建仓期判断：本月是否在 buildMonths 内（从最早 commonDate 月份开始计）
+      const isBuildMonth = (buildMonthCount < buildMonths);
+      // 月内首日（每月只在 dayIdx==0 或跨月时执行建仓一次）
+      const isMonthFirstDay = (m !== (alignedDates[dayIdx - 1] || '').slice(0, 7));
+
+      if (isBuildMonth && isMonthFirstDay) {
+        const buildFraction = Math.min(1, (buildMonthCount + 1) / buildMonths);
+        for (const asset of ASSETS) {
+          if (asset === CASH_ASSET) continue;
+          const currentTarget = targetValues[asset] * buildFraction;
+          const diff = currentTarget - holdings[asset];
+          if (Math.abs(diff) <= 1) continue;
+          const fee = Math.abs(diff) * feeRate;
+          if (diff > 0) {
+            const need = diff + fee;
+            const avail = Math.min(holdings[CASH_ASSET], need);
+            if (avail > 1) { holdings[CASH_ASSET] -= avail; holdings[asset] += (avail - fee); }
+          } else {
+            holdings[CASH_ASSET] += (Math.abs(diff) - fee);
+            holdings[asset] = currentTarget;
+          }
+        }
+        buildMonthCount += 1;
+      }
+
+      // 再平衡检查
+      if (!isBuildMonth && rebalanceSet.has(date)) {
+        for (const asset of ASSETS) {
+          if (asset === CASH_ASSET) continue;
+          const tv = targetValues[asset];
+          const ch = holdings[asset];
+          if (tv <= 0) continue;
+          const dev = (ch - tv) / tv;
+          if (Math.abs(dev) > threshold) {
+            const diff = tv - ch;
+            const fee = Math.abs(diff) * feeRate;
+            if (diff > 0) {
+              const need = diff + fee;
+              const avail = Math.min(holdings[CASH_ASSET], need);
+              if (avail > 1) { holdings[CASH_ASSET] -= avail; holdings[asset] += (avail - fee); }
+            } else {
+              holdings[CASH_ASSET] += (Math.abs(diff) - fee);
+              holdings[asset] = tv;
+            }
+          }
+        }
+      }
+
+      totalValue = ASSETS.reduce((s, asset) => s + holdings[asset], 0);
+    }
+    // 收尾最后一个月
+    if (curMonth !== null) {
+      const r = prevMonthTotal > 0 ? (totalValue / prevMonthTotal - 1) : 0;
+      monthlyReturns.push(r);
+      if (totalValue > peakValue) peakValue = totalValue;
+      const dd = (totalValue / peakValue - 1) * 100;
+      if (dd < maxDrawdown) maxDrawdown = dd;
+    }
+
+    // 指标
+    const n = monthlyReturns.length;
+    const finalValue = totalValue;
+    const totalReturn = (finalValue / totalCapital - 1) * 100;
+    const annual = n > 0 ? (Math.pow(finalValue / totalCapital, 12 / n) - 1) * 100 : 0;
+    const meanR = n ? monthlyReturns.reduce((x,y)=>x+y,0)/n : 0;
+    const variance = n > 1 ? monthlyReturns.reduce((s,r)=>s+(r-meanR)**2,0)/(n-1) : 0;
+    const annVol = Math.sqrt(Math.max(0, variance)) * Math.sqrt(12);
+    const sharpe = annVol > 0 ? (annual/100 - 0.02) / annVol : 0;
+    const neg = monthlyReturns.filter(r => r < 0);
+    const dVar = neg.length > 1 ? neg.reduce((s,r)=>s+r*r,0)/(neg.length-1) : 0;
+    const annDown = Math.sqrt(Math.max(0, dVar)) * Math.sqrt(12);
+    const sortino = annDown > 0 ? (annual/100 - 0.02) / annDown : 0;
+    const posMonths = monthlyReturns.filter(r => r > 0).length;
+    const winRate = n ? posMonths / n : 0;
+
+    return {
+      annual, maxDd: maxDrawdown,
+      sharpe: Math.max(0, Math.min(sharpe, 10)),
+      sortino: Math.max(0, Math.min(sortino, 10)),
+      total: totalReturn, finalValue,
+      monthlyWinRate: winRate,
+      monthlyReturns,
+      positiveMonths: posMonths,
+      totalMonths: n,
+      trades: monthlyReturns.length  // 占位字段，dailystudy 单独算
+    };
+  }
+
+  /**
+   * 构造再平衡检查日集合
+   * schedule:
+   *   'weekly-mon'      -> 每周一
+   *   'biweekly-mon'    -> 每 2 周周一
+   *   'monthly-eom'     -> 每月最后一个交易日
+   *   'monthly-day-N'   -> 每月第 N 个交易日（N=1..31，遇周末/节假日顺延下一交易日；数据精度为日，无节假日表，按"周一~周五"判断）
+   */
+  function buildRebalanceSet(dates, schedule) {
+    const set = new Set();
+    // alias: monthly-day-N → every-1-months-calendar-N
+    if (schedule.startsWith('monthly-day-')) {
+      schedule = 'every-1-months-cal-' + schedule.slice('monthly-day-'.length);
+    }
+    if (schedule === 'weekly-mon' || schedule === 'biweekly-mon') {
+      const step = schedule === 'weekly-mon' ? 1 : 2;
+      let weekCount = 0;
+      for (const d of dates) {
+        const dow = new Date(d + 'T00:00:00Z').getUTCDay(); // 0=Sun, 1=Mon
+        if (dow === 1) {
+          if (weekCount % step === 0) set.add(d);
+          weekCount += 1;
+        }
+      }
+    } else if (schedule === 'monthly-eom') {
+      // 每月最后一个交易日（数据集中最后一天即月末）
+      let prevM = null;
+      for (let i = 0; i < dates.length; i++) {
+        const m = dates[i].slice(0, 7);
+        const nextM = (dates[i+1] || '').slice(0, 7);
+        if (m !== nextM) set.add(dates[i]);
+        prevM = m;
+      }
+    } else if (/^every-\d+-months-cal-/.test(schedule)) {
+      // 日历日 schedule：每月第 N 个日历日（N=1..31，遇周末顺延下一交易日）
+      // 形如 every-N-months-cal-K（K 为日历日 1~31）
+      // N 始终 1（每月都触发），K 是日历日
+      const dayOfMonth = parseInt(schedule.match(/-cal-(\d+)$/)[1], 10);
+      // 收集每月日期范围
+      let curMonth = null;
+      let monthDates = [];
+      const monthDateMap = [];
+      for (const d of dates) {
+        const m = d.slice(0, 7);
+        if (m !== curMonth) {
+          monthDateMap.push({ m, dates: monthDates });
+          curMonth = m;
+          monthDates = [];
+        }
+        monthDates.push(d);
+      }
+      monthDateMap.push({ m: curMonth, dates: monthDates });
+
+      // 每月找日历日 = dayOfMonth；若该日非交易日则顺延下个交易日；
+      // 该月无该日（如 2 月无 30/31）则取该月末
+      for (const entry of monthDateMap) {
+        if (!entry.dates.length) continue;
+        const targetMonth = entry.m;
+        const dayStr = String(dayOfMonth).padStart(2, '0');
+        const targetDay = targetMonth + '-' + dayStr;
+        // 找 >= targetDay 的第一个交易日
+        let pickDay = null;
+        for (const d of entry.dates) {
+          if (d >= targetDay) { pickDay = d; break; }
+        }
+        // 该月无此日（如 2 月 30 号不存在且最大 28/29）→ 取月末
+        if (!pickDay) pickDay = entry.dates[entry.dates.length - 1];
+        // pickDay 是周末则顺延下一交易日
+        if (pickDay) {
+          let idx = entry.dates.indexOf(pickDay);
+          let dow = new Date(pickDay + 'T00:00:00Z').getUTCDay();
+          while ((dow === 0 || dow === 6) && idx + 1 < entry.dates.length) {
+            idx += 1;
+            pickDay = entry.dates[idx];
+            dow = new Date(pickDay + 'T00:00:00Z').getUTCDay();
+          }
+          if (dow === 0 || dow === 6) pickDay = null;  // 整月无交易日（极端）
+          if (pickDay) set.add(pickDay);
+        }
+      }
+    } else if (/^every-\d+-months-/.test(schedule)) {
+      // 形如 every-N-months-eom 或 every-N-months-day-M（N 为数字）
+      const m = schedule.match(/^every-(\d+)-months-(.+)$/);
+      if (!m) return set;
+      const stepMonths = parseInt(m[1], 10);
+      const rest = m[2];
+      let dayN;
+      if (rest === 'eom') {
+        dayN = null;
+      } else if (rest.startsWith('day-')) {
+        dayN = parseInt(rest.slice('day-'.length), 10);
+      } else {
+        return set;
+      }
+      // 收集每月的交易日列表
+      let curMonth = null;
+      let monthTradingDays = [];
+      const monthDayMap = [];  // [{m, lastDay}]
+      for (const d of dates) {
+        const m = d.slice(0, 7);
+        const dow = new Date(d + 'T00:00:00Z').getUTCDay();
+        if (m !== curMonth) {
+          monthDayMap.push({ m, days: monthTradingDays });
+          curMonth = m;
+          monthTradingDays = [];
+        }
+        if (dow >= 1 && dow <= 5) monthTradingDays.push(d);
+      }
+      monthDayMap.push({ m: curMonth, days: monthTradingDays });
+
+      // 找每 N 月触发点
+      for (let i = 0; i < monthDayMap.length; i++) {
+        const entry = monthDayMap[i];
+        if (i % stepMonths !== 0) continue;
+        if (entry.days.length === 0) continue;
+        let pickDay;
+        if (dayN == null) {
+          pickDay = entry.days[entry.days.length - 1];  // EOM
+        } else {
+          pickDay = entry.days[Math.min(dayN - 1, entry.days.length - 1)];  // 第 N 个交易日（不足则取月末）
+        }
+        if (pickDay) set.add(pickDay);
+      }
+    }
+    return set;
+  }
+
   function getDefaultResult() {
     return compute(DEFAULT_CONFIG);
   }
@@ -456,6 +800,8 @@ const BacktestEngine = (() => {
     compute,
     getDefaultResult,
     simulateCMV,
+    simulateCMV_daily,
+    buildRebalanceSet,
     generateMonthlyReturns,
     DEFAULT_CONFIG,
     PLANS,
