@@ -507,10 +507,13 @@ const BacktestEngine = (() => {
     );
     if (commonDates.length < 60) return null;
 
-    // 按 startDate 裁剪（默认 '2015-08-01'，对齐月频 realReturns 起点）
+    // 按 startDate / endDate 裁剪（默认 '2015-08-01' 起；endDate 用于对齐月频数据终点）
     const startDate = opts.startDate || '2015-08-01';
+    const endDate = opts.endDate || '2099-12-31';
     const startIdx = commonDates.findIndex(d => d >= startDate);
-    const alignedDates = startIdx >= 0 ? commonDates.slice(startIdx) : commonDates.slice();
+    let alignedDates = startIdx >= 0 ? commonDates.slice(startIdx) : commonDates.slice();
+    alignedDates = alignedDates.filter(d => d <= endDate);
+    if (alignedDates.length < 60) return null;
 
     // 建立日索引到 close 的映射
     const closeMap = {};
