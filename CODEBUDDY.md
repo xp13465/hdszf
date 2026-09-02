@@ -297,6 +297,21 @@ investment-advisor/
 - `scripts/rebalance_study.js` 读 `js/data.js`，现在重跑会得到 132 月结果，与已入库的 `scripts/_rebalance_study_report.md`（131 月快照）不再逐行一致。研究报告**需重跑刷新或标注快照版本**，见下条待办。
 - [ ] 待办：刷新 `_daily_cache.json` 至 2026-08-31 后重跑 `node scripts/rebalance_study.js`，让报告回到可核对状态。
 
+**新旧数据差异（2026-09-02 出报告）**
+- 新增工具 `scripts/diff_data_update.js`：把当前 `data.js` 截掉最后 N 个月作为「旧口径」，
+  与全量「新口径」各跑一遍 `RollingBacktest.runAll()` + `BacktestEngine.simulateCMV`，
+  输出与站内「滚动回测汇总」同构的 12 列表格，并逐指标标注正向/负向。
+  用法 `node scripts/diff_data_update.js [--drop N] [--md 输出路径]`，详见文件头注释。
+- ⚠️ 实现要点：`data.js` 顶层是 `const APP_DATA`，在 Node `vm` 里 **不会挂到 context 对象上**
+  （`ctx.APP_DATA` 是 `undefined`），必须用 `vm.runInContext('APP_DATA', ctx)` 求值取到。
+- ⚠️ 对齐口径：收口月后移 1 个月后，常规起点的日历月也整体后移（旧「10 年前」= 2016-07，新 = 2016-08），
+  按具体年月只能对上 1 行。**必须按「N 年前入场 + 建仓方式」对齐**，回测月数才相同、才可比。
+- 本次结论：**12 个入场起点全部正向，无一恶化**。2026-08 是全面上涨月
+  （沪深300 +0.69%、中证500 +6.32%、标普500 +7.70%、纳斯达克100 +4.92%、黄金 +8.29%）。
+  稳健型全周期：年化 7.49% → 7.63%（+0.13 pct）、终值 110.1万 → 112.2万（+21645 元）、
+  Sharpe 0.91 → 0.93、最大回撤 −6.09% → −6.09%（未加深）。
+- 报告：`scripts/data_update_report_2026-08.md`（221 行，随数据一并入库）。
+
 ---
 
 ## 十二、本次会话完成工作

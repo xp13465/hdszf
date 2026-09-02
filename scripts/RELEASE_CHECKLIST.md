@@ -96,6 +96,10 @@
 
 - [ ] `node scripts/smoke_check.js` → 全部 PASS，退出码 0（校验引擎一致性 + Hero ID + 三档动态≈静态）
 - [ ] `node scripts/recompute_derived.js --check` → 全 OK
+- [ ] `node scripts/diff_data_update.js --md scripts/data_update_report_<TARGET>.md`
+      生成「新旧数据差异报告」，格式与站内「滚动回测汇总」表同构（12 列），
+      逐起点标注正向/负向。报告必须随本次提交一起入库（脚本与报告配套互相验证）。
+      默认 `--drop 1`（对比截掉最后 1 个月的旧口径）；跨月补更时用 `--drop N`。
 - [ ] 本地起服务（`python -m http.server` 或 `wrangler dev`）肉眼核对：
   - [ ] 滚动汇总表新增起点行且无 NaN/∞/负终值
   - [ ] 三档方案数字与 `data.js` 一致
@@ -114,6 +118,8 @@
 - [ ] `scripts/rebalance_study.js` **直接读 `js/data.js`**，数据更新后重跑会得到新月份数。
       已入库的 `scripts/_rebalance_study_report.md` 会成为旧快照、与脚本不再逐行一致
       → 重跑 `node scripts/rebalance_study.js` 刷新报告，或在报告头部标注「数据快照：N-1 个月」。
+- [ ] 差异报告 `scripts/data_update_report_<TARGET>.md` 已随数据提交入库（见阶段 5）。
+      历史差异报告保留，便于回溯每月更新的影响方向与幅度。
 
 ---
 
