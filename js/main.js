@@ -193,7 +193,7 @@
 
     const funds = APP_DATA.funds || [];
     // 回测实际截止日期
-    const actualEndDate = '2026-07';
+    const actualEndDate = '2026-08';
 
     funds.forEach(fund => {
       const code = fund.code || fund.fund_code || '';

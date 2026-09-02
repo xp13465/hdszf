@@ -1,7 +1,7 @@
 {
   "_status": "VERIFIED 2026-08-20",
   "_source": "新浪财经前复权日K线(scale=240,adj=qfq)，月末close/上月末close-1 聚合为月收益；非 eastmoney 基金净值",
-  "_offset_note": "项目 month 标签比真实日历早 1 个月：项目['2026-05']=日历2026-06收益。故日历YM的月收益写入项目标签 (YM-1)。",
+  "_offset_note": "【2026-09-02 修正】标签=日历月，无偏移。months 是月末标签数组，长度=收益条数+1；returns[i] = 日历月 months[i+1] 的收益。例：末位标签 2026-08 对应的收益就是日历 2026 年 8 月。旧版曾写「标签=日历-1」，已证伪，勿再沿用。",
   "_primary_codes_from": ["xlsx 主选ETF代码", "data.js funds 数组"],
   "assets": {
     "沪深300":     {"primary": "510300", "primary_name": "华泰柏瑞沪深300ETF", "sina": "sh510300", "backup": ["160706", "510310"]},

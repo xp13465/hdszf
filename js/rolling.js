@@ -24,7 +24,7 @@ const RollingBacktest = (() => {
     startYear: 2016,
     startMonth: 7,
     endYear: 2026,
-    endMonth: 7
+    endMonth: 8
   };
 
   const ASSETS = ['沪深300', '中证500', '标普500', '纳斯达克100', '黄金', '现金·货币基金'];
@@ -32,7 +32,7 @@ const RollingBacktest = (() => {
 
   /**
    * 获取所有回测起点（数据最早月 ~ 1年前，按月对齐）
-   * 起点列表: 2015-08 (131个月), 2016-07, 2017-07, ..., 2025-07
+   * 起点列表: 2015-08 (132个月), 2016-07, 2017-07, ..., 2025-08
    */
   function getStartPoints() {
     const points = [];

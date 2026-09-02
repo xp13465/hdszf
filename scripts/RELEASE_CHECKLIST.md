@@ -1,102 +1,125 @@
 # 滚动回测月度更新 · 发布检查清单（RELEASE CHECKLIST）
 
-本清单用于「把最后完整月之后的新月份补进回测并上线」。
+本清单用于「把最后一个完整日历月补进回测并上线」。
 
-> ★ 先读这段，避免逆向工程 ★
+> **用法**：全文用占位符，动手前先在心里替换：
+> - `TARGET` = 本次要补入的**日历月**（如 `2026-09`）
+> - `PREV` = 当前已填到的**日历月**（如 `2026-08`）
+> - `N` = 补数后的收益条数（当前 132）；`N-1` = 补数前的条数（当前 131）
+> - `END_M` = 收口月**数字**（`TARGET` 的月份数字，如 9）
 >
-> **月份标签偏移（最大坑）**：项目的 month 标签比真实日历早 1 个月。
-> 日历 2026-07（7 月）的真实收益，要写入 `js/data.js` / `js/real_returns.json` 的 `2026-06` 标签位。
-> 取数脚本 `fetch_returns.py --target 2026-07` 会自动算出「项目标签 = 2026-06」，并打出 5 个资产的值。
-> 详见 `scripts/fetch_returns.py` 文件头注释与 `scripts/fund_map.json`。
->
-> **哪些已经动态化（无需手工回填）**：
-> - 滚动回测汇总表：前端 `RollingBacktest.runAll()` 实时计算。
-> - 交互式回测区 / 默认结果：引擎主路径 `BacktestEngine.simulateCMV` 直读真实数据实时算。
-> - **三档方案对比卡片**：`js/main.js` 的 `initComparisonCards` 于 2026-08-21 改为内联三档配置并调用
->   `simulateCMV` 实时计算，页面展示随数据更新**自动生效**，不再依赖 `data.js` 里写死的 `comparisons`。
->   三档配置的唯一事实来源是 `BacktestEngine.PLANS`（engine.js）。
-> - **首屏 Hero 4 张统计卡**（终值/年化、月胜率 x/y月、10年仅N年亏损·最多亏Z%、最大回撤、现金比例）：
->   `main.js` 的 `updateHeroStats` 于 2026-08-21 接入 `getDefaultResult()` 实时填充，随数据更新自动生效。
->   其中"月胜率 x/y 月"和年度亏损统计来自 `simulateCMV` 新增的 `positiveMonths/totalMonths/yearly` 字段。
-> - **三档雷达图 / 4 个对比柱状图**：`charts.js` 经 `getPlansMetrics` 用 `BacktestEngine.PLANS`+`simulateCMV` 实时算。
-> - **分享图（Hero 海报 + 回测结果卡）**：`share-image.js` 动态取 `getDefaultResult()`，无需回填。
-> - **收益/回撤曲线**：统一走 `simulateCMV` 月度序列，与指标卡数值一致。
-> - **回测窗口**：`simulateCMV` 按真实收益条数自动迭代（排除 months 末位占位标签），补数据后自动延伸，无需改引擎。
->
-> **哪些仍是写死、需随数据窗口延伸重算**（`js/data.js`）：
-> - `finalConfig.backtest`、`goldSweep`（15 组）、`trendData`（约 30+ 行）。
-> - `comparisons`（三档方案）静态值：页面已不读它渲染卡片/图表（均动态），但 README 表与 `data.js` 内该对象仍可同步更新，
->   以便「静态对照」和离线兜底（`initComparisonCards` 真实数据缺失时回退到此）。
-> - 这些写死数字多一个月后会轻微漂移，漏重算会导致「汇总表新、方案数字旧」的表面矛盾。
+> 最近一次执行：**2026-09-02，补入日历 2026-08，131 → 132 个月**。
 
 ---
 
-## 阶段 0 · 前置（9/1 前完成）
+> ## ★ 先读这段，避免逆向工程 ★
+>
+> ### 月份标签口径（无偏移 · 已用源数据核验）
+> `months` 是**月末标签数组，长度恒为「收益条数 + 1」**；`returns[i]` = **日历月 `months[i+1]`** 的收益。
+> **标签直接等于日历月，没有任何偏移。** 日历 2026-08 的真实收益 → 写入 `2026-08` 标签位。
+>
+> 例：当前 `months = [2015-08 … 2026-08]`（133 条）配 132 条收益，日历覆盖 **2015-09 ~ 2026-08**。
+> `months[0] = 2015-08` 是**起点标记**（入场时点），不是第一个收益月。
+>
+> ⚠️ **历史坑**：旧版文档/脚本/fund_map 曾写「标签 = 日历 − 1 个月」，`fetch_returns.py` 的 `prev_label()`
+> 据此做减月 —— 一旦用 `--write` 就会**把新月份收益覆盖掉上月的真实值**。该说法已于 2026-09-02 证伪，
+> `prev_label()` 改为恒等映射。**若在任何地方再看到「标签比日历早 1 个月」，一律以本节为准并修正。**
+>
+> ### 哪些已动态化（补数据即生效，无需回填）
+> - 滚动回测汇总表：前端 `RollingBacktest.runAll()` 实时算。
+> - 交互式回测区 / 默认结果：`BacktestEngine.simulateCMV` 直读真实数据实时算。
+> - 三档方案对比卡片：`main.js` 的 `initComparisonCards` → `simulateCMV`（配置唯一来源 `BacktestEngine.PLANS`）。
+> - 首屏 Hero 4 张统计卡：`main.js` 的 `updateHeroStats` → `getDefaultResult()`。
+> - 三档雷达图 / 4 个对比柱状图：`charts.js` 的 `getPlansMetrics` → `simulateCMV`。
+> - 分享图、收益/回撤曲线：动态取 `getDefaultResult()` / `simulateCMV` 月度序列。
+> - 回测窗口：`simulateCMV` 按真实收益条数自动迭代，补数据后自动延伸。
+>
+> ### 哪些仍是写死、需重算（都在 `js/data.js`）
+> - `finalConfig.backtest`、`comparisons`（三档）→ **已可用 `scripts/recompute_derived.js` 自动重算**。
+> - `goldSweep`（15 组）、`trendData`（30+ 行）→ **脚本未覆盖，仍需手工重算**。
+>   二者仅作真实数据缺失时的兜底与历史对照，页面主路径已不读它们。
+> - 漏重算会导致「动态新、静态旧」的表面矛盾，`smoke_check.js` 会报 FAIL。
 
-- [ ] 确认 `scripts/fund_map.json` 的基金代码与实际回测口径一致（原数据用 35,784 条基金净值，
-      仓库未记录具体基金，此为待校验项）。脚本默认值是常见 ETF 猜测，必须核对。
-- [ ] 确认月收益率口径：原数据用的是「自然月首个净值 / 末个净值」还是「复权净值」或其他，
-      保证 `fetch_returns.py` 计算结果与原序列口径一致。
-- [ ] 确保目标月已完全结束（如补 `2026-08`，需在 8/31 之后运行）。
+---
 
-## 阶段 1 · 取数（脚本取数，但“写回”半自动）
+## 阶段 0 · 前置
 
-- [ ] `cd hdszf && python scripts/fetch_returns.py --target 2026-08`
-      （脚本只打印「日历月 → 项目标签(=2026-07)」及 5 资产月收益，**不自动写文件**）
-- [ ] 核对 5 个资产月收益率是否合理（无异常 ±50% 之类的脏值）
-- [ ] 手工（或另写一次性脚本）把值写回 `js/data.js` 与 `js/real_returns.json`：
-  - [ ] 在 `months` 末尾**替换/追加**目标项目标签（注意偏移：日历 2026-08 → 项目标签 `2026-07`）
-  - [ ] 5 个资产数组各补 1 个值到对应位置
-  - [ ] `month_count` / `data_range` / `n_months` 同步更新
-  - [ ] 先备份 `.bak`，确认无误后可删
-- [ ] **双数据源必须同步改**（`data.js` + `real_returns.json`），漏改其一会导致前端与原始数据不一致
+- [ ] 确保 `TARGET` 月已**完全结束**（补 `2026-09` 需在 10/1 之后运行）。
+      **月未结束或取不到数就别更新**，绝不用历史均值占位。
+- [ ] 确认 `scripts/fund_map.json` 的基金代号与实际口径一致（当前标记 `VERIFIED 2026-08-20`）。
+- [ ] 确认月收益口径一致：新浪前复权日 K 线，月末 close / 上月末 close − 1。
+
+## 阶段 1 · 取数与写回（双数据源必须同步）
+
+- [ ] `cd hdszf && python scripts/fetch_returns.py --target TARGET`
+      （只打印「项目标签 = TARGET（无偏移）」及 5 资产月收益，**不自动写文件**）
+- [ ] 核对 5 个资产月收益率是否合理（无 ±50% 之类的脏值）
+- [ ] 写回 `js/data.js` **与** `js/real_returns.json`（先备份 `.bak`，确认无误后可删）：
+  - [ ] `months` 末尾**追加** `TARGET`（追加，不要替换末位——末位是上月真实值）
+  - [ ] 5 个资产数组各追加 1 个值
+  - [ ] `realReturns.month_count` 与 `meta.n_months` 各 +1
+- [ ] **双数据源必须同步改**，漏改其一前端与原始数据就不一致
 
 ## 阶段 2 · 引擎与展示边界（手动改代码）
 
-- [ ] `js/rolling.js`：`CONFIG.endMonth` 7 → 8（若仍用于收口）；注释中 `131个月/2025-07` → `132个月/2025-08`
-- [ ] `js/main.js`：`actualEndDate` `'2026-07'` → `'2026-08'`
-- [ ] 三档卡片无需改 `initComparisonCards` 配置（已内联），真实数据一更新页面即变
+- [ ] `js/rolling.js`：`CONFIG.endMonth` 改为 `END_M`；注释里 `N-1个月/起始月` → `N个月/起始月+1`
+- [ ] `js/main.js`：`actualEndDate` `'PREV'` → `'TARGET'`
+- [ ] 三档卡片无需改（已内联动态）
+- [ ] 起点会整体后移 1 个月：跑 `node -e` 或临时脚本打印 `RollingBacktest.getStartPoints()`，
+      确认最早起点月数为 `N`、最近起点为「`TARGET` 前 1 年」且 yearsAgo=1
 
-## 阶段 3 · 派生指标重算（核心，手动/node）
+## 阶段 3 · 派生指标重算
 
-> 这些数字写在 `js/data.js`，多一个月后所有年化/回撤/Sharpe/Sortino/终值会轻微漂移。
-> 需本地重跑回测引擎（node 加载 `js/data.js`+`js/engine.js` 后调用 `BacktestEngine.simulateCMV(alloc)` 等入口）得到新值再回填：
+- [ ] `node scripts/recompute_derived.js --check`
+      → 输出 32 个字段的「动态 vs 静态」对照表；全 OK 则退出 0，有差异退出 1
+- [ ] `node scripts/recompute_derived.js`
+      → 有差异时自动回填 `comparisons`（三档 × 8 字段）+ `finalConfig.backtest`（8 字段）并复核；
+      写前自动备份 `js/data.js.bak`。**写回保留完整浮点精度**，diff 里只出现真正变化的字段
+- [ ] `goldSweep` / `trendData`：**脚本未覆盖，手工重算**（可选，仅影响兜底与历史对照）
 
-- [ ] `finalConfig.backtest`（年化/总收益/最大回撤/Sharpe/Sortino/终值/月胜率/月度波动/回撤持续）
-- [ ] `goldSweep` 全部 15 组（gold_pct 0~26）的 best_annual/best_dd/best_sharpe
-- [ ] `trendData` 全部条目（约 30+ 行）的 annual/dd/sharpe/sortino/final/total
-- [ ] `comparisons`（三档方案）静态值：仅影响 README 表与离线兜底，页面卡片已动态，**可选**同步
-- [ ] 滚动汇总表：前端会新增一行起点（1 年前入场），所有窗口长度 +1 个月，需目测渲染正确
+## 阶段 4 · 文案与「最后更新」戳
 
-## 阶段 4 · 文案与「最后更新」戳（多文件同步）
+> 首屏 Hero 卡与三档卡片已动态化，**不需要**手工改；以下**静态文案**仍要手工刷。
 
-> 首屏 Hero 卡片与三档卡片已动态化，**不需要**手工改；以下**静态文案**仍要手工刷：
-> `index.html` 里写死的回测数字（og:description 年化、`insight-box` 三档年化/回撤、最终方案副标题
-> 年化/夏普、SEO 隐藏文本段落）。每月补数后按下列清单核对并替换为新值。
-
-- [ ] `index.html`：L395 / L612 / L747（131个月→132个月；2026年7月→8月）；L814 / L862 更新日期戳
-- [ ] `index.html` 静态文案中的年化/回撤/夏普数字（og:description、insight-box 三档、section-subtitle、SEO 隐藏段落）
-- [ ] `README.md`：数据缺口说明、回测表数字、数据范围指向新月份
-- [ ] `CODEBUDDY.md`：日期、数据缺口、数组长度注释
-- [ ] `PROJECT_SPEC.md`：日期与数据范围
-- [ ] `wrangler.jsonc`：`compatibility_date`、sitemap.xml `lastmod` → 今天
+- [ ] `index.html`：正文里「N-1 个月 → N 个月」「PREV 年 M 月 → TARGET 年 M 月」（约 3 处：数据说明段、
+      三档说明段、SEO 隐藏段）
+- [ ] `index.html` 静态数字：og:description 年化、`insight-box` 三档年化、最终方案副标题（年化/夏普）、
+      Hero 静态回退值 → 用 `recompute_derived.js --check` 显示的动态值替换
+- [ ] `index.html`：隐私政策 / 用户协议两处「最后更新日期」→ 今天
+- [ ] `README.md`：数据范围、月数、三档表、月份标签口径备忘
+- [ ] `CODEBUDDY.md`：头部「最后更新」、版本表、数据口径备忘、追加「数据刷新记录」小节
+- [ ] `PROJECT_SPEC.md`：1.1 数据范围、1.4 各资产独立年化（用当前 data.js 重算，别沿用旧值）
+- [ ] `sitemap.xml`：`lastmod` → 今天
+- [ ] **不要动** `wrangler.jsonc` 的 `compatibility_date`（Cloudflare 运行时开关，改了可能改变 Worker 行为）
 
 ## 阶段 5 · 验证与上线
 
-- [ ] `node scripts/smoke_check.js`（引擎一致性 + Hero ID 齐全 + 三档动态≈静态，退出码 0）
-- [ ] 本地 `python -m http.server` 或 `wrangler dev` 起服务，肉眼核对：
-  - [ ] 滚动汇总表新增 `2025-08` 起点行且无 NaN/∞/负终值
+- [ ] `node scripts/smoke_check.js` → 全部 PASS，退出码 0（校验引擎一致性 + Hero ID + 三档动态≈静态）
+- [ ] `node scripts/recompute_derived.js --check` → 全 OK
+- [ ] 本地起服务（`python -m http.server` 或 `wrangler dev`）肉眼核对：
+  - [ ] 滚动汇总表新增起点行且无 NaN/∞/负终值
   - [ ] 三档方案数字与 `data.js` 一致
-  - [ ] 首屏 4 张 Hero 卡数字与引擎一致（无 "undefined"、无双负号）
-  - [ ] 主题切换（三套）数字同步
-- [ ] `git add -A && git commit -m "data: 滚动回测更新至 2026-08"`
+  - [ ] 首屏 Hero 卡无 "undefined"、无双负号
+  - [ ] 三套主题切换后数字同步
+- [ ] 版本号 bump：`index.html` 里改动过的 `js/*.js?v=N` 全部 +1（否则用户浏览器/CDN 用旧缓存）
+- [ ] `git add -A && git commit -m "data: 滚动回测更新至 TARGET（N 个月）"`
 - [ ] `git push origin main`（SSH，本仓库既定传输方式）→ 触发 Cloudflare 自动部署
-- [ ] 受毛子云 CDN 最长 20 分钟缓存影响，公开页面约数分钟后刷新；部署后访问 `h.sugas.site` 复核
+- [ ] 推送后用 `git ls-remote origin main` 核对远程 tip（本地 push 输出有时不可信）
+- [ ] 受毛子云 CDN 最长 20 分钟缓存影响，部署后访问 `h.sugas.site` 复核
+
+## 阶段 6 · 关联产物（容易忘）
+
+- [ ] `scripts/_daily_cache.json` 日频缓存会**过期**（最近一次更新止于 2026-08-21）。
+      若需要重跑日级研究，先用 `scripts/fetch_daily.py` 刷新到 `TARGET` 月末。
+- [ ] `scripts/rebalance_study.js` **直接读 `js/data.js`**，数据更新后重跑会得到新月份数。
+      已入库的 `scripts/_rebalance_study_report.md` 会成为旧快照、与脚本不再逐行一致
+      → 重跑 `node scripts/rebalance_study.js` 刷新报告，或在报告头部标注「数据快照：N-1 个月」。
 
 ---
 
 ## 风险与边界
 
-- 不要凭空造目标月收益：月未结束或无法取数时，宁可不更新，也不要用历史均值填（会污染结论并需全表标⚠️）。
-- 双数据源（`data.js` + `real_returns.json`）必须同步改，漏改其一会导致前端与原始数据不一致。
-- 派生指标若重算不全，页面会出现「汇总表是新的、方案数字是旧的」矛盾，上线前务必阶段 3 全量重算。
+- 不要凭空造目标月收益：月未结束或无法取数时宁可不更新，也不用历史均值填。
+- 双数据源（`data.js` + `real_returns.json`）必须同步改。
+- 派生指标重算不全 → 页面出现「汇总表新、方案数字旧」的矛盾，上线前务必跑阶段 3。
+- 版本号忘 bump → 线上看不出变化（毛子云 CDN + 浏览器缓存双重缓存）。

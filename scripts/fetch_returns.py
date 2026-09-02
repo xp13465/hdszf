@@ -5,14 +5,18 @@
 
 数据源：新浪财经前复权日K线  money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData
 口径：  月末最后一个交易日收盘价 / 上月末收盘价 - 1 = 当月收益（前复权）
-标签偏移：项目 month 标签比真实日历早 1 个月。
-         => 日历 YM 的真实月收益，应写入项目标签 (YM - 1)。
-         => 例：日历2026-07(7月)收益 写入 项目标签 2026-06。
+标签偏移：项目 month 标签 = 真实日历月（无偏移）。已用源数据核验（2026-09-02 复核）：
+         日历2026-08(8月)的真实收益 = data.js 末位标签 2026-08 的值，故标签直接等于日历月。
+         => 日历 YM 的真实月收益，写入项目标签 YM 本身。
+         => 例：日历2026-08(8月)收益 写入 项目标签 2026-08。
+         ⚠️ 旧版曾写「标签 = 日历 − 1 个月」，已证伪；prev_label() 已改为恒等映射，勿改回。
 
 用法：
   python fetch_returns.py --dry-run            # 只打印各资产最新若干月收益，不写文件
-  python fetch_returns.py --target 2026-07     # 计算日历2026-07(7月)收益，打印对应项目标签与值
-  python fetch_returns.py --target 2026-07 --write   # 真正写回 js/data.js 与 js/real_returns.json（先备份.bak）
+  python fetch_returns.py --target 2026-09     # 计算日历2026-09(9月)收益，打印对应项目标签与值
+  python fetch_returns.py --target 2026-09 --write   # 真正写回 js/data.js 与 js/real_returns.json（先备份.bak）
+
+约束：只填已结束的完整日历月。当前已填至日历 2026-08，下一次应填 2026-09（需在 10 月初之后运行）。
 
 注意：本脚本只负责“取数+对齐”，不重算 finalConfig/goldSweep/trendData 等写死在 data.js 的派生字段，
       需另行重跑回测引擎回填（见 RELEASE_CHECKLIST.md）。
@@ -48,10 +52,9 @@ def monthly_returns(daily):
 
 
 def prev_label(ym):
-    y, m = map(int, ym.split("-")); m -= 1
-    if m == 0:
-        m = 12; y -= 1
-    return "%04d-%02d" % (y, m)
+    # 保留兼容：本项目标签=日历月（无偏移），故直接返回原值。
+    # 旧版曾错误地返回 ym-1，会导致把当月收益误写进上月标签、覆盖真实值。
+    return ym
 
 
 def main():

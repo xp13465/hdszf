@@ -1,6 +1,6 @@
 # 恒市值助手 — 项目记忆文件
 
-> 最后更新: 2026-08-20 | 维护者: CodeBuddy AI + @sugas
+> 最后更新: 2026-09-02（数据刷新至日历 2026-08，131 → 132 个月） | 维护者: CodeBuddy AI + @sugas
 
 ---
 
@@ -30,7 +30,7 @@ investment-advisor/
 │   ├── modern.css          # 清新现代风（绿+白）
 │   └── tech.css            # 深色科技风（深蓝+青绿）
 ├── js/
-│   ├── data.js             # 核心数据（131个月真实收益、13只基金净值、三档对比）
+│   ├── data.js             # 核心数据（132个月真实收益、13只基金净值、三档对比）
 │   ├── engine.js           # 主回测引擎（trendData 205条预计算插值法）⚠️ 前视偏差
 │   ├── rolling.js          # 滚动回测引擎（逐月真实回测，无前视偏差）✅ 可审计
 │   ├── charts.js           # ECharts 图表（含雷达图三色图例）
@@ -72,16 +72,16 @@ investment-advisor/
 | 现金·货币基金 | 25% | ¥125,000 |
 
 ### 三种建仓模式（滚动回测12行）
-- **一次建仓版**（2015-08，131个月）：第1月全仓买入 → 红色标签
-- **分批建仓版·同起点**（2015-08，131个月）：12次分批 → 橙色标签（公平对比）
-- **分批建仓版**（2016-07 ~ 2025-07，120~12个月）：12次分批 → 蓝色标签
+- **一次建仓版**（2015-08 入场，132个月）：第1月全仓买入 → 红色标签
+- **分批建仓版·同起点**（2015-08 入场，132个月）：12次分批 → 橙色标签（公平对比）
+- **分批建仓版**（2016-08 ~ 2025-08，120~12个月）：12次分批 → 蓝色标签
 
 ---
 
 ## 四、回测数据与指标
 
 ### 数据来源
-- 月度收益：新浪财经前复权K线（2015-08 ~ 2026-07，131个月）
+- 月度收益：新浪财经前复权K线（2015-08 ~ 2026-08，132个完整月，全部真实）
 - 基金净值：天天基金网 API（13只基金，35,784条记录）
 - 数据处理：前复权含分红、多基金规模加权合成、QDII溢价3%/8%分档
 
@@ -200,13 +200,13 @@ investment-advisor/
 | style.css | v=18 | index.html line 58 |
 | modern.css | v=18 | main.js themeMap |
 | tech.css | v=18 | main.js themeMap |
-| data.js | v=19 | index.html line ~721 |
+| data.js | v=20 | index.html line ~721 |
 | engine.js | v=21 | index.html |
 | sliders.js | v=9 | index.html |
 | charts.js | v=17 | index.html |
-| rolling.js | v=11 | index.html |
+| rolling.js | v=12 | index.html |
 | share-image.js | v=5 | index.html |
-| main.js | v=40 | index.html |
+| main.js | v=41 | index.html |
 
 ### 版本号修改规则
 - **每次修改 CSS/JS 后必须 +1**
@@ -229,7 +229,7 @@ investment-advisor/
 
 ### 🟡 功能问题
 - [ ] engine.js 的 `w_positive_ratio` 在 trendData 中 191/195 缺失，导致交互回测月胜率偶尔显示 0%
-- [x] months 数组 132 个元素 vs 收益率数据 131 条：末尾 `2026-07` 标签 = 日历 2026-08（待补，均值估计）；真实 131 个月已含 2026-07（日历7月，2026-08-20 补入真实收益）
+- [x] ~~months 数组 132 个元素 vs 收益率数据 131 条~~ → 2026-09-02 已解决：`months` 为月末标签，长度恒为「收益条数+1」；追加日历 2026-08 真实收益后变为 **months 133 / 收益 132 条**，无均值占位。同时修正 `fetch_returns.py` 的错误偏移（旧版 `prev_label()` 会把新月份收益覆盖上月真实值）
 - [ ] 基金表格中 510880（红利ETF）和 511010（国债ETF）未纳入 funds 数组
 - [ ] 参数缺乏敏感度分析（±3%/±7% 阈值、6/18个月建仓等对比）
 - [ ] 手续费 0.1% 未考虑 ETF 滑点和冲击成本
@@ -237,7 +237,10 @@ investment-advisor/
 ### 📌 数据口径备忘（2026-08-20 核验）
 - **数据源**：回测月收益来自**新浪财经前复权日K线**（`money.finance.sina.com.cn` getKLineData scale=240 adj=qfq），月末close/上月末close-1；不是 eastmoney 基金净值。取数脚本见 `scripts/fetch_returns.py`。
 - **基金代码**（xlsx 主选ETF ≈ `js/data.js` funds 数组）：沪深300=510300、中证500=512500、标普500=513650、纳斯达克100=159659、黄金=518660。
-- **月份标签偏移**：项目 month 标签比真实日历早 1 个月（项目`2026-05`=日历6月收益）。日历YM收益写入项目标签(YM-1)。
+- **月份标签口径（2026-09-02 修正，此前记录是错的）**：`months` 是**月末标签数组**，长度恒为「收益条数 + 1」；`returns[i]` = **日历月 `months[i+1]`** 的收益。**标签直接等于日历月，没有任何偏移。**
+  - 反例验证：`returns` 末位值（旧数据末位标签 `2026-07`）实测 = 日历 2026-07 的真实月收益（-7.29%），与新浪取数一致。
+  - 因此：`months = [2015-08 … 2026-08]`（133 条）配 `returns`（132 条），日历覆盖 **2015-09 ~ 2026-08**。`months[0]=2015-08` 是**起点标记**（入场时点），不是第一个收益月。
+  - ⚠️ 旧备忘曾写「标签 = 日历 − 1，`prev_label()` 做减月」——**该说法已证伪并删除**。`scripts/fetch_returns.py` 的 `prev_label()` 曾据此实现，会把新月份收益**覆盖掉上月的真实值**；现已改为恒等映射。若看到任何地方仍写着「标签比日历早 1 个月」，一律以本节为准并修正。
 - **回测引擎架构（2026-08-21 修正）**：`engine.js.compute` 主路径已切到自包含的恒市值法回测 `simulateCMV`（含建仓+±阈值再平衡+费率，直读 `APP_DATA.realReturns` 全量真实月收益，无前视偏差）。`trendData`（205条硬编码表）降级为 `realReturns` 缺失时的兜底，不再驱动主展示。此前"数据更新了页面却不变"的根因正是主路径走 trendData 插值、未读最新月份。`comparisons`（三档方案）与 `finalConfig.backtest` 已用 `simulateCMV` 重算回填（反映最新月份）。`main.js` 的 `initComparisonCards` 已于 2026-08-21 改为动态调用 `simulateCMV`（三档配置内联于函数内），真实数据缺失时回退 `APP_DATA.comparisons` 静态值。至此三档对比卡片随数据更新自动生效，不再需要手工回填 `comparisons`。
 - **首屏 Hero 卡片（2026-08-21 修正）**：此前 `index.html` 首屏 4 张统计卡（50万→终值/月胜率/最大回撤/现金比例）是**写死的静态 HTML**，改数据后永不变。现 `main.js` 新增 `updateHeroStats(result)`，在 init 里用 `getDefaultResult()`（=simulateCMV 稳健型）实时填充 8 个 ID 元素（`hero-final-value/sub`、`hero-winrate-label/value/sub`、`hero-dd-value/sub`、`hero-cash-value`）。`simulateCMV` 返回值扩展了 `monthlyReturns/positiveMonths/totalMonths/yearly{fullYears,negativeYears,worstYear}`，供"月胜率 x/y 月"和"10年仅N年亏损·最多亏Z%"动态展示。更新后的文案（og:description、三档说明 insight-box、最终方案副标题、SEO 隐藏文本）仍为静态，需随数据更新手工刷新，位置见 RELEASE_CHECKLIST 阶段4。
 - **全站审计（2026-08-21 追加）**：
@@ -272,6 +275,27 @@ investment-advisor/
 - [ ] 回测结果分享图（generateResultCard）已从 UI 移除但代码保留，如需恢复可在 init() 加回来
 - [ ] 可考虑用 `git ls-files` 检查 `.playwright-cli/` 是否被误提交
 - [ ] `scripts/fetch_daily.py` 当前 datalen=3000（约 12 年，优先 backup 老 ETF 代码），已满足日级研究；项目数据精度为月的情况下月级研究无需日频，**优先级低**。
+
+### 🔵 数据刷新记录（2026-09-02 · 日历 2026-08 入库）
+
+**做了什么**
+- 追加日历 2026-08 真实月收益（新浪前复权日 K 线，5 资产）到 `js/data.js` 与 `js/real_returns.json`：
+  沪深300 +0.6877%、中证500 +6.3222%、标普500 +7.6964%、纳斯达克100 +4.9217%、黄金 +8.2851%。
+- 数据窗口 131 → **132 个月**（`months` 标签 133 条，`month_count` / `meta.n_months` 132）。
+- 重算写死的派生字段 `comparisons`（三档）与 `finalConfig.backtest`，使「动态 ≈ 静态」一致（smoke_check 24 项全 PASS）。
+- 滚动表收口月同步：`js/rolling.js` `CONFIG.endMonth` 7 → 8；`js/main.js` `actualEndDate` → `'2026-08'`。起点现为 **2015年8月（132月）… 2025年8月（12月）** 共 12 个。
+- **修复取数脚本偏移 bug**：`fetch_returns.py` 的 `prev_label()` 原按「标签 = 日历 − 1」做减月，若用 `--write` 会把新月份收益**覆盖上月真实值**；已改为恒等映射，并订正 docstring、`fund_map.json._offset_note` 与本文口径备忘中同一处错误说法。
+- 清理 `js/data.js` 中重复定义的顶层 `meta` 键（后者静默覆盖前者，`generated_from` 实际丢失），合并为一个并把 `data_range` 更新为 `2015-08 ~ 2026-08`。
+- 同步静态文案与文档：`index.html`（Hero 卡/og/insight-box 三档/SEO 隐藏段/隐私政策与用户协议日期戳 → 2026年9月2日）、`README.md`、`PROJECT_SPEC.md`（1.1 数据范围 + 1.4 各资产年化按当前数据重算）、`sitemap.xml` lastmod。
+- 版本号 bump：`data.js` v20、`rolling.js` v12、`main.js` v41。
+
+**口径结果（132 个月，稳健型）**：年化 7.63%、终值 112.2 万、Sharpe 0.93、最大回撤 −6.09%、月胜率 68.2%（90/132）。
+三档：保守 5.66% / 91.6万 / 月胜率 73.5%；稳健 7.63% / 112.2万 / 68.2%；进取 11.64% / 167.9万 / 65.2%。
+
+**遗留**
+- `scripts/_daily_cache.json` 日频缓存只到 **2026-08-21**（8 月 20 日会话取的，已过期）。
+- `scripts/rebalance_study.js` 读 `js/data.js`，现在重跑会得到 132 月结果，与已入库的 `scripts/_rebalance_study_report.md`（131 月快照）不再逐行一致。研究报告**需重跑刷新或标注快照版本**，见下条待办。
+- [ ] 待办：刷新 `_daily_cache.json` 至 2026-08-31 后重跑 `node scripts/rebalance_study.js`，让报告回到可核对状态。
 
 ---
 
