@@ -32,7 +32,7 @@ investment-advisor/
 ├── js/
 │   ├── data.js             # 核心数据（132个月真实收益、13只基金净值、三档对比）
 │   ├── engine.js           # 主回测引擎（trendData 205条预计算插值法）⚠️ 前视偏差
-│   ├── rolling.js          # 滚动回测引擎（逐月真实回测，无前视偏差）✅ 可审计
+│   ├── rolling.js          # 滚动回测引擎（逐月真实回测，无前视偏差）✅ 可审计；完整持仓日志含「年度收益率」列
 │   ├── charts.js           # ECharts 图表（含雷达图三色图例）
 │   ├── sliders.js          # 滑块交互
 │   ├── share-image.js      # 分享图生成（Canvas 绑制，含站点二维码）
@@ -72,9 +72,10 @@ investment-advisor/
 | 现金·货币基金 | 25% | ¥125,000 |
 
 ### 三种建仓模式（滚动回测12行）
-- **一次建仓版**（2015-08 入场，132个月）：第1月全仓买入 → 红色标签
-- **分批建仓版·同起点**（2015-08 入场，132个月）：12次分批 → 橙色标签（公平对比）
-- **分批建仓版**（2016-08 ~ 2025-08，120~12个月）：12次分批 → 蓝色标签
+- **一次建仓版**（2015-08 入场，133个月快照=入场月+132真实收益月）：第1月全仓买入 → 红色标签
+- **分批建仓版·同起点**（2015-08 入场，133个月）：12次分批 → 橙色标签（公平对比）
+- **分批建仓版**（2016-08 ~ 2025-08，122~13个月）：12次分批 → 蓝色标签
+> 注：2026-09-28 修复 off-by-one 后，日志末月已追到数据最新月（2026-08）。每月补数后窗口自动延伸，无需改 `CONFIG.endMonth`（见下方「完整持仓日志修复」）。
 
 ---
 
@@ -249,7 +250,18 @@ investment-advisor/
   - **收益/回撤曲线**：`engine.js.generateMonthlyReturns` 改为基于 `simulateCMV` 的月度序列（恒市值法），曲线终点=总收益、最小回撤=最大回撤，不再用"买入持有加权"模型。
   - **分享图**：`share-image.js` Hero 海报动态取 `getDefaultResult()`；结果卡月胜率改用 `monthlyWinRate`（原用不存在的 `winRate` 恒回退 67.9%）。
   - **口径刷新**：`data.js` comparisons/finalConfig.backtest、`index.html` 静态文案（og:description、insight-box 三档、section-subtitle、SEO 隐藏文本、Hero 静态回退值）、README 三档表全部同步到 131 月口径（稳健年化 7.49%、Sharpe 0.91、终值 110.1万、月胜率 67.9%）。
-- **发布前自检**：`node scripts/smoke_check.js` 一键校验引擎一致性、Hero ID 齐全性、回测窗口=真实数据条数、三档动态≈静态（退出码 0=通过）。
+- **发布前自检**：`node scripts/smoke_check.js` 一键校验引擎一致性、Hero ID 齐全性、回测窗口=真实数据条数、三档动态≈静态（退出码 0=通过）。2026-09-28 起新增第 5 项：**滚动日志末月=数据末月（防 off-by-one 回归）**——加载 `js/rolling.js` 跑 `runAll()`，断言每个起点的末位快照月份 == `months` 末位标签，防止日志又退回 2026-07。
+
+### 完整持仓日志：off-by-one 修复 + 年度收益率列（2026-09-28）
+- **现象**：「完整持仓日志」明细表末行只到 **2026-07**，而数据已含 2026-08（132 条真实收益，标签至 2026-08）。用户问"是展示没更新还是模拟没做到最新"——**根因是模拟层 off-by-one，不是展示层**。
+- **根因（两处）**：
+  1. `rolling.js` 的 `getMonthReturnsWithFallback(monthKey)` 用 `idx = months.indexOf(monthKey)` 直接作 `asset_returns` 索引。但约定 `returns[i] = months[i+1]`（months[0]=2015-08 是入场标记月，无收益），故正确索引应为 **`idx - 1`**。原代码导致每行套用了**次月**收益（如 2015-08 行用了 2015-09 收益、2026-07 行用了 2026-08 收益）。
+  2. `getStartPoints` 的 `totalMonthsNeeded` 用日期差公式，把"末月"算成 exclusive，少覆盖 1 个月——循环只到 2026-07，2026-08 这一行从未生成。
+- **修复**：
+  1. `getMonthReturnsWithFallback` / `getMonthReturns` 改为 `ridx = idx - 1`；入场标记月（`idx===0`）无真实收益，按 **0** 处理（不计入"估计值"，保持全量回测"全部真实"徽章）。
+  2. `totalMonthsNeeded` 改为 `months.length - monthIdx`（自动覆盖到 `months` 末位，含 2026-08），每月补数后自动延伸，无需再手改 `CONFIG.endMonth`。
+  3. `main.js` 的 `showLogDetail` 新增 **「年度收益率」列**：对每条记录按日历年聚合，展示该年"至今"的**收益金额(¥)** 与**收益比例(%)**（区别于"年化收益=均值"）。yearStartValue = 上一年末总市值（首年=初始资金 50 万），故 12 月行=全年收益、进行中月=年迄今收益。CSV 导出（`exportLogCSV`）同步加了「年度收益率(%) / 年收益金额(元)」两列。
+- **新增脚本 `scripts/monthly_progress.js`（进行中月份进度快照）**：每周/每交易日跑，取"当前未完成月"的**月至今(MTD)**收益（新浪前复权日 K 线，与 `fetch_returns.py` 同源），把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的组合进度报告。**绝不写 `data.js`/`real_returns.json`**，不污染主回测；真正的月末定稿仍由 `monthly_update.js`（每月 3 号）负责。用法：`node scripts/monthly_progress.js [--out 报告.md] [--no-fetch]`。取数全失败时降级为 MTD=0 占位仍输出。
 
 ### 日频回测与再平衡深度研究（2026-08-22）
 - **新增能力**：`engine.js.simulateCMV_daily` — 基于日 K 线的恒市值法回测（与月频 `simulateCMV` 同口径，仅频率细化为日）。读 `scripts/_daily_cache.json`，支持 `schedule: 'weekly-mon' | 'biweekly-mon' | 'monthly-eom' | 'every-N-months-eom' | 'every-1-months-cal-N'`（alias `monthly-day-N` → `every-1-months-cal-N`，遇周末顺延下个交易日）。
@@ -311,6 +323,23 @@ investment-advisor/
   稳健型全周期：年化 7.49% → 7.63%（+0.13 pct）、终值 110.1万 → 112.2万（+21645 元）、
   Sharpe 0.91 → 0.93、最大回撤 −6.09% → −6.09%（未加深）。
 - 报告：`scripts/data_update_report_2026-08.md`（221 行，随数据一并入库）。
+
+### 数据刷新记录（2026-09-28 · 日志修复 + 年度收益率列 + 进度快照脚本）
+**背景**：用户发现「完整持仓日志」明细表末行只到 2026-07（数据已含 2026-08），并希望日志新增「年度收益率」列（区别于年化均值）。
+
+**做了什么**
+- **修复滚动回测 off-by-one（模拟层，非展示层）**：
+  - `js/rolling.js` 的 `getMonthReturnsWithFallback` / `getMonthReturns` 改为 `ridx = idx - 1`（约定 `returns[i] = months[i+1]`，months[0]=入场标记月无收益）；入场标记月按 **0** 处理（保持全量回测"全部真实"徽章）。
+  - `getStartPoints` 的 `totalMonthsNeeded` 改为 `months.length - monthIdx`（自动覆盖到 `months` 末位，含 2026-08）。每月补数后窗口自动延伸，**不再需要手改 `CONFIG.endMonth`**。
+  - 效果：12 个起点的日志末月全部从 2026-07 → **2026-08**，且每行改用当月真实收益（此前每行套用次月收益）。
+- **新增「年度收益率」列**（`js/main.js` 的 `showLogDetail`）：对每条记录按日历年聚合，展示该年"至今"的**收益金额(¥)** 与**收益比例(%)**（yearStartValue=上一年末总市值，首年=初始资金 50 万）。CSV 导出同步加「年度收益率(%) / 年收益金额(元)」两列。
+- **新增 `scripts/monthly_progress.js`（进行中月份进度快照）**：取"当前未完成月"的**月至今(MTD)**收益（新浪前复权日 K 线，与 `fetch_returns.py` 同源），把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的报告。**绝不写 `data.js`/`real_returns.json`**，不污染主回测。用法 `node scripts/monthly_progress.js [--out 报告.md] [--no-fetch]`。
+- **`scripts/smoke_check.js` 新增第 5 项守卫**：加载 `js/rolling.js` 跑 `runAll()`，断言每个起点末位快照月份 == `months` 末位标签，防止日志 off-by-one 回归。
+- 删除调试用临时脚本 `scripts/_log_check.js`（不入库）。
+- **未改 `data.js` / `engine.js`**：本次无新月份数据（2026-09 尚未走完，9/28 实时 MTD 沪深300 −5.72%，待 10 月初再定稿）。
+- 版本号 bump（绕 CDN 缓存）：`index.html` 中 `rolling.js` v12 → **v13**、`main.js` v41 → **v42**。
+
+**口径结果（不变）**：主引擎 `simulateCMV` 官方口径未动，稳健型仍年化 7.63% / 终值 112.2 万。滚动日志为独立引擎，其末月延伸 + 回归当月真实收益后，与官方口径的"方向/量级"一致（如 2026-08 组合月收益 +1.99% 对应当月沪深300 +0.69%、黄金 +8.29% 加权）。
 
 ---
 

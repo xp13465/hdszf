@@ -795,12 +795,24 @@
     const TARGET_PCTS = RollingBacktest.CONFIG.allocations;
 
     let tableHTML = '<div class="log-table-wrap"><table class="log-table"><thead><tr>';
-    tableHTML += '<th style="cursor:pointer;" id="log-sort-btn" title="点击切换正序/倒序">月份 <span id="log-sort-icon">↓</span></th><th>阶段</th><th>资产</th><th>目标市值</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>占总额%</th><th>偏离目标</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th><th>累计收益</th><th>仓位</th>';
+    tableHTML += '<th style="cursor:pointer;" id="log-sort-btn" title="点击切换正序/倒序">月份 <span id="log-sort-icon">↓</span></th><th>阶段</th><th>资产</th><th>目标市值</th><th>月初市值</th><th>月收益率</th><th>月末市值</th><th>占总额%</th><th>偏离目标</th><th>操作</th><th>金额</th><th>总市值</th><th>月收益</th><th>累计收益</th><th>年度收益率</th><th>仓位</th>';
     tableHTML += '</tr></thead><tbody>';
 
     // 读取排序偏好（默认正序 = 最旧在上）
     const sortDesc = (sessionStorage.getItem('log_sort_desc') === '1');
     const snapshots = sortDesc ? [...result.monthlySnapshots].reverse() : result.monthlySnapshots;
+
+    // 年度收益率：按日历年聚合。yearStartValue = 上一年末总市值（首年=初始资金 50万）
+    // 用于计算每条记录对应年份的「年收益金额 + 年收益比例」（区别于年化均值）
+    const yearStartMap = {};
+    let prevSnap = null;
+    for (const s of result.monthlySnapshots) {
+      const y = s.month.substring(0, 4);
+      if (!(y in yearStartMap)) {
+        yearStartMap[y] = prevSnap ? prevSnap.totalValue : RollingBacktest.CONFIG.totalCapital;
+      }
+      prevSnap = s;
+    }
 
     for (const snap of snapshots) {
       const phaseClass = snap.phase.includes('建仓') ? 'phase-build' : 'phase-rebalance';
@@ -860,6 +872,14 @@
           const cumReturn = (snap.totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100;
           const cumClass = cumReturn >= 0 ? 'action-buy' : 'action-sell';
           tableHTML += `<td rowspan="${rowSpan}" class="${cumClass}" style="font-weight:600;">${cumReturn >= 0 ? '+' : ''}${cumReturn.toFixed(1)}%</td>`;
+          // 年度收益率 = 对应日历年至今的「收益金额 + 收益比例」（区别于年化均值）
+          const yearStartValue = yearStartMap[snap.month.substring(0, 4)] || RollingBacktest.CONFIG.totalCapital;
+          const annAmount = snap.totalValue - yearStartValue;
+          const annPct = yearStartValue > 0 ? (annAmount / yearStartValue) * 100 : 0;
+          const annClass = annAmount >= 0 ? 'action-buy' : 'action-sell';
+          tableHTML += `<td rowspan="${rowSpan}" class="${annClass}" style="font-weight:600;text-align:right;">` +
+            `${annPct >= 0 ? '+' : ''}${annPct.toFixed(2)}%` +
+            `<div style="font-size:0.7rem;font-weight:400;opacity:0.85;">¥${annAmount >= 0 ? '+' : ''}${Math.round(annAmount).toLocaleString()}</div></td>`;
           // 仓位占比 = 排除现金后的权益 / 总市值
           const cashHolding = snap.holdings['现金·货币基金'] || 0;
           const positionPct = snap.totalValue > 0 ? ((snap.totalValue - cashHolding) / snap.totalValue * 100) : 0;
@@ -870,8 +890,8 @@
         tableHTML += '</tr>';
       });
 
-      // 每月之间加分隔线
-      tableHTML += '<tr class="month-separator"><td colspan="15" style="padding:0;border:none;height:4px;background:var(--color-bg);"></td></tr>';
+      // 每月之间加分隔线（16 列：含新增的「年度收益率」）
+      tableHTML += '<tr class="month-separator"><td colspan="16" style="padding:0;border:none;height:4px;background:var(--color-bg);"></td></tr>';
     }
 
     tableHTML += '</tbody></table></div>';

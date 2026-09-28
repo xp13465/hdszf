@@ -42,7 +42,9 @@ const RollingBacktest = (() => {
     // 1. 先添加数据最早月作为起点（2015-08）— 一次建仓版
     const earliestKey = rr.months[0]; // "2015-08"
     const [ey, em] = earliestKey.split('-').map(Number);
-    const earliestMonthsNeeded = (endDate.getFullYear() - ey) * 12 + (endDate.getMonth() + 1 - em);
+    const earliestMonthIdx = rr.months.indexOf(earliestKey); // 0
+    // 覆盖到 months 末位（最新真实收益月，含），inclusive
+    const earliestMonthsNeeded = rr.months.length - earliestMonthIdx;
     points.push({
       yearsAgo: null,
       label: `${ey}年${em}月`,
@@ -50,7 +52,7 @@ const RollingBacktest = (() => {
       year: ey,
       month: em,
       inDataRange: true,
-      monthIdx: 0,
+      monthIdx: earliestMonthIdx,
       totalMonthsNeeded: earliestMonthsNeeded,
       dataMonthsAvailable: rr.months.length,
       isEarliest: true,
@@ -89,7 +91,8 @@ const RollingBacktest = (() => {
       
       const monthIdx = rr.months.indexOf(key);
       const inDataRange = monthIdx >= 0;
-      const totalMonthsNeeded = (endDate.getFullYear() - y) * 12 + (endDate.getMonth() + 1 - m);
+      // 覆盖到 months 末位（最新真实收益月，含），inclusive
+      const totalMonthsNeeded = rr.months.length - monthIdx;
       
       points.push({
         yearsAgo,
@@ -115,15 +118,17 @@ const RollingBacktest = (() => {
    */
   function getMonthReturns(monthKey) {
     const rr = APP_DATA.realReturns;
+    // 约定：returns[i] 对应 months[i+1]，months[0] 是入场标记月（无收益）
+    // 故 monthKey 的真实收益索引 = idx - 1；入场标记月（idx===0）无收益
     const idx = rr.months.indexOf(monthKey);
-    if (idx < 0) return null;
-    
+    if (idx < 1) return null;
+
     const ret = {};
     for (const asset of ASSETS) {
       if (asset === CASH_ASSET) {
         ret[asset] = rr.cash_monthly || 0.00083;
       } else if (rr.asset_returns[asset]) {
-        ret[asset] = rr.asset_returns[asset][idx] || 0;
+        ret[asset] = rr.asset_returns[asset][idx - 1] || 0;
       } else {
         ret[asset] = 0;
       }
@@ -162,12 +167,20 @@ const RollingBacktest = (() => {
     const rr = APP_DATA.realReturns;
     const idx = rr.months.indexOf(monthKey);
     const ret = {};
-    
+
+    // 约定：returns[i] 对应 months[i+1]，months[0] 是入场标记月（无真实收益）
+    // 故 monthKey 对应的真实收益索引 = idx - 1
+    // 入场标记月（idx===0）无真实收益 → 走估计分支
+    const ridx = idx - 1;
+
     for (const asset of ASSETS) {
       if (asset === CASH_ASSET) {
         ret[asset] = { value: rr.cash_monthly || 0.00083, estimated: false };
-      } else if (idx >= 0 && rr.asset_returns[asset] && idx < rr.asset_returns[asset].length) {
-        ret[asset] = { value: rr.asset_returns[asset][idx] || 0, estimated: false };
+      } else if (idx >= 1 && rr.asset_returns[asset] && ridx < rr.asset_returns[asset].length) {
+        ret[asset] = { value: rr.asset_returns[asset][ridx] || 0, estimated: false };
+      } else if (idx === 0) {
+        // 入场标记月（months[0]）无真实收益，按 0 处理（不计入估计，保持"全部真实"）
+        ret[asset] = { value: 0, estimated: false };
       } else {
         ret[asset] = estimateMonthReturns(asset);
       }
@@ -517,10 +530,24 @@ const RollingBacktest = (() => {
    * 导出单个回测的完整日志为CSV（每月一行，含全部6资产）
    */
   function exportLogCSV(result) {
-    const header = ['月份', '阶段', '资产', '目标比例', '月初市值(元)', '本月收益率', '月末市值(元)', '实际比例', '偏离度', '操作', '操作金额(元)', '手续费(元)', '总市值(元)', '月收益率', '数据状态'];
+    const header = ['月份', '阶段', '资产', '目标比例', '月初市值(元)', '本月收益率', '月末市值(元)', '实际比例', '偏离度', '操作', '操作金额(元)', '手续费(元)', '总市值(元)', '月收益率', '年度收益率(%)', '年收益金额(元)', '数据状态'];
     const rows = [header];
-    
+
+    // 年度收益率：按日历年聚合，yearStartValue = 上一年末总市值（首年=初始资金）
+    const yearStartMap = {};
+    let prevSnap = null;
+    for (const s of result.monthlySnapshots) {
+      const y = s.month.substring(0, 4);
+      if (!(y in yearStartMap)) {
+        yearStartMap[y] = prevSnap ? prevSnap.totalValue : CONFIG.totalCapital;
+      }
+      prevSnap = s;
+    }
+
     for (const snap of result.monthlySnapshots) {
+      const yearStartValue = yearStartMap[snap.month.substring(0, 4)] || CONFIG.totalCapital;
+      const annAmount = snap.totalValue - yearStartValue;
+      const annPct = yearStartValue > 0 ? (annAmount / yearStartValue) * 100 : 0;
       for (const ad of snap.assetDetails) {
         rows.push([
           snap.month,
@@ -537,6 +564,8 @@ const RollingBacktest = (() => {
           ad.fee > 0 ? ad.fee.toFixed(2) : '-',
           snap.totalValue.toFixed(2),
           (snap.monthReturn * 100).toFixed(2) + '%',
+          (annPct >= 0 ? '+' : '') + annPct.toFixed(2),
+          (annAmount >= 0 ? '+' : '') + annAmount.toFixed(2),
           snap.estimatedMonth ? '⚠️估计值' : '真实数据'
         ]);
       }

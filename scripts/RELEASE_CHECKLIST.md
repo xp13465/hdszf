@@ -62,8 +62,8 @@
 
 ## 阶段 2 · 引擎与展示边界（手动改代码）
 
-- [ ] `js/rolling.js`：`CONFIG.endMonth` 改为 `END_M`；注释里 `N-1个月/起始月` → `N个月/起始月+1`
-- [ ] `js/main.js`：`actualEndDate` `'PREV'` → `'TARGET'`
+- [ ] `js/rolling.js`：**2026-09-28 起日志窗口已自动延伸**（`totalMonthsNeeded = months.length − monthIdx`），补数后**无需手改 `CONFIG.endMonth`**，日志末月自动追到最新月。
+- [ ] `js/main.js`：`actualEndDate` `'PREV'` → `'TARGET'`（若仍被引用；首屏 Hero 已动态化，确认无引用后可忽略）
 - [ ] 三档卡片无需改（已内联动态）
 - [ ] 起点会整体后移 1 个月：跑 `node -e` 或临时脚本打印 `RollingBacktest.getStartPoints()`，
       确认最早起点月数为 `N`、最近起点为「`TARGET` 前 1 年」且 yearsAgo=1
@@ -120,6 +120,26 @@
       → 重跑 `node scripts/rebalance_study.js` 刷新报告，或在报告头部标注「数据快照：N-1 个月」。
 - [ ] 差异报告 `scripts/data_update_report_<TARGET>.md` 已随数据提交入库（见阶段 5）。
       历史差异报告保留，便于回溯每月更新的影响方向与幅度。
+
+---
+
+## 进行中月份进度快照（每周 / 每交易日）
+
+> 用户要求：除了每月 3 号的全量定稿，还要"每周或每个交易日出一个自动更新脚本，哪怕不是完整月，但标记进行中"。
+
+- **脚本**：`scripts/monthly_progress.js`（Node，自包含，用全局 `fetch` 取新浪日 K 线）。
+  - 作用：取"当前未完成月"的**月至今(MTD)**收益，把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的组合进度报告。
+  - **绝不写 `js/data.js` / `js/real_returns.json`**，不污染主回测口径；真正的月末定稿仍由 `monthly_update.js`（每月 3 号）负责。
+  - 用法：`node scripts/monthly_progress.js [--out 报告.md] [--no-fetch]`。取数全失败时降级为 MTD=0 占位仍输出（退出码 2）。
+  - 实时取数需联网；若自动化环境无外网，会降级为占位并在报告里标明。
+- **与全量更新的分工**：`monthly_update.js` = 月末定稿（写数据 + 重算 + 上线）；`monthly_progress.js` = 月中进度（只读 + 报告）。二者互补，不冲突。
+
+---
+
+## 回归守卫（防 off-by-one 复发）
+
+- `scripts/smoke_check.js` 第 5 项：加载 `js/rolling.js` 跑 `runAll()`，断言每个起点末位快照月份 == `months` 末位标签。
+  若日志又退回 2026-07（或任何非最新月），smoke_check 直接 FAIL，阻断发布。
 
 ---
 

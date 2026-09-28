@@ -86,5 +86,20 @@ for (const id of Object.keys(B.PLANS)) {
     ok ? `annual=${dyn.annual.toFixed(4)} vs ${stat.annual.toFixed(4)}` : `dyn=${dyn && dyn.annual} stat=${stat && stat.annual}`);
 }
 
+// ---- 5) 滚动回测日志末月 = 数据末月（防 off-by-one 回归：曾停在 2026-07）----
+vm.runInContext(read('js/rolling.js') + '; this.RollingBacktest = RollingBacktest;', ctx);
+const RB = ctx.RollingBacktest;
+const rollingResults = RB.runAll();
+const lastMonthInData = rr.months[rr.months.length - 1];
+let rollingOk = true;
+let badDetail = '';
+for (const r of rollingResults) {
+  const snaps = r.monthlySnapshots;
+  const last = snaps.length ? snaps[snaps.length - 1].month : '(空)';
+  if (last !== lastMonthInData) { rollingOk = false; badDetail += `${r.startPoint.label}:${last} `; }
+}
+check('滚动日志末月=数据末月 (无 off-by-one)', rollingOk,
+  `data末月=${lastMonthInData}${badDetail ? ' 异常:' + badDetail : ''}`);
+
 console.log(failures === 0 ? '\n全部通过 ✓' : `\n${failures} 项失败 ✗`);
 process.exit(failures === 0 ? 0 : 1);
