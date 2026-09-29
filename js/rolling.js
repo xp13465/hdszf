@@ -30,6 +30,45 @@ const RollingBacktest = (() => {
   const ASSETS = ['沪深300', '中证500', '标普500', '纳斯达克100', '黄金', '现金·货币基金'];
   const CASH_ASSET = '现金·货币基金';
 
+  // ============================================================
+  //  进行中月份叠加层（live overlay）—— 与 engine.js#simulateCMV 同源同口径
+  //  ● 由 js/progress.json 的 MTD 驱动；months 之外的「未完整月」按 MTD 重估，
+  //    该月**不触发再平衡**（恒市值法只在月末调仓），故结果 = 上月末持仓 × (1+MTD)。
+  //  ● 本引擎的 monthlySnapshots **保持固化**（绝不 append 叠加月）：
+  //    完整持仓日志表格 / CSV 导出 / 既有图表仍走固化口径，零回归风险；
+  //    叠加结果单独挂在 result.live 上，供「弹窗顶部汇总 / 滚动汇总表 / 折线图」使用。
+  //  ● 校验：月份格式合法、必须**晚于**数据末月、且**不在** months 里，否则静默拒绝。
+  // ============================================================
+  let LIVE_OVERLAY = null;
+
+  function setLiveOverlay(o) {
+    LIVE_OVERLAY = null;
+    if (!o || !o.month || !o.mtd) return null;
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(o.month))) return null;
+    const rr = (typeof APP_DATA !== 'undefined' && APP_DATA) ? APP_DATA.realReturns : null;
+    if (!rr || !rr.months || !rr.months.length) return null;
+    const lastMonth = rr.months[rr.months.length - 1];
+    // 晚于数据末月 + 未定稿（不在 months 里）——两者缺一都说明快照过期或数据已收口
+    if (rr.months.indexOf(o.month) >= 0 || String(o.month) <= String(lastMonth)) return null;
+    // 数值闸门：null / undefined / '' / 布尔 / 数组 / 非有限数一律拒绝。
+    // ⚠️ 必须显式拦住 null —— Number(null) === 0，会把「没有数据」当成「当月持平」。
+    const mtd = {};
+    const keys = Object.keys(o.mtd);
+    if (!keys.length) return null;
+    for (const k of keys) {
+      const v = o.mtd[k];
+      if (v === null || v === undefined || v === '' || typeof v === 'boolean' || Array.isArray(v)) return null;
+      const n = Number(v);
+      if (!isFinite(n)) return null;   // 任一资产数值异常 → 整体不启用，宁可不显示
+      mtd[k] = n;
+    }
+    LIVE_OVERLAY = { month: String(o.month), asOf: o.asOf || '', mtd, baseMonth: lastMonth };
+    return LIVE_OVERLAY;
+  }
+
+  function getLiveOverlay() { return LIVE_OVERLAY; }
+  function clearLiveOverlay() { LIVE_OVERLAY = null; }
+
   /**
    * 获取所有回测起点（数据最早月 ~ 1年前，按月对齐）
    * 起点列表: 2015-08 (132个月), 2016-07, 2017-07, ..., 2025-08
@@ -210,7 +249,7 @@ const RollingBacktest = (() => {
    * @param {Object} startPoint - 起点信息
    * @returns {Object} 完整的回测结果和操作日志
    */
-  function runSingleBacktest(startPoint) {
+  function runSingleBacktest(startPoint, opts) {
     const { year, month, totalMonthsNeeded } = startPoint;
     const allocations = CONFIG.allocations;
     const totalCapital = CONFIG.totalCapital;
@@ -424,21 +463,122 @@ const RollingBacktest = (() => {
       currentMonth = next.month;
     }
     
-    // 计算最终指标
-    const finalValue = totalValue;
-    const totalReturn = (finalValue / totalCapital - 1) * 100;
-    const nYears = totalMonthsNeeded / 12;
-    const annualReturn = (Math.pow(finalValue / totalCapital, 1 / nYears) - 1) * 100;
-    
-    // 计算赚钱月占比
-    const positiveMonths = monthlySnapshots.filter(s => s.monthReturn > 0).length;
-    const winRate = monthlySnapshots.length > 0
-      ? (positiveMonths / monthlySnapshots.length) * 100 
-      : 0;
+    // ============================================================
+    //  进行中月份叠加层（live overlay）—— 与 engine.js#simulateCMV 同源同口径
+    //  ⚠️ 绝不动 monthlySnapshots：叠加结果只挂在 result.live 上，
+    //     日志表格 / CSV 导出 / 既有图表因此保持固化口径、零回归。
+    // ============================================================
+    let live = null;
+    const ov = (opts && opts.liveOverlay === false) ? null : LIVE_OVERLAY;
+    if (ov) {
+      const anchorSnap = monthlySnapshots[monthlySnapshots.length - 1];
+      // 只在本次回测确实跑到叠加月起点（= 数据末月）时才叠加；
+      // 否则说明该起点序列没覆盖到末月，硬接尾会得出错误口径。
+      if (anchorSnap && anchorSnap.month === ov.baseMonth) {
+        const before = {};
+        for (const asset of ASSETS) before[asset] = holdings[asset];
 
-    // 计算自然年胜率（每年收益率汇总后判断）
+        let liveTotal = 0;
+        const liveDetails = [];
+        for (const asset of ASSETS) {
+          const r = Number(ov.mtd[asset]) || 0;
+          const after = before[asset] * (1 + r);
+          holdings[asset] = after;
+          liveTotal += after;
+          liveDetails.push({
+            asset,
+            targetPct: allocations[asset],
+            targetVal: targetValues[asset],
+            holdingBefore: before[asset],
+            monthReturn: { value: r, estimated: false },
+            holdingAfter: after,
+            actualPct: 0,
+            deviationFromTarget: 0,
+            triggered: false,        // 未完整月不调仓：恒市值法只在月末再平衡
+            action: '无操作',
+            amount: 0,
+            fee: 0,
+            reason: '进行中月份：恒市值法仅在月末调仓，本月不产生任何买卖'
+          });
+        }
+        for (const d of liveDetails) {
+          d.actualPct = liveTotal > 0 ? d.holdingAfter / liveTotal : 0;
+          d.deviationFromTarget = d.targetVal > 0 ? (d.holdingAfter - d.targetVal) / d.targetVal : 0;
+        }
+
+        const liveMonthReturn = prevTotalValue > 0 ? (liveTotal / prevTotalValue - 1) : 0;
+        if (liveTotal > peakValue) peakValue = liveTotal;
+        const liveDd = (liveTotal / peakValue - 1) * 100;   // 同主循环：负数百分比
+
+        const liveSnap = {
+          month: ov.month,
+          monthIndex: monthlySnapshots.length + 1,   // 累计月序（入场月 = 第 1 个月）
+          phase: '进行中',
+          holdings: { ...holdings },
+          totalValue: liveTotal,
+          drawdown: liveDd,
+          peakValue,
+          assetDetails: liveDetails,
+          monthReturn: liveMonthReturn,
+          estimatedMonth: false,     // 未完成月不是「历史数据回退估计」，不污染数据质量判定
+          isLiveEstimate: true,
+          hasOperations: false,
+          opCount: 0
+        };
+
+        live = Object.assign({
+          month: ov.month,
+          asOf: ov.asOf || '',
+          baseMonth: ov.baseMonth,
+          snapshot: liveSnap
+        }, computeMetrics(monthlySnapshots.concat([liveSnap]), totalCapital));
+      }
+    }
+
+    const metrics = computeMetrics(monthlySnapshots, totalCapital);
+    return {
+      startPoint,
+      finalValue: metrics.finalValue,
+      totalReturn: metrics.totalReturn,
+      annualReturn: metrics.annualReturn,
+      maxDrawdown: metrics.maxDrawdown,
+      sharpe: metrics.sharpe,
+      sortino: metrics.sortino,
+      winRate: metrics.winRate,
+      yearWinRate: metrics.yearWinRate,
+      annVol: metrics.annVol,
+      totalMonths: metrics.totalMonths,
+      operationCount: metrics.operationCount,
+      activeMonths: metrics.activeMonths,
+      finalPosition: metrics.finalPosition,
+      monthlySnapshots,    // 每月完整快照（含全部资产详情）—— 恒为固化序列
+      hasEstimatedData,
+      live,                // 含当月估算的口径（无叠加时为 null）
+      overlayMonth: live ? live.month : null,
+      frozenMonths: monthlySnapshots.length
+    };
+  }
+
+  /**
+   * 由月度快照序列计算全部指标
+   * 固化口径与叠加口径共用同一函数 —— 从根上杜绝「两套数字」再次分叉。
+   * @param {Array} snaps 月度快照序列（month / totalValue / drawdown / monthReturn / holdings / opCount）
+   * @param {number} totalCapital 固定基准本金（50 万）
+   */
+  function computeMetrics(snaps, totalCapital) {
+    const n = snaps.length;
+    const finalValue = n ? snaps[n - 1].totalValue : totalCapital;
+    const totalReturn = (finalValue / totalCapital - 1) * 100;
+    const nYears = n / 12;
+    const annualReturn = nYears > 0 ? (Math.pow(finalValue / totalCapital, 1 / nYears) - 1) * 100 : 0;
+
+    // 赚钱月占比
+    const positiveMonths = snaps.filter(s => s.monthReturn > 0).length;
+    const winRate = n > 0 ? (positiveMonths / n) * 100 : 0;
+
+    // 自然年胜率（每年收益率汇总后判断）
     const yearReturns = {};
-    for (const snap of monthlySnapshots) {
+    for (const snap of snaps) {
       const y = parseInt(snap.month.substring(0, 4));
       if (!yearReturns[y]) yearReturns[y] = 1;
       yearReturns[y] *= (1 + snap.monthReturn);
@@ -446,15 +586,16 @@ const RollingBacktest = (() => {
     const years = Object.keys(yearReturns);
     const positiveYears = years.filter(y => yearReturns[y] > 1).length;
     const yearWinRate = years.length > 0 ? (positiveYears / years.length) * 100 : 0;
-    
-    // 计算Sharpe
-    const monthlyReturns = monthlySnapshots.map(s => s.monthReturn);
-    const meanR = monthlyReturns.length > 0 ? monthlyReturns.reduce((a, b) => a + b, 0) / monthlyReturns.length : 0;
-    const variance = monthlyReturns.length > 1 
-      ? monthlyReturns.reduce((s, r) => s + (r - meanR) ** 2, 0) / (monthlyReturns.length - 1)
+
+    // Sharpe
+    const monthlyReturns = snaps.map(s => s.monthReturn);
+    const meanR = n > 0 ? monthlyReturns.reduce((a, b) => a + b, 0) / n : 0;
+    const variance = n > 1
+      ? monthlyReturns.reduce((s, r) => s + (r - meanR) ** 2, 0) / (n - 1)
       : 0;
     const annVol = Math.sqrt(Math.max(0, variance)) * Math.sqrt(12);
     const sharpe = annVol > 0 ? (annualReturn / 100 - 0.02) / annVol : 0;
+
     // Sortino: 只对负收益率计算下行标准差
     const negReturns = monthlyReturns.filter(r => r < 0);
     const downVariance = negReturns.length > 1
@@ -462,47 +603,36 @@ const RollingBacktest = (() => {
       : (negReturns.length === 1 ? negReturns[0] ** 2 : 0);
     const annDownVol = Math.sqrt(Math.max(0, downVariance)) * Math.sqrt(12);
     const sortino = annDownVol > 0 ? (annualReturn / 100 - 0.02) / annDownVol : 0;
-    
-    // 计算交易次数
-    const operationCount = monthlySnapshots.reduce((sum, s) => sum + s.opCount, 0);
-    
-    // 计算有交易的月份数（排除现金操作）
-    const activeMonths = monthlySnapshots.filter(s => s.opCount > 0).length;
 
-    // 计算期末仓位（排除现金·货币基金后的权益占比）
-    const lastSnap = monthlySnapshots[monthlySnapshots.length - 1];
-    const finalEquity = lastSnap.totalValue - (lastSnap.holdings[CASH_ASSET] || 0);
-    const finalPosition = lastSnap.totalValue > 0 ? finalEquity / lastSnap.totalValue : 0;
-    
+    // 最大回撤（快照 drawdown 为负数百分比，取最小值；全 0 时为 0）
+    const maxDrawdown = snaps.reduce((m, s) => Math.min(m, s.drawdown || 0), 0);
+
+    const operationCount = snaps.reduce((sum, s) => sum + s.opCount, 0);
+    const activeMonths = snaps.filter(s => s.opCount > 0).length;
+
+    // 期末仓位（排除现金·货币基金后的权益占比）
+    const lastSnap = snaps[n - 1];
+    const finalEquity = lastSnap ? lastSnap.totalValue - (lastSnap.holdings[CASH_ASSET] || 0) : 0;
+    const finalPosition = (lastSnap && lastSnap.totalValue > 0) ? finalEquity / lastSnap.totalValue : 0;
+
     return {
-      startPoint,
-      finalValue,
-      totalReturn,
-      annualReturn,
-      maxDrawdown,
+      finalValue, totalReturn, annualReturn, maxDrawdown,
       sharpe: Math.max(0, Math.min(sharpe, 10)),
       sortino: Math.max(0, Math.min(sortino, 10)),
-      winRate,
-      yearWinRate,
-      annVol,
-      totalMonths: totalMonthsNeeded,
-      operationCount,
-      activeMonths,
-      finalPosition,
-      monthlySnapshots,    // 每月完整快照（含全部资产详情）
-      hasEstimatedData
+      winRate, yearWinRate, annVol,
+      totalMonths: n, operationCount, activeMonths, finalPosition
     };
   }
 
   /**
    * 执行所有起点的滚动回测
    */
-  function runAll() {
+  function runAll(opts) {
     const points = getStartPoints();
     const results = [];
     
     for (const point of points) {
-      const result = runSingleBacktest(point);
+      const result = runSingleBacktest(point, opts);
       results.push(result);
     }
     
@@ -625,9 +755,15 @@ const RollingBacktest = (() => {
 
   return {
     CONFIG,
+    ASSETS,
+    CASH_ASSET,
     getStartPoints,
     runSingleBacktest,
     runAll,
+    computeMetrics,
+    setLiveOverlay,
+    getLiveOverlay,
+    clearLiveOverlay,
     fmtMoney,
     fmtPct,
     exportLogCSV,

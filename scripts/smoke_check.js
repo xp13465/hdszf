@@ -13,6 +13,8 @@
  *  7) progress.json 不污染主回测（基准月/资产名/÷50万口径）
  *  8) 两套引擎口径一致（simulateCMV == RollingBacktest，一次建仓版 & 分批建仓版）
  *  9) 进行中月份叠加层 == progress.json（est_total / 累计% / 月数 +1、非法叠加被拒）
+ *     第二轮追加：滚动引擎同源叠加（result.live 与 engine 逐项一致、monthlySnapshots 未被污染、
+ *     进行中月 opCount=0、累计月序=冻结月数+1）、空值/空表不得冒充 0
  * 10) 降级快照闸门：progress.json 若标记 degraded，估算字段必须全为 null，
  *     绝不允许出现用 0 填补出来的「当月持平」（会被 live overlay 当成真估算发到全站）
  *
@@ -263,6 +265,67 @@ if (typeof PROG !== 'undefined' && fs.existsSync(PROG)) {
     ];
     check('非法叠加（已定稿月/非法月份/缺收益）被拒绝', reject.every(x => x === null),
       reject.map(x => x === null ? 'null' : 'accepted').join(','));
+    // ---- 滚动引擎同源校验（弹窗顶部汇总 / 滚动汇总表 / 折线图 都吃这一套）----
+    // 前面的「非法叠加」测试会把两个引擎的叠加状态清空，这里重新装回再比。
+    B.setLiveOverlay({ month: prog.in_progress_month, asOf: prog.data_as_of, returns: Object.assign({}, returns) });
+    const rApplied = RB.setLiveOverlay({ month: prog.in_progress_month, asOf: prog.data_as_of, mtd: Object.assign({}, returns) });
+    check('滚动引擎 live overlay 被接受（与 engine 同源判定）', !!rApplied,
+      `month=${prog.in_progress_month} 数据末月=${lastMonthInData}`);
+    if (rApplied) {
+      const rLiveResults = RB.runAll();
+      const rEarliest = rLiveResults.find(x => x.startPoint.isEarliest);
+      const rComparison = rLiveResults.find(x => x.startPoint.isComparison);
+
+      check('滚动叠加：一次建仓版终值 = progress.est_total',
+        Math.abs(rEarliest.live.finalValue - prog.est_total) < 0.05,
+        `rolling=${rEarliest.live.finalValue.toFixed(2)} progress=${prog.est_total}（差 ${(rEarliest.live.finalValue - prog.est_total).toFixed(4)}）`);
+
+      check('滚动叠加：monthlySnapshots 未被污染（日志表格 / CSV 仍为固化口径）',
+        rEarliest.monthlySnapshots.length === rEarliest.frozenMonths &&
+        Math.abs(rEarliest.monthlySnapshots[rEarliest.monthlySnapshots.length - 1].totalValue - earliest.finalValue) < 0.01,
+        `snaps=${rEarliest.monthlySnapshots.length} frozen=${rEarliest.frozenMonths}`);
+
+      check('滚动叠加：进行中月不产生任何操作（恒市值法只在月末调仓）',
+        rEarliest.live.snapshot.opCount === 0 && rEarliest.live.snapshot.assetDetails.every(a => a.action === '无操作'),
+        `opCount=${rEarliest.live.snapshot.opCount}`);
+
+      check('滚动叠加：累计月序 = 冻结月数 + 1（入场月=第1个月）',
+        rEarliest.live.snapshot.monthIndex === rEarliest.frozenMonths + 1,
+        `monthIndex=${rEarliest.live.snapshot.monthIndex} frozen=${rEarliest.frozenMonths}`);
+
+      const crossLive = (tag, eng, rl) => {
+        const rows = [
+          ['终值', eng.finalValue, rl.finalValue],
+          ['累计%', eng.total, rl.totalReturn],
+          ['年化%', eng.annual, rl.annualReturn],
+          ['最大回撤%', eng.maxDd, rl.maxDrawdown],
+          ['Sharpe', eng.sharpe, rl.sharpe],
+          ['月胜率%', eng.monthlyWinRate * 100, rl.winRate],
+          ['月数', eng.totalMonths, rl.totalMonths]
+        ];
+        const bad = rows.filter(([, a, b]) => Math.abs(a - b) > 1e-6)
+          .map(([k, a, b]) => `${k}: engine=${a} rolling=${b}`);
+        check(`两引擎叠加口径一致 · ${tag}`, bad.length === 0, bad.join(' | '));
+      };
+      crossLive('一次建仓版', B.simulateCMV(B.PLANS.balanced), rEarliest.live);
+      crossLive('分批建仓版(同起点)', B.simulateCMV(B.PLANS.balanced, { buildMonths: 12 }), rComparison.live);
+
+      // 空值闸门：null / undefined 绝不能被当作 0（「没有数据」≠「当月持平」）
+      const badReturns = Object.assign({}, returns, { '黄金': null });
+      check('空值不得冒充 0（engine 拒绝含 null 的收益表）',
+        B.setLiveOverlay({ month: prog.in_progress_month, returns: badReturns }) === null);
+      check('空值不得冒充 0（rolling 拒绝含 null 的 MTD 表）',
+        RB.setLiveOverlay({ month: prog.in_progress_month, mtd: badReturns }) === null);
+      check('空表被拒（不得默认全 0）',
+        B.setLiveOverlay({ month: prog.in_progress_month, returns: {} }) === null &&
+        RB.setLiveOverlay({ month: prog.in_progress_month, mtd: {} }) === null);
+
+      RB.clearLiveOverlay();
+      check('滚动 clearLiveOverlay 后回到固化口径（live=null、快照仍固化）',
+        RB.runSingleBacktest(RB.getStartPoints()[0]).live === null &&
+        Math.abs(RB.runSingleBacktest(RB.getStartPoints()[0]).finalValue - earliest.finalValue) < 0.01);
+    }
+
     B.clearLiveOverlay();
     check('clearLiveOverlay 后回到固化口径',
       Math.abs(B.simulateCMV(B.PLANS.balanced).finalValue - earliest.finalValue) < 0.01);

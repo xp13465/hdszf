@@ -40,7 +40,22 @@ const BacktestEngine = (() => {
     const lastMonth = rr.months[rr.months.length - 1];
     // 安全闸门：叠加月必须晚于真实数据末月，且未出现在 months 中（否则说明该月已定稿，应改走主回测）
     if (rr.months.indexOf(o.month) >= 0 || String(o.month) <= String(lastMonth)) { LIVE_OVERLAY = null; return null; }
-    LIVE_OVERLAY = { month: String(o.month), asOf: o.asOf || '', returns: o.returns, baseMonth: lastMonth };
+    // 数值闸门：null / undefined / '' / 布尔 / 数组 / 非有限数一律拒绝。
+    // ⚠️ 必须显式拦住 null —— Number(null) === 0，「没有数据」会被静默当成
+    //    「当月持平」发布到全站（项目铁律：不凭空造月收益）。
+    const returns = {};
+    const keys = Object.keys(o.returns);
+    if (!keys.length) { LIVE_OVERLAY = null; return null; }
+    for (const k of keys) {
+      const v = o.returns[k];
+      if (v === null || v === undefined || v === '' || typeof v === 'boolean' || Array.isArray(v)) {
+        LIVE_OVERLAY = null; return null;
+      }
+      const n = Number(v);
+      if (!isFinite(n)) { LIVE_OVERLAY = null; return null; }
+      returns[k] = n;
+    }
+    LIVE_OVERLAY = { month: String(o.month), asOf: o.asOf || '', returns, baseMonth: lastMonth };
     return LIVE_OVERLAY;
   }
 

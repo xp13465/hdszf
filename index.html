@@ -176,6 +176,8 @@
     /* 卡片右上角「含当月估」小标：仅当引擎已叠加进行中月（body.has-live-estimate）时出现 */
     .live-tag { display: none; position: absolute; top: 8px; right: 8px; font-size: 0.62rem; font-weight: 600; line-height: 1; padding: 3px 6px; border-radius: 999px; color: var(--color-warning, #c05600); background: rgba(192,86,0,0.10); border: 1px solid rgba(192,86,0,0.35); letter-spacing: 0.02em; white-space: nowrap; }
     body.has-live-estimate .live-tag { display: inline-block; }
+    /* 行内变体：用于表格行 / 弹窗汇总项等非「绝对定位到卡片右上角」的场景 */
+    .live-tag.tag-inline { position: static; margin-left: 4px; vertical-align: middle; }
     /* 有进行中数据时：可悬浮的指标加虚线下划线 + 询问光标，提示「这里有说明」 */
     body.has-live-estimate [data-tip-key] { cursor: help; }
     body.has-live-estimate [data-tip-key] .stat-value,
@@ -367,6 +369,8 @@
             </tbody>
           </table>
         </div>
+        <!-- 含当月估算说明行（body.has-live-estimate 控制显隐，由 main.js#renderLiveNotes 写入） -->
+        <div class="live-note-line" id="rolling-live-note"></div>
       </div>
 
       <!-- 滚动回测可视化图表 -->
@@ -769,12 +773,12 @@
 
   <!-- Scripts -->
   <script src="js/data.js?v=21"></script>
-  <script src="js/engine.js?v=22"></script>
+  <script src="js/engine.js?v=23"></script>
   <script src="js/sliders.js?v=9"></script>
   <script src="js/charts.js?v=17"></script>
-  <script src="js/rolling.js?v=17"></script>
+  <script src="js/rolling.js?v=18"></script>
   <script src="js/share-image.js?v=6"></script>
-  <script src="js/main.js?v=53"></script>
+  <script src="js/main.js?v=54"></script>
 
 
   <!-- ===== SEO 静态文本（爬虫可见） ===== -->

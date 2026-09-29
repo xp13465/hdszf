@@ -171,18 +171,24 @@
 
 ## 全站「含当月估算」+ hover 固化对照（2026-09-29 起）
 
-> 与上一节配套：`progress.json` 此前只喂日志表的「🟡 进行中」行；现在**同时喂首屏 Hero、三档卡片、交互回测指标卡**。
+> 与上一节配套：`progress.json` 此前只喂日志表的「🟡 进行中」行；现在**同时喂首屏 Hero、三档卡片、交互回测指标卡，
+> 以及滚动回测板块（汇总表 12 行 + 折线图末点 + 弹窗顶部汇总）**（后四者 2026-09-29 第二轮追加）。
 
 ### 数据流
 
 ```
 scripts/monthly_progress.js  →  js/progress.json (含 mtd_raw 高精度字段)
         ↓ fetch + ?t= 缓存
-main.js ensureLiveProgress() → applyLiveOverlay(d) → BacktestEngine.setLiveOverlay({month, asOf, returns})
-        ↓
-simulateCMV(alloc) = 真实收益月 + 1 个「叠加月」（不触发再平衡）
-simulateCMV(alloc, {liveOverlay:false}) = 固化口径（对照值）
+main.js ensureLiveProgress() → applyLiveOverlay(d)
+        ├─ BacktestEngine.setLiveOverlay({month, asOf, returns})   → simulateCMV 多算 1 个月（不触发再平衡）
+        │                                                            Hero / 三档卡 / 雷达图 / 收益回撤曲线 / 指标卡
+        └─ RollingBacktest.setLiveOverlay({month, asOf, mtd})      → result.live（monthlySnapshots 保持固化！）
+                                                                     滚动汇总表 / 折线图末点 / 弹窗顶部汇总 / 日志「🟡 进行中」行
+simulateCMV(alloc, {liveOverlay:false}) / RollingBacktest.runAll({liveOverlay:false}) = 固化口径（对照值）
 ```
+
+**两个引擎的叠加状态各自独立，必须同时设置** —— 只设一个会出现「首屏含估算、弹窗不含」这类同页面口径打架
+（正是第二轮修复的起因）。`main.js#applyLiveOverlay()` 里两处 `setLiveOverlay` 成对出现，别拆。
 
 ### 改动前后必查（改引擎/展示前请先读）
 
@@ -195,7 +201,13 @@ simulateCMV(alloc, {liveOverlay:false}) = 固化口径（对照值）
 - [ ] `has-live-progress`（日志 🟡 角标）与 `has-live-estimate`（全站「含当月估」小标）**是两个独立 class**，别合并。
 - [ ] **分享图固定用固化口径**：`share-image.js#getDefaultResult()` 必须传 `{liveOverlay:false}`。
 - [ ] 三档卡片字段是 **`dd`**（不是 `maxDd`），对照值在 `data.frozen.maxDd`。
-- [ ] 改了 `engine.js` / `main.js` / `style.css` → 记得 bump `index.html` 的 `?v=`，
+- [ ] **滚动引擎的叠加层绝不能 append 进 `result.monthlySnapshots`** —— 叠加结果只放 `result.live`。
+      一旦写进快照序列，日志表格正文、CSV 导出、折线图全部会跟着变，且累计月序会多算一格。
+- [ ] **`null` 绝不能被当成 0**：两个引擎的 `setLiveOverlay` 与 `main.js#applyLiveOverlay` 都要显式拒绝
+      `null` / `undefined` / `''` / 布尔 / 数组 / 非有限数。`Number(null) === 0`，漏了就变成「当月持平」。
+- [ ] 弹窗「🟡 进行中」行必须**直接渲染 `result.live.snapshot`**，不要本地复算 MTD
+      （旧实现用 2 位 `progress.mtd`，与引擎 `mtd_raw` 会差几元，同一弹窗内自相矛盾）。
+- [ ] 改了 `engine.js` / `rolling.js` / `main.js` / `style.css` → 记得 bump `index.html` 的 `?v=`，
       且 `main.js themeMap.business` 的 `style.css` 版本号**必须与 index.html 一致**。
 
 ### 验证命令
@@ -205,10 +217,15 @@ node scripts/smoke_check.js          # 期望退出码 0（含第 5/7/8/9/10 项
 node scripts/monthly_progress.js     # 刷新 progress.json（--push 才提交）
 ```
 
-实机核对（本机 Playwright，隔离工作区）：
-`C:\Users\23405\.workbuddy\binaries\node\workspace\verify_live.py`
-→ Hero / 指标卡 / 三档数值、悬浮层文本（含当月 vs 固化）、曲线点数（应 = 收益条数 + 2）、
-   日志表横向溢出（`scrollWidth === clientWidth`）、双主题无 console 错误。
+实机核对（本机 Playwright，隔离工作区 `C:\Users\23405\.workbuddy\binaries\node\workspace\`）：
+- 本地改动**未 push** 时才需要起服务：`<python> -m http.server 8123 --bind 127.0.0.1`（**必须用后台任务参数**；
+  命令末尾加 `&` 会「任务报 failed + python 子进程脱管占端口」，换端口重试会累积出多个僵尸服务）。
+- `verify_live.py` → Hero / 指标卡 / 三档数值、悬浮层文本（含当月 vs 固化）、曲线点数、日志表横向溢出、双主题。
+- `_verify_rolling_live.py` → 滚动汇总表 12 行「含当月估」小标 + 数值、折线图末点（估算是最后一点）、
+  弹窗顶部汇总 5 项含估算 + 悬停对照、进行中行（第 134 个月）、`scrollWidth === clientWidth`。
+- `_verify_roll_hover.py` → 汇总表行悬停提示。⚠️ 悬停**必须等 fade-in 位移动画结束**（`scrollIntoView` 后 sleep ≥ 900ms 再取
+  `bounding_box()` 并 `mouse.move`），否则坐标是动画中间态、提示不会弹出（假失败）。
+- 验证完 `TaskStop` 后台服务并核对端口释放。
 
 ---
 
@@ -224,7 +241,9 @@ node scripts/monthly_progress.js     # 刷新 progress.json（--push 才提交�
   - `est_change_pct_base` == `est_change_amount ÷ base_capital`（防口径退回"÷上月末总市值"）。
   失败通常意味着"该月已定稿但快照没更新"，重跑 `monthly_progress.js` 即可。
 - **累计月序口径（2026-09-29 用户拍板）**：入场月 = **第 1 个月**（不是第 0 个月），数据末月 2026-08 = 第 133 个月，进行中月 2026-09 = 第 134 个月。
-  前端 `main.js`（`monthNoMap = i + 1`）与 CSV `rolling.js`（同）必须同源，改一处必改另一处 —— 目前无 smoke 守卫，靠人工核对。
+  前端 `main.js`（`monthNoMap = i + 1`）与 CSV `rolling.js`（同）必须同源，改一处必改另一处。
+  **已加守卫**：`smoke_check` 第 9 项断言「滚动叠加：累计月序 = 冻结月数 + 1」；
+  日志「进行中」行的月序直接取引擎的 `live.snapshot.monthIndex`（不再由 `snaps.length + 1` 推算，避免叠加月被算两遍）。
 - `scripts/smoke_check.js` 第 5 项（2026-09-29 改写）：**`simulateCMV` 窗口 = 入场月 + 真实收益月**，断言 `m.totalMonths === assetLen + 1`
   （旧断言是 `=== assetLen`，口径统一后已作废）。
 - `scripts/smoke_check.js` 第 8 项（2026-09-29 新增）：**两引擎口径一致** —— `simulateCMV` 与 `RollingBacktest` 在

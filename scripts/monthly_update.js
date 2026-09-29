@@ -335,6 +335,7 @@ for (const a of Object.keys(assetCagr)) {
 sub('sitemap.xml', /<lastmod>\d{4}-\d{2}-\d{2}<\/lastmod>/, `<lastmod>${V.todayISO}</lastmod>`, 'sitemap lastmod');
 sub('CODEBUDDY.md', /最后更新:\s*[\d-]+（[^）]*）/, `最后更新: ${V.todayISO}（数据刷新至日历 ${V.endLabel}，${V.n} 个月）`, 'CODEBUDDY 头部日期');
 sub('CODEBUDDY.md', /(\|\s*data\.js\s*\|\s*v=)\d+/, `$1${verOf('data.js')}`, 'CODEBUDDY 版本表 data.js');
+sub('CODEBUDDY.md', /(\|\s*engine\.js\s*\|\s*v=)\d+/, `$1${verOf('engine.js')}`, 'CODEBUDDY 版本表 engine.js');
 sub('CODEBUDDY.md', /(\|\s*rolling\.js\s*\|\s*v=)\d+/, `$1${verOf('rolling.js')}`, 'CODEBUDDY 版本表 rolling.js');
 sub('CODEBUDDY.md', /(\|\s*main\.js\s*\|\s*v=)\d+/, `$1${verOf('main.js')}`, 'CODEBUDDY 版本表 main.js');
 

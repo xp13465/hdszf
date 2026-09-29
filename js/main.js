@@ -188,6 +188,9 @@
 
   // --- 回测回调 ---
   let lastBacktestArgs = null;    // ['当前配置', '锁定配置']，供拿到进行中快照后重算
+  // 滚动回测状态（声明上移：refreshLiveDisplay 在异步回调里会读到它们，避免 TDZ）
+  let rollingReady = false;       // 首轮渲染已完成（弹窗绑定只做一次）
+  let rollingModalInited = false;
 
   function onBacktestChange(currentValues, lockedValues) {
     lastBacktestArgs = [currentValues, lockedValues];
@@ -217,6 +220,8 @@
       ChartManager.updateEquityCurve(live, null);
       ChartManager.updateDrawdownCurve(live, null);
     }
+    // 滚动回测：汇总表 / 完整持仓日志弹窗 / 折线图也要切到「含当月估算」口径
+    if (rollingReady) rerunRollingLive();
     bindTips();
   }
 
@@ -570,14 +575,36 @@
   let rollingResults = null;
   let rollingCharts = {};
 
+  // 滚动回测统一渲染入口：固化与「含当月估算」都走这里，避免两条路径分叉
+  function renderRollingAll() {
+    rollingResults = RollingBacktest.runAll();
+    renderRollingSummary(rollingResults);
+    renderRollingEquityChart(rollingResults);
+    if (!rollingModalInited) { initLogModal(); rollingModalInited = true; }
+    rollingReady = true;
+    bindTips();
+  }
+
+  // 进行中快照到达后重算（叠加层已在引擎上生效，这里只负责重新渲染）
+  function rerunRollingLive() {
+    try {
+      renderRollingAll();
+      // 弹窗开着就按新口径重渲染当前这条，避免屏幕上是旧数字
+      const modal = document.getElementById('log-modal');
+      if (modal && modal.style.display !== 'none') {
+        const i = parseInt(modal.dataset.logIndex, 10);
+        if (isFinite(i) && rollingResults[i]) showLogDetail(rollingResults[i], i);
+      }
+    } catch (e) {
+      console.error('滚动回测（含当月估算）重算失败:', e);
+    }
+  }
+
   function initRollingBacktest() {
     // 异步运行回测（避免阻塞UI）
     setTimeout(() => {
       try {
-        rollingResults = RollingBacktest.runAll();
-        renderRollingSummary(rollingResults);
-        renderRollingEquityChart(rollingResults);
-        initLogModal();
+        renderRollingAll();
       } catch (e) {
         console.error('滚动回测运行失败:', e);
         const tbody = document.getElementById('rolling-summary-body');
@@ -592,43 +619,72 @@
     const tbody = document.getElementById('rolling-summary-body');
     if (!tbody || !results || results.length === 0) return;
 
-    // 找最佳值用于高亮
-    const bestAnnual = Math.max(...results.map(r => r.annualReturn));
-    const bestSharpe = Math.max(...results.map(r => r.sharpe));
-    const bestDD = Math.max(...results.map(r => r.maxDrawdown)); // 最大回撤（最不负面）
+    // 显示口径：有进行中估算（r.live）就用含当月结果，否则用固化结果
+    const shown = results.map(r => r.live || r);
+
+    // 找最佳值用于高亮（按显示口径，保证与页面数字一致）
+    const bestAnnual = Math.max(...shown.map(r => r.annualReturn));
+    const bestSharpe = Math.max(...shown.map(r => r.sharpe));
+    const bestDD = Math.max(...shown.map(r => r.maxDrawdown)); // 最大回撤（最不负面）
 
     tbody.innerHTML = results.map((r, i) => {
       const isEstimated = r.hasEstimatedData;
+      const d = shown[i];                      // 显示用指标（含当月估算）
+      const hasLive = !!r.live;
       const startLabel = r.startPoint.label;
       const yearsAgo = r.startPoint.yearsAgo;
       const buildMonths = r.startPoint.buildMonths || 12;
-      
+
+      // 含当月估算 → 悬停对照固化值（与首屏 Hero / 三档卡同口径同提示）
+      if (hasLive) {
+        tipLive('roll-' + i, [
+          ['含估 终值', '¥' + RollingBacktest.fmtMoney(d.finalValue)],
+          ['固化 终值', '¥' + RollingBacktest.fmtMoney(r.finalValue)],
+          ['含估 累计', RollingBacktest.fmtPct(d.totalReturn)],
+          ['固化 累计', RollingBacktest.fmtPct(r.totalReturn)],
+          ['含估 年化', d.annualReturn.toFixed(2) + '%'],
+          ['固化 年化', r.annualReturn.toFixed(2) + '%'],
+          ['含估 回撤', d.maxDrawdown.toFixed(2) + '%'],
+          ['固化 回撤', r.maxDrawdown.toFixed(2) + '%'],
+          ['含估 月胜率', d.winRate.toFixed(1) + '%'],
+          ['固化 月胜率', r.winRate.toFixed(1) + '%'],
+          ['回测月数', d.totalMonths + '（固化 ' + r.frozenMonths + '）']
+        ]);
+      } else {
+        delete TIPS['roll-' + i];
+      }
+
       // 高亮最佳值
-      const annualClass = r.annualReturn === bestAnnual ? 'cell-positive' : (r.annualReturn >= 0 ? 'cell-positive' : 'cell-negative');
-      const sharpeClass = r.sharpe === bestSharpe ? 'cell-positive' : '';
-      const ddClass = r.maxDrawdown === bestDD ? 'cell-negative' : 'cell-negative';
-      
-      // 构建周期字符串 + 建仓方式
-      const endLabel = `${RollingBacktest.CONFIG.endYear}年${RollingBacktest.CONFIG.endMonth}月`;
-      const periodStr = `${startLabel} → ${endLabel}`;
-      const buildStr = buildMonths === 1
-        ? `${r.totalMonths}个月 · <span style="display:inline-block;background:#c53030;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">⚡一次建仓</span>`
+      const annualClass = d.annualReturn === bestAnnual ? 'cell-positive' : (d.annualReturn >= 0 ? 'cell-positive' : 'cell-negative');
+      const sharpeClass = d.sharpe === bestSharpe ? 'cell-positive' : '';
+      const ddClass = d.maxDrawdown === bestDD ? 'cell-negative' : 'cell-negative';
+
+      // 构建周期字符串 + 建仓方式（含估时终点顺延到进行中月）
+      const endYM = hasLive ? r.live.month : (RollingBacktest.CONFIG.endYear + '-' + String(RollingBacktest.CONFIG.endMonth).padStart(2, '0'));
+      const endParts = endYM.split('-');
+      const endLabel = endParts[0] + '年' + parseInt(endParts[1], 10) + '月';
+      const periodStr = startLabel + ' → ' + endLabel;
+      const liveTag = hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : '';
+      const buildTag = buildMonths === 1
+        ? '<span style="display:inline-block;background:#c53030;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">⚡一次建仓</span>'
         : (r.startPoint.isComparison
-          ? `${r.totalMonths}个月 · <span style="display:inline-block;background:#e8890c;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">🔶分批建仓(${buildMonths}次)</span>`
-          : `${r.totalMonths}个月 · <span style="display:inline-block;background:#5a9fd4;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;">📅分批建仓(${buildMonths}次)</span>`);
-      
+          ? '<span style="display:inline-block;background:#e8890c;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">🔶分批建仓(' + buildMonths + '次)</span>'
+          : '<span style="display:inline-block;background:#5a9fd4;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;">📅分批建仓(' + buildMonths + '次)</span>');
+      // 月数 + 「含当月估」小标 + 建仓方式挤在同一行，避免格子被撑高
+      const buildStr = d.totalMonths + '个月' + liveTag + ' · ' + buildTag;
+
       return `
-        <tr>
+        <tr${hasLive ? ' data-tip-key="roll-' + i + '"' : ''}>
           <td class="cell-start">${startLabel}<br><small style="color:var(--color-text-muted)">${yearsAgo != null ? yearsAgo + '年前入场' : '数据最早月 · 完整回测'}</small></td>
           <td>${periodStr}<br><small style="color:var(--color-text-muted)">${buildStr}</small></td>
-          <td class="${r.finalValue >= 500000 ? 'cell-positive' : 'cell-negative'}">¥${RollingBacktest.fmtMoney(r.finalValue)}</td>
-          <td class="${r.totalReturn >= 0 ? 'cell-positive' : 'cell-negative'}">${RollingBacktest.fmtPct(r.totalReturn)}</td>
-          <td class="${annualClass}">${r.annualReturn.toFixed(2)}%</td>
-          <td class="${ddClass}">${r.maxDrawdown.toFixed(2)}%</td>
-          <td class="${sharpeClass}">${r.sharpe.toFixed(4)}</td>
-          <td>${r.winRate.toFixed(1)}%<br><small style="color:var(--color-text-muted);font-size:0.7rem;">年${r.yearWinRate.toFixed(0)}%</small></td>
-          <td>${r.operationCount}次<br><small style="color:var(--color-text-muted);font-size:0.7rem;">${r.activeMonths}个月有交易</small></td>
-          <td><span style="font-weight:600;">${(r.finalPosition * 100).toFixed(0)}%</span><br><small style="color:var(--color-text-muted);font-size:0.7rem;">期末仓位</small></td>
+          <td class="${d.finalValue >= 500000 ? 'cell-positive' : 'cell-negative'}">¥${RollingBacktest.fmtMoney(d.finalValue)}</td>
+          <td class="${d.totalReturn >= 0 ? 'cell-positive' : 'cell-negative'}">${RollingBacktest.fmtPct(d.totalReturn)}</td>
+          <td class="${annualClass}">${d.annualReturn.toFixed(2)}%</td>
+          <td class="${ddClass}">${d.maxDrawdown.toFixed(2)}%</td>
+          <td class="${sharpeClass}">${d.sharpe.toFixed(4)}</td>
+          <td>${d.winRate.toFixed(1)}%<br><small style="color:var(--color-text-muted);font-size:0.7rem;">年${d.yearWinRate.toFixed(0)}%</small></td>
+          <td>${d.operationCount}次<br><small style="color:var(--color-text-muted);font-size:0.7rem;">${d.activeMonths}个月有交易</small></td>
+          <td><span style="font-weight:600;">${(d.finalPosition * 100).toFixed(0)}%</span><br><small style="color:var(--color-text-muted);font-size:0.7rem;">期末仓位</small></td>
           <td class="${isEstimated ? 'cell-estimated' : 'cell-all-real'}">${isEstimated ? '⚠️含估计值' : '✓ 真实数据<br><small style="color:var(--color-text-muted);font-size:0.65rem;">真实模拟</small>'}</td>
           <td><button class="btn-detail" onclick="window.showRollingLog(${i})">📋 查看操作记录</button></td>
         </tr>
@@ -655,9 +711,20 @@
         data.push([j, (snapshots[j].totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100]);
       }
 
+      // 含当月估算（live overlay）：把进行中月作为末点接上。
+      // 该点是 MTD 估算，末端用空心圆标出，与固化月区分（表头说明行 + 悬停提示同步解释）。
+      let liveCoord = null;
+      if (r.live) {
+        liveCoord = [snapshots.length, (r.live.finalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100];
+        data.push(liveCoord);
+      }
+
       const isEarliest = r.startPoint.isEarliest;
       const isComparison = r.startPoint.isComparison;
       const depth = (isEarliest || isComparison) ? 0 : (r.startPoint.yearsAgo / 10);
+      const lineColor = isEarliest
+        ? '#c53030'
+        : (isComparison ? '#e8890c' : `hsl(${200 + depth * 30}, ${60 - depth * 20}%, ${45 + depth * 20}%)`);
 
       return {
         name: r.startPoint.label + (r.hasEstimatedData ? ' ⚠️' : '') + (isComparison ? ' 分批' : (isEarliest ? ' 一次' : '')),
@@ -667,13 +734,12 @@
         symbol: 'none',
         lineStyle: {
           width: isEarliest ? 3 : (isComparison ? 2 : 1.5),
-          color: isEarliest
-            ? '#c53030'
-            : (isComparison ? '#e8890c' : `hsl(${200 + depth * 30}, ${60 - depth * 20}%, ${45 + depth * 20}%)`),
+          color: lineColor,
           type: isComparison ? 'dashed' : 'solid'
         },
         emphasis: { focus: 'series' },
-        // 终点打点
+        // 终点打点：最早起点用 pin（带 +X% 标签，含估时自动落在估算点上）；
+        // 其余起点含估时用空心圆，标出「这个末点是估算」
         markPoint: isEarliest ? {
           data: [{
             name: '终点',
@@ -690,7 +756,11 @@
             }
           }],
           animation: false
-        } : undefined
+        } : (liveCoord ? {
+          data: [{ coord: liveCoord, symbol: 'emptyCircle', symbolSize: 7, itemStyle: { color: lineColor, borderColor: lineColor, borderWidth: 2 } }],
+          label: { show: false },
+          animation: false
+        } : undefined)
       };
     });
 
@@ -850,16 +920,29 @@
     if (d.degraded) return null;      // 降级快照不含真实 MTD → 绝不叠加（双保险）
     const returns = {};
     for (const a of d.assets) {
-      const v = (a.mtd_raw != null) ? Number(a.mtd_raw) : (Number(a.mtd) / 100);
-      if (!isFinite(v)) return null;      // 任一资产数值异常 → 整体不启用，宁可不显示
-      returns[a.name] = v;
+      const raw = (a.mtd_raw != null) ? a.mtd_raw : a.mtd;
+      // ⚠️ 必须显式拦住空值：Number(null) === 0 会把「没有数据」当成「当月持平」
+      if (raw === null || raw === undefined || raw === '' || typeof raw === 'boolean') return null;
+      const n = Number(raw);
+      if (!isFinite(n)) return null;      // 任一资产数值异常 → 整体不启用，宁可不显示
+      // mtd_raw 是小数收益率；旧字段 mtd 是百分比 → 两者口径不同，不能混用
+      returns[a.name] = (a.mtd_raw != null) ? n : n / 100;
     }
-    const applied = BacktestEngine.setLiveOverlay({
+    const payload = {
       month: d.in_progress_month,
       asOf: d.data_as_of || '',
       returns
-    });
+    };
+    const applied = BacktestEngine.setLiveOverlay(payload);
     if (!applied) return null;
+    // 滚动引擎（弹窗顶部汇总 / 滚动汇总表 / 折线图）用同一份 MTD，字段名不同（mtd）
+    if (typeof RollingBacktest !== 'undefined') {
+      RollingBacktest.setLiveOverlay({
+        month: payload.month,
+        asOf: payload.asOf,
+        mtd: Object.assign({}, returns)
+      });
+    }
     LIVE_INFO = { month: applied.month, asOf: applied.asOf, baseMonth: applied.baseMonth };
     return LIVE_INFO;
   }
@@ -954,6 +1037,12 @@
       cmp.innerHTML = `🟡 上方三档卡片的年化 / 总收益已含 <b>${LIVE_INFO.month}</b> 未完整月（MTD 估算，数据截至 ${LIVE_INFO.asOf || '—'}）；` +
         `下方「数据说明」中的年化与回撤为截至 ${LIVE_INFO.baseMonth} 的固化口径。悬停卡片可对比两者。`;
     }
+    const roll = document.getElementById('rolling-live-note');
+    if (roll) {
+      roll.innerHTML = `🟡 下方汇总表与曲线的<b>末点为 ${LIVE_INFO.month} 估算</b>（MTD 估算，数据截至 ${LIVE_INFO.asOf || '—'}）；` +
+        `悬停任意一行可看「截至 ${LIVE_INFO.baseMonth} 的固化值」。` +
+        `弹窗内「完整持仓日志」正文与 CSV 导出仍为固化口径，仅额外标注一行「🟡 进行中」。`;
+    }
   }
 
 
@@ -1022,41 +1111,75 @@
     title.textContent = `📋 完整持仓日志 — ${result.startPoint.label}入场${yearsLabel}${buildTag}`;
 
     // 汇总信息
+    // 顶部汇总口径：拿到进行中估算（result.live）就显示「含当月」，悬停看固化对照；
+    // 否则纯固化展示。与首屏 Hero / 三档卡 / 滚动汇总表同一套口径与提示。
+    const dsum = result.live || result;
+    const hasLive = !!result.live;
+    if (hasLive) {
+      tipLive('log-months', [
+        ['含估 回测月数', dsum.totalMonths + ' 个月'],
+        ['固化 回测月数', result.totalMonths + ' 个月'],
+        ['进行中月', result.live.month + '（第 ' + result.live.snapshot.monthIndex + ' 个月）']
+      ]);
+      tipLive('log-final', [
+        ['含估 最终市值', '¥' + RollingBacktest.fmtMoney(dsum.finalValue)],
+        ['固化 最终市值', '¥' + RollingBacktest.fmtMoney(result.finalValue)],
+        ['含估 累计收益', RollingBacktest.fmtPct(dsum.totalReturn)],
+        ['固化 累计收益', RollingBacktest.fmtPct(result.totalReturn)]
+      ]);
+      tipLive('log-annual', [
+        ['含估 年化收益', dsum.annualReturn.toFixed(2) + '%'],
+        ['固化 年化收益', result.annualReturn.toFixed(2) + '%'],
+        ['含估 月胜率', dsum.winRate.toFixed(1) + '%'],
+        ['固化 月胜率', result.winRate.toFixed(1) + '%']
+      ]);
+      tipLive('log-dd', [
+        ['含估 最大回撤', dsum.maxDrawdown.toFixed(2) + '%'],
+        ['固化 最大回撤', result.maxDrawdown.toFixed(2) + '%']
+      ]);
+    } else {
+      ['log-months', 'log-final', 'log-annual', 'log-dd'].forEach((k) => delete TIPS[k]);
+    }
+
     const summaryHTML = `
       <div class="log-summary">
         <div class="log-summary-item">
           <div class="label">起点</div>
           <div class="value accent">${result.startPoint.label}</div>
         </div>
-        <div class="log-summary-item">
-          <div class="label">回测月数</div>
-          <div class="value">${result.totalMonths}个月</div>
+        <div class="log-summary-item"${hasLive ? ' data-tip-key="log-months"' : ''}>
+          <div class="label">回测月数${hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : ''}</div>
+          <div class="value">${dsum.totalMonths}个月</div>
         </div>
-        <div class="log-summary-item">
-          <div class="label">最终市值</div>
-          <div class="value ${result.finalValue >= 500000 ? 'green' : 'red'}">¥${RollingBacktest.fmtMoney(result.finalValue)}</div>
+        <div class="log-summary-item"${hasLive ? ' data-tip-key="log-final"' : ''}>
+          <div class="label">最终市值${hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : ''}</div>
+          <div class="value ${dsum.finalValue >= 500000 ? 'green' : 'red'}">¥${RollingBacktest.fmtMoney(dsum.finalValue)}</div>
         </div>
-        <div class="log-summary-item">
-          <div class="label">总收益率</div>
-          <div class="value ${result.totalReturn >= 0 ? 'green' : 'red'}">${RollingBacktest.fmtPct(result.totalReturn)}</div>
+        <div class="log-summary-item"${hasLive ? ' data-tip-key="log-final"' : ''}>
+          <div class="label">总收益率${hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : ''}</div>
+          <div class="value ${dsum.totalReturn >= 0 ? 'green' : 'red'}">${RollingBacktest.fmtPct(dsum.totalReturn)}</div>
         </div>
-        <div class="log-summary-item">
-          <div class="label">年化收益</div>
-          <div class="value ${result.annualReturn >= 0 ? 'green' : 'red'}">${result.annualReturn.toFixed(2)}%</div>
+        <div class="log-summary-item"${hasLive ? ' data-tip-key="log-annual"' : ''}>
+          <div class="label">年化收益${hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : ''}</div>
+          <div class="value ${dsum.annualReturn >= 0 ? 'green' : 'red'}">${dsum.annualReturn.toFixed(2)}%</div>
         </div>
-        <div class="log-summary-item">
-          <div class="label">最大回撤</div>
-          <div class="value red">${result.maxDrawdown.toFixed(2)}%</div>
+        <div class="log-summary-item"${hasLive ? ' data-tip-key="log-dd"' : ''}>
+          <div class="label">最大回撤${hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : ''}</div>
+          <div class="value red">${dsum.maxDrawdown.toFixed(2)}%</div>
         </div>
         <div class="log-summary-item">
           <div class="label">总操作次数</div>
-          <div class="value accent">${result.operationCount}次</div>
+          <div class="value accent">${dsum.operationCount}次</div>
         </div>
         <div class="log-summary-item">
           <div class="label">数据质量</div>
           <div class="value ${result.hasEstimatedData ? 'red' : 'green'}">${result.hasEstimatedData ? '⚠️含估计值' : '✓全部真实'}</div>
         </div>
       </div>
+      ${(hasLive && LIVE_INFO) ? `<div class="live-note-line" style="display:block;margin-top:0.6rem;">` +
+        `🟡 上方汇总的「回测月数 / 最终市值 / 总收益率 / 年化收益 / 最大回撤」已含 <b>${LIVE_INFO.month}</b> 未完整月` +
+        `（MTD 估算，数据截至 ${LIVE_INFO.asOf || '—'}）。下方持仓明细正文与 CSV 导出仍为截至 ${LIVE_INFO.baseMonth} 的固化口径，` +
+        `仅额外标注一行「🟡 进行中」；悬停任一汇总项可对比两者。</div>` : ''}
     `;
 
     // 每月完整持仓表格：每月一行，展开显示6个资产
@@ -1117,20 +1240,24 @@
       const snaps = result.monthlySnapshots;
       if (!snaps.length) return '';
       const last = snaps[snaps.length - 1];
+      // 叠加层由滚动引擎统一产出（RollingBacktest.setLiveOverlay → result.live）。
+      // 这里只负责渲染，不再本地复算 MTD —— 否则同一弹窗内会出现两套数字
+      // （旧实现用 2 位小数的 progress.mtd，比引擎的 mtd_raw 差几元）。
+      const liveOv = result.live;
+      if (!liveOv || !liveOv.snapshot) return '';
       // 基准月必须正好是日志最后一个完整月，否则说明数据已定稿 / 不同步 → 不展示
       if (!d.base_month || d.base_month !== last.month) return '';
 
+      const liveSnap = liveOv.snapshot;
       const mtdMap = {};
-      d.assets.forEach((a) => { mtdMap[a.name] = Number(a.mtd) || 0; });
-
       const est = {};
-      let estTotal = 0;
-      ASSETS.forEach((name) => {
-        const hold = last.holdings[name] || 0;
-        const m = (name in mtdMap) ? mtdMap[name] : 0;
-        est[name] = hold * (1 + m / 100);
-        estTotal += est[name];
+      liveSnap.assetDetails.forEach((ad) => {
+        const mr = ad.monthReturn;
+        const v = (mr && typeof mr === 'object') ? (mr.value || 0) : (mr || 0);
+        mtdMap[ad.asset] = v * 100;        // 百分比（与列头「月收益率」同显示口径）
+        est[ad.asset] = ad.holdingAfter;
       });
+      const estTotal = liveOv.finalValue;  // = Σ holdingAfter（引擎口径，含 mtd_raw 全精度）
 
       const baseCapital = RollingBacktest.CONFIG.totalCapital || 500000;
       const targetValMap = {};
@@ -1140,7 +1267,7 @@
         targetPctMap[ad.asset] = ad.targetPct;
       });
 
-      const liveMonth = d.in_progress_month || '';
+      const liveMonth = liveOv.month || d.in_progress_month || '';
       const lParts = liveMonth.split('-');
       const ly = lParts[0] || last.month.substring(0, 4);
       const lm = parseInt(lParts[1], 10) || 0;
@@ -1152,7 +1279,7 @@
       const yearStartValue = yearStartMap[ly] || baseCapital;
       const annAmount = estTotal - yearStartValue;
       const annPct = baseCapital > 0 ? (annAmount / baseCapital) * 100 : 0;
-      const cumNo = snaps.length + 1;                            // 入场月=第1个月 → 进行中月 = 条数+1
+      const cumNo = liveSnap.monthIndex;          // 累计月序（入场月 = 第 1 个月，由引擎给出）
       const cumAmount = estTotal - baseCapital;
       const cumPct = (estTotal / baseCapital - 1) * 100;
       const cashEst = est['现金·货币基金'] || 0;
@@ -1169,7 +1296,7 @@
       ASSETS.forEach((name, ai) => {
         const m = (name in mtdMap) ? mtdMap[name] : 0;
         const mRowCls = m > 0 ? 'action-buy' : (m < 0 ? 'action-sell' : '');
-        const pctOfTotal = estTotal > 0 ? (est[name] / estTotal) : 0;
+        const pctOfTotal = estTotal > 0 ? ((est[name] || 0) / estTotal) : 0;
         const dev = (pctOfTotal - (targetPctMap[name] || 0)) * 100;
 
         html += '<tr class="live-month-row">';
@@ -1185,7 +1312,7 @@
         html += `<td style="font-weight:600;">¥${(targetValMap[name] || 0).toFixed(0)}</td>`;
         html += `<td>¥${(last.holdings[name] || 0).toFixed(0)}</td>`;
         html += `<td class="${mRowCls}">${m >= 0 ? '+' : ''}${m.toFixed(2)}%</td>`;
-        html += `<td style="font-weight:600;">¥${est[name].toFixed(0)}</td>`;
+        html += `<td style="font-weight:600;">¥${(est[name] || 0).toFixed(0)}</td>`;
         html += `<td>${(pctOfTotal * 100).toFixed(1)}%</td>`;
         html += `<td class="${Math.abs(dev) > 5 ? 'action-sell' : ''}">${dev >= 0 ? '+' : ''}${dev.toFixed(1)}%</td>`;
         html += `<td style="color:var(--color-text-muted);">—</td>`;
@@ -1337,6 +1464,7 @@
     `;
 
     body.innerHTML = summaryHTML + tableHTML;
+    bindTips(body);   // 弹窗内容每次重建 → 需重新绑定汇总项的悬停说明
     modal.style.display = 'flex';
 
     // ---- 进行中月份（MTD 估算）行：追加到表格首/末（跟随排序方向）----
