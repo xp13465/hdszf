@@ -101,5 +101,23 @@ for (const r of rollingResults) {
 check('滚动日志末月=数据末月 (无 off-by-one)', rollingOk,
   `data末月=${lastMonthInData}${badDetail ? ' 异常:' + badDetail : ''}`);
 
+// ---- 6) 数据起点固化 2015-08：全周期真实数据、无估计值泄漏 ----
+// 项目数据边界：五资产中历史最短的是中证500(新浪最早 2015-08)，故入场月地板=2015-08，
+// 首个可算收益月=2015-09。起点固化于此，未来只增量 append 末月，绝不前移 months[0]。
+const FLOOR = '2015-08';
+check('数据起点地板=2015-08', rr.months[0] === FLOOR, `months[0]=${rr.months[0]}`);
+let floorOk = true, estLeak = '', earliestStart = '9999';
+for (const r of rollingResults) {
+  const sp = r.startPoint, snaps = r.monthlySnapshots;
+  const first = snaps.length ? snaps[0].month : '(空)';
+  if (first < earliestStart) earliestStart = first;
+  const est = snaps.filter(s => s.estimatedMonth).length;
+  if (est > 0) { floorOk = false; estLeak += `${sp.label}/${sp.buildLabel}:${est}个估计月 `; }
+}
+check('最早入场月≥地板2015-08', earliestStart === FLOOR,
+  `最早入场=${earliestStart}`);
+check('12起点全真实数据(无估计泄漏)', floorOk,
+  estLeak ? estLeak : '');
+
 console.log(failures === 0 ? '\n全部通过 ✓' : `\n${failures} 项失败 ✗`);
 process.exit(failures === 0 ? 0 : 1);
