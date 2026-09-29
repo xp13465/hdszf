@@ -145,7 +145,50 @@
 
 ---
 
-## 回归守卫（防 off-by-one 复发）
+## 全站「含当月估算」+ hover 固化对照（2026-09-29 起）
+
+> 与上一节配套：`progress.json` 此前只喂日志表的「🟡 进行中」行；现在**同时喂首屏 Hero、三档卡片、交互回测指标卡**。
+
+### 数据流
+
+```
+scripts/monthly_progress.js  →  js/progress.json (含 mtd_raw 高精度字段)
+        ↓ fetch + ?t= 缓存
+main.js ensureLiveProgress() → applyLiveOverlay(d) → BacktestEngine.setLiveOverlay({month, asOf, returns})
+        ↓
+simulateCMV(alloc) = 真实收益月 + 1 个「叠加月」（不触发再平衡）
+simulateCMV(alloc, {liveOverlay:false}) = 固化口径（对照值）
+```
+
+### 改动前后必查（改引擎/展示前请先读）
+
+- [ ] **两引擎口径必须逐位相等**：`simulateCMV(alloc)` vs `RollingBacktest` 一次建仓版
+      → `finalValue / annual / maxDd / sharpe / winRate` 全 0 差。
+      `smoke_check.js` 第 8 项已守；若 FAIL，先查 `engine.js` 的 `arr[t-1]` 映射有没有被改回 `arr[t]`。
+- [ ] `engine.js` 月份映射铁律：`t=0` = 入场月（收益 0），`t>=1` 取 `arr[t-1]`，循环次数 = 收益条数 + 1（+ 有 overlay 再 +1）。
+- [ ] overlay 只吃 **`progress.json#assets[].mtd_raw`**（8 位小数）。用 2 位 `mtd` 会漂 ±3 元，`smoke_check` 第 10 项会 FAIL。
+- [ ] overlay 月份必须**晚于**数据末月且**不在** `months` 里，否则 `setLiveOverlay` 直接拒绝（静默降级）。
+- [ ] `has-live-progress`（日志 🟡 角标）与 `has-live-estimate`（全站「含当月估」小标）**是两个独立 class**，别合并。
+- [ ] **分享图固定用固化口径**：`share-image.js#getDefaultResult()` 必须传 `{liveOverlay:false}`。
+- [ ] 三档卡片字段是 **`dd`**（不是 `maxDd`），对照值在 `data.frozen.maxDd`。
+- [ ] 改了 `engine.js` / `main.js` / `style.css` → 记得 bump `index.html` 的 `?v=`，
+      且 `main.js themeMap.business` 的 `style.css` 版本号**必须与 index.html 一致**。
+
+### 验证命令
+
+```bash
+node scripts/smoke_check.js          # 期望退出码 0（含第 5/7/8/9/10 项）
+node scripts/monthly_progress.js     # 刷新 progress.json（--push 才提交）
+```
+
+实机核对（本机 Playwright，隔离工作区）：
+`C:\Users\23405\.workbuddy\binaries\node\workspace\verify_live.py`
+→ Hero / 指标卡 / 三档数值、悬浮层文本（含当月 vs 固化）、曲线点数（应 = 收益条数 + 2）、
+   日志表横向溢出（`scrollWidth === clientWidth`）、双主题无 console 错误。
+
+---
+
+
 
 - `scripts/smoke_check.js` 第 5 项：加载 `js/rolling.js` 跑 `runAll()`，断言每个起点末位快照月份 == `months` 末位标签。
   若日志又退回 2026-07（或任何非最新月），smoke_check 直接 FAIL，阻断发布。
@@ -158,6 +201,13 @@
   失败通常意味着"该月已定稿但快照没更新"，重跑 `monthly_progress.js` 即可。
 - **累计月序口径（2026-09-29 用户拍板）**：入场月 = **第 1 个月**（不是第 0 个月），数据末月 2026-08 = 第 133 个月，进行中月 2026-09 = 第 134 个月。
   前端 `main.js`（`monthNoMap = i + 1`）与 CSV `rolling.js`（同）必须同源，改一处必改另一处 —— 目前无 smoke 守卫，靠人工核对。
+- `scripts/smoke_check.js` 第 5 项（2026-09-29 改写）：**`simulateCMV` 窗口 = 入场月 + 真实收益月**，断言 `m.totalMonths === assetLen + 1`
+  （旧断言是 `=== assetLen`，口径统一后已作废）。
+- `scripts/smoke_check.js` 第 8 项（2026-09-29 新增）：**两引擎口径一致** —— `simulateCMV` 与 `RollingBacktest` 在
+  一次建仓版 & 分批建仓版（同起点）下逐项相等。这是本次最核心的防回归。
+- `scripts/smoke_check.js` 第 9 项（2026-09-29 新增）：**live overlay 与 progress.json 逐位一致** ——
+  叠加终值 == `est_total`、月数 +1、累计% == `cum_return_pct_base`、不污染固化口径、非法叠加被拒、`clearLiveOverlay` 后复位。
+- `scripts/smoke_check.js` 第 10 项（2026-09-29 新增）：`progress.json` 必须含 **`mtd_raw`**（高精度 MTD，防 ±3 元漂移）。
 
 ---
 

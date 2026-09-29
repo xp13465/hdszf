@@ -4,10 +4,15 @@
  *   node scripts/smoke_check.js
  *
  * 校验内容：
- *  1) 引擎输出内部一致性（CAGR、月胜率、年度统计）
+ *  1) 引擎输出内部一致性（CAGR、月胜率、年度统计、窗口=入场月+收益月）
  *  2) index.html 首屏 Hero 卡片 ID 齐全
  *  3) main.js 的 updateHeroStats 引用的 ID 与 index.html 一致
- *  4) data.js 与 real_returns.json 数据窗口一致
+ *  4) 三档卡片动态口径 ≈ data.js 静态 comparisons
+ *  5) 滚动日志末月 = 数据末月（防 off-by-one 回归）
+ *  6) 数据起点固化 2015-08、12 起点无估计值泄漏
+ *  7) progress.json 不污染主回测（基准月/资产名/÷50万口径）
+ *  8) 两套引擎口径一致（simulateCMV == RollingBacktest，一次建仓版 & 分批建仓版）
+ *  9) 进行中月份叠加层 == progress.json（est_total / 累计% / 月数 +1、非法叠加被拒）
  *
  * 退出码：0 通过；1 失败。供 CI / 发布前调用。
  */
@@ -58,9 +63,9 @@ const assetLen = Object.values(rr.asset_returns)[0].length;
 check('数据窗口一致 (months=资产条数+1)', rr.months.length === assetLen + 1,
   `months=${rr.months.length} asset=${assetLen}`);
 
-// 引擎回测窗口 = 真实数据条数（排除占位月，与 rolling 口径一致）
-check('simulateCMV 窗口=真实数据条数', m.totalMonths === assetLen,
-  `totalMonths=${m.totalMonths} asset=${assetLen}`);
+// 引擎回测窗口 = 入场月 + 全部真实收益月（= months 标签数，与 rolling.js 的 totalMonthsNeeded 同源）
+check('simulateCMV 窗口=入场月+真实收益月', m.totalMonths === assetLen + 1,
+  `totalMonths=${m.totalMonths} asset=${assetLen}（应 ${assetLen + 1}）`);
 
 // ---- 2) index.html 首屏 ID ----
 const html = read('index.html');
@@ -159,6 +164,81 @@ if (fs.existsSync(PROG)) {
   }
 } else {
   check('progress.json 存在（站点日志「进行中行」数据源）', true, '未生成，日志将不含进行中行（非致命）');
+}
+
+// ---- 8) 两套引擎口径一致（2026-09-29 统一）----
+// 背景：simulateCMV 曾按 arr[t] 取值，把 2015-09 的收益应用在空仓上 → 组合只吃到 131 个月收益
+//       却对外报 132 个月，导致首屏/三档（112.22万 / 累计 124.44% / 年化 7.63%）与滚动日志
+//       （110.58万 / 121.16% / 7.42%）两套数字并存。现两者必须逐项相等。
+const earliest = rollingResults.find(x => x.startPoint.isEarliest);
+const comparison = rollingResults.find(x => x.startPoint.isComparison);
+function crossCheck(tag, eng, rb) {
+  const rows = [
+    ['终值', eng.finalValue, rb.finalValue],
+    ['累计收益%', eng.total, rb.totalReturn],
+    ['年化%', eng.annual, rb.annualReturn],
+    ['最大回撤%', eng.maxDd, rb.maxDrawdown],
+    ['Sharpe', eng.sharpe, rb.sharpe],
+    ['月胜率%', eng.monthlyWinRate * 100, rb.winRate],
+    ['月数', eng.totalMonths, rb.totalMonths]
+  ];
+  const bad = rows.filter(([, a, b]) => Math.abs(a - b) > 1e-6)
+    .map(([k, a, b]) => `${k}: engine=${a} rolling=${b}`);
+  check(`两引擎口径一致 · ${tag}`, bad.length === 0, bad.join(' | '));
+}
+crossCheck('一次建仓版', B.simulateCMV(B.PLANS.balanced, { liveOverlay: false }), earliest);
+crossCheck('分批建仓版(同起点)', B.simulateCMV(B.PLANS.balanced, { buildMonths: 12, liveOverlay: false }), comparison);
+
+// ---- 9) 进行中月份叠加层（live overlay）：结果必须与 progress.json 逐位一致 ----
+// 叠加月的口径 = 「上月末持仓 × (1 + 各资产 MTD)」，且该月不触发再平衡；
+// 因此引擎终值必须等于 progress.json 的 est_total（差几厘以内），否则说明再平衡或月份映射跑偏了。
+if (typeof PROG !== 'undefined' && fs.existsSync(PROG)) {
+  let prog = null;
+  try { prog = JSON.parse(fs.readFileSync(PROG, 'utf8')); } catch (e) { prog = null; }
+  if (prog && prog.in_progress) {
+    const returns = {};
+    let rawOk = true;
+    for (const a of prog.assets) {
+      const v = (a.mtd_raw != null) ? Number(a.mtd_raw) : Number(a.mtd) / 100;
+      if (!isFinite(v)) rawOk = false;
+      returns[a.name] = v;
+    }
+    check('progress.json 含 mtd_raw（高精度 MTD，避免 ±3 元漂移）',
+      prog.assets.every(a => a.mtd_raw != null), '缺 mtd_raw 时叠加结果会有几元误差');
+
+    const applied = B.setLiveOverlay({ month: prog.in_progress_month, asOf: prog.data_as_of, returns });
+    check('live overlay 被接受（月份晚于数据末月且未定稿）', !!applied,
+      `month=${prog.in_progress_month} 数据末月=${lastMonthInData}`);
+
+    const live = B.simulateCMV(B.PLANS.balanced);
+    check('含当月叠加：稳健型终值 = progress.est_total',
+      Math.abs(live.finalValue - prog.est_total) < 0.05,
+      `engine=${live.finalValue.toFixed(2)} progress=${prog.est_total}（差 ${(live.finalValue - prog.est_total).toFixed(4)}）`);
+    check('含当月叠加：月数 +1（固化为入场月+收益月）',
+      live.totalMonths === earliest.totalMonths + 1,
+      `live=${live.totalMonths} frozen=${earliest.totalMonths}`);
+    check('含当月叠加：累计%=progress.cum_return_pct_base',
+      Math.abs(live.total - prog.cum_return_pct_base) < 0.01,
+      `engine=${live.total.toFixed(2)} progress=${prog.cum_return_pct_base}`);
+
+    // 叠加层不得污染固化口径（同一进程内 frozen 结果必须与叠加前逐位一致）
+    const frozen = B.simulateCMV(B.PLANS.balanced, { liveOverlay: false });
+    check('叠加层不污染固化口径', Math.abs(frozen.finalValue - earliest.finalValue) < 0.01,
+      `frozen=${frozen.finalValue.toFixed(2)} rolling=${earliest.finalValue.toFixed(2)}`);
+
+    // 安全闸门：已定稿月 / 非法月份格式必须被拒
+    const reject = [
+      B.setLiveOverlay({ month: lastMonthInData, returns: {} }),      // 已定稿月
+      B.setLiveOverlay({ month: '2026-13', returns: {} }),            // 非法月份
+      B.setLiveOverlay({ month: '', returns: {} }),                   // 空月份
+      B.setLiveOverlay({ month: '2026-10', returns: null })           // 缺收益表
+    ];
+    check('非法叠加（已定稿月/非法月份/缺收益）被拒绝', reject.every(x => x === null),
+      reject.map(x => x === null ? 'null' : 'accepted').join(','));
+    B.clearLiveOverlay();
+    check('clearLiveOverlay 后回到固化口径',
+      Math.abs(B.simulateCMV(B.PLANS.balanced).finalValue - earliest.finalValue) < 0.01);
+  }
 }
 
 console.log(failures === 0 ? '\n全部通过 ✓' : `\n${failures} 项失败 ✗`);

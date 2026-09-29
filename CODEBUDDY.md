@@ -195,19 +195,21 @@ investment-advisor/
 
 ## 十、版本号管理
 
-### 当前版本号
+### 当前版本号（2026-09-29 更新）
 | 文件 | 版本 | 位置 |
 |------|------|------|
-| style.css | v=18 | index.html line 58 |
+| style.css | v=19 | index.html `<link id=theme-style>` **+ main.js themeMap.business 必须同步** |
 | modern.css | v=18 | main.js themeMap |
 | tech.css | v=18 | main.js themeMap |
-| data.js | v=20 | index.html line ~721 |
-| engine.js | v=21 | index.html |
+| data.js | v=21 | index.html |
+| engine.js | v=22 | index.html |
 | sliders.js | v=9 | index.html |
 | charts.js | v=17 | index.html |
-| rolling.js | v=12 | index.html |
-| share-image.js | v=5 | index.html |
-| main.js | v=41 | index.html |
+| rolling.js | v=17 | index.html |
+| share-image.js | v=6 | index.html |
+| main.js | v=52 | index.html |
+
+> 查当前值：`grep -o "js/[a-z_-]*\.js?v=[0-9]*\|css/[a-z_-]*\.css?v=[0-9]*" index.html`
 
 ### 版本号修改规则
 - **每次修改 CSS/JS 后必须 +1**
@@ -435,6 +437,69 @@ investment-advisor/
 
 **自动化（每周/每交易日跑，不进主数据）**：`node scripts/monthly_progress.js --push`
 → 更新 `js/progress.json` → 有变化才 commit + push → CF 自动部署 → 打开完整持仓日志即可看到末行「🟡 进行中」。
+
+---
+
+### 全站默认「含当月估算」+ hover 显示固化对照（2026-09-29 · 用户拍板）
+
+**需求原文**：「既然完整持仓里可以有最新的预估的累计收益，那就以最新数据算出的累计收益等都可以展示出来了；hover 时提示数据是包含不完整的当前余额数据，截止到上月的固化数据是多少」
+
+**两个决策（用户从推荐项拍板）**
+1. **口径统一**：`engine.js#simulateCMV` 的月份映射改为与 `rolling.js` **完全一致**（消除此前两套引擎两套数字）。
+2. **展示范围**：Hero 4 卡 + 三档方案卡片 + 交互回测指标卡，默认全部显示「含当月估算」，悬停弹出固化对照。
+
+#### A. 引擎口径统一（这是本次最关键的修复）
+
+| 引擎 | 修复前 | 修复后 |
+|---|---|---|
+| `rolling.js#RollingBacktest`（日志） | `returns[i]` = `months[i+1]`，入场月无收益 ✅ | 不变（基准口径） |
+| `engine.js#simulateCMV`（首屏/三档/交互） | 按 `arr[t]` 取值 → **把 2015-09 收益套在空仓的入场月上**，组合只吃到 131 个月收益却报 132 个月 | `t=0` 为入场月（收益 0），`t>=1` 取 `arr[t-1]`，循环 `arrLen+1` 次 |
+
+- 后果对比：修复前 Hero 稳健型 **112.22 万 / 年化 7.63%**，滚动日志 **110.58 万 / 年化 7.42%** —— 高约 1.46pp。
+  修复后两引擎 `finalValue/annual/maxDd/sharpe/winRate` **逐位相等（0 差）**。
+- `nYears = ticks / 12`（年数含入场月）；胜率分母 = 实际迭代月数。
+- `generateMonthlyReturns` 的月份标签改为 `rr.months.slice(0, min(月收益条数, months 长度))`，保证曲线点数与月度收益一一对应。
+
+#### B. live overlay（含当月估算的叠加层）
+
+| 环节 | 做法 |
+|---|---|
+| 入口 | `BacktestEngine.setLiveOverlay({month, asOf, returns})` —— 校验月份格式、必须**晚于**数据末月、且**不在** `months` 里（已定稿月会被拒绝） |
+| 生效 | `simulateCMV(alloc, opts)` 里作为**最后一个额外汇总月**处理：`ticks = arrLen + 1 + 1`；该月用 `overlay.returns[asset]`，**跳过再平衡**（恒市值法只在月末调仓）；返回体新增 `liveOverlay / overlayMonth / frozenMonths` |
+| 关闸 | `simulateCMV(alloc, {liveOverlay:false})` 强制固化口径；`clearLiveOverlay()` 全局复位 |
+| 精度 | `progress.json` 新增 **`mtd_raw`（8 位小数）**；引擎只用 `mtd_raw`，用 2 位 `mtd` 会产生 **±3 元漂移**（已实测：1095440.28 vs 1095437.21，改后差 0.0046 元） |
+| 三处一致 | 叠加结果的终值必须 = `progress.json#est_total` = 日志末行「🟡 进行中」的累计金额（smoke_check 第 9 项守卫生效） |
+
+**两个 body class 必须分清（易踩坑）**
+- `has-live-progress`：日志表「🟡」角标，来自 `ensureLiveProgress()` + `markLiveBadges()`。
+- `has-live-estimate`：全站「含当月估」小标 + 虚线 + 底部说明行，只在**引擎成功 applyLiveOverlay** 时由 `updateHeroStats()` 末尾切换。
+  两者解耦：progress.json 存在但叠加失败时，只出角标不出「含当月估」标记。
+
+#### C. 悬浮说明层（单例）
+
+- 单例 `position:fixed` 浮层 + `data-tip-key` 锚点；`TIPS` 表 + `tipLive(key, lines)` 动态写入。
+- **视口边界收敛**：锚点在视口上 35% 内则浮层放下方，否则放上方（避免被 Hero 顶部裁掉）。
+- 内容统一为「含当月 vs 固化」对照，例如：
+  `含 2026-09 未完整月估算 · 终值 109.5 万 / 年化 7.28%` + `截至 2026-08 固化 · 110.6 万 / 年化 7.42%`。
+- 三档卡片字段名注意：卡片对象用 **`dd`** 而非 `maxDd`（曾因此 `toFixed` 崩溃，见"已修 bug"）。
+- 新增三个说明行：`#hero-live-note` / `#compare-live-note` / `#backtest-live-note`，由 `renderLiveNotes()` 写入。
+
+#### D. 仍用固化口径的地方（有意为之）
+- **分享图**：`share-image.js#getDefaultResult()` 显式传 `{liveOverlay:false}` —— 海报不放未完成月的估算。
+- **完整持仓日志的 12 行滚动汇总 / 官方指标口径**：`rolling.js` 不认 overlay，永远只到最新完整月。
+- **CSV 导出**：仍只导正式月份。
+
+#### E. 回归守卫（`scripts/smoke_check.js` 已加）
+- 第 5 项：`simulateCMV` 窗口 = 入场月 + 真实收益月（`totalMonths === assetLen + 1`）。
+- 第 8 项：**两引擎口径逐项一致**（一次建仓版 & 分批建仓版）。
+- 第 9 项：**live overlay 与 progress.json 逐位一致**（终值=est_total、月数 +1、累计%=`cum_return_pct_base`、不污染固化、非法叠加被拒、clear 后复位）。
+- 第 10 项：`progress.json` 必须含 `mtd_raw`。
+> 一次全绿验证：`node scripts/smoke_check.js`（退出码 0）。
+
+#### F. 已修 bug（防回归）
+1. `setCompareCard` 用 `data.maxDd` → `undefined.toFixed` 崩溃；正确字段是 `data.dd`、对照值 `data.frozen.maxDd`。
+2. `main.js` themeMap.business 仍旧 `v=18`（index.html 已 v=19）→ 切回商务风命中旧缓存；已同步。
+3. 悬浮层被日志弹窗遮挡 / 视口顶部裁切 → 改 `scrollIntoView` + `mouse.move`，并加 35% 边界收敛。
 
 ---
 

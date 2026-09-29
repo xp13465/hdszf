@@ -20,6 +20,34 @@ const BacktestEngine = (() => {
   const ASSETS = ['沪深300', '中证500', '标普500', '纳斯达克100', '黄金', '现金·货币基金'];
   const CASH_ASSET = '现金·货币基金';
 
+  // ============================================================
+  //  进行中月份叠加层（live overlay）· 2026-09-29 新增
+  //  —— 把「未完成月」的月至今(MTD)收益当作一个额外的汇总月，接在真实收益数据之后，
+  //     供需要「以最新数据计算」的展示使用（首屏 Hero / 三档卡片 / 交互指标卡 / 曲线）。
+  //  —— 该月**不触发再平衡**（恒市值法只在月末调仓），因此其结果严格等于
+  //     「上月末持仓 × (1 + MTD)」，与 js/progress.json 的 est_total、日志末行
+  //     「🟡 进行中」三处逐位一致（由 scripts/smoke_check.js 第 9 项守卫锁定）。
+  //  —— 绝不修改 APP_DATA；js/rolling.js 走自己的代码路径，完全不受影响。
+  //  —— 数据来源只有 js/progress.json（scripts/monthly_progress.js 生成）。
+  // ============================================================
+  let LIVE_OVERLAY = null;
+
+  function setLiveOverlay(o) {
+    if (!o || !o.month || !o.returns) { LIVE_OVERLAY = null; return null; }
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(o.month))) { LIVE_OVERLAY = null; return null; }
+    const rr = APP_DATA && APP_DATA.realReturns;
+    if (!rr || !rr.months || !rr.months.length) { LIVE_OVERLAY = null; return null; }
+    const lastMonth = rr.months[rr.months.length - 1];
+    // 安全闸门：叠加月必须晚于真实数据末月，且未出现在 months 中（否则说明该月已定稿，应改走主回测）
+    if (rr.months.indexOf(o.month) >= 0 || String(o.month) <= String(lastMonth)) { LIVE_OVERLAY = null; return null; }
+    LIVE_OVERLAY = { month: String(o.month), asOf: o.asOf || '', returns: o.returns, baseMonth: lastMonth };
+    return LIVE_OVERLAY;
+  }
+
+  function getLiveOverlay() { return LIVE_OVERLAY; }
+  function clearLiveOverlay() { LIVE_OVERLAY = null; }
+
+
   // 三档方案配置（唯一事实来源：对比卡片/雷达图/柱状图/README 均由此驱动）
   const PLANS = {
     conservative: { '沪深300': 0.10, '中证500': 0.03, '标普500': 0.07, '纳斯达克100': 0.10, '黄金': 0.20, '现金·货币基金': 0.50 },
@@ -191,7 +219,9 @@ const BacktestEngine = (() => {
    * realReturns 缺失时的兜底（覆盖回测范围外的极端配置估算）。
    *
    * @param {Object} alloc - 资产配置（小数比例，如 {'沪深300':0.15}），缺额自动补现金
-   * @param {Object} opts  - {buildMonths, threshold, feeRate, totalCapital, rebalanceEveryMonths}
+   * @param {Object} opts  - {buildMonths, threshold, feeRate, totalCapital, rebalanceEveryMonths, liveOverlay}
+   *                         liveOverlay 默认 true（有进行中快照时叠加该月，见 setLiveOverlay）；
+   *                         传 false 可强制只看「截至最新完整月」的固化口径。
    * @returns {Object|null} 指标对象；realReturns 缺失时返回 null
    */
   function simulateCMV(alloc, opts) {
@@ -213,8 +243,21 @@ const BacktestEngine = (() => {
     if (sum < 0.999) a[CASH_ASSET] += (1 - sum);
 
     const months = rr.months;
-    // 回测窗口 = 有真实收益数据的月份数（排除 months 末位“下月占位”标签，与 rolling 口径一致）
-    const n = rr.asset_returns['沪深300'].length;
+    // ---------------------------------------------------------------
+    // 回测窗口与月份映射（2026-09-29 与 rolling.js 对齐，改动前必读）
+    //   约定：returns[i] 是日历月 months[i+1] 的收益；months[0] 是入场标记月（无收益）。
+    //   故循环 t=0 为「入场月」（收益 0，仅计手续费损耗），t>=1 取 arr[t-1]，
+    //   共 arrLen + 1 次迭代（当前 132 + 1 = 133）。指标定义（年数 / 胜率分母）
+    //   与 rolling.js 的 runSingleBacktest 完全一致，两边逐月结果必须逐位相等
+    //   （由 scripts/smoke_check.js 第 8 项守卫锁定）。
+    //   ⚠️ 旧实现按 arr[t] 取值 → 2015-09 的收益被应用在空仓上，组合实际只吃到
+    //      131 个月收益却对外报 132 个月，导致 Hero/三档 比滚动日志高出约 1.46pp。
+    // ---------------------------------------------------------------
+    const arrLen = rr.asset_returns['沪深300'].length;
+    const overlay = opts.liveOverlay === false ? null : LIVE_OVERLAY;   // 进行中月份叠加层
+    const overlayIdx = overlay ? arrLen + 1 : -1;                       // 叠加月 = 最后一个迭代
+    const ticks = arrLen + 1 + (overlay ? 1 : 0);
+    const labelOf = (i) => (i < months.length ? months[i] : (overlay && i === overlayIdx ? overlay.month : null));
 
     // 状态初始化（恒定市值法：目标市值永远不变）
     const holdings = {};
@@ -230,9 +273,9 @@ const BacktestEngine = (() => {
     let prevTotalValue = totalCapital;
     const monthlyReturns = [];
 
-    for (let t = 0; t < n; t++) {
-      const idx = t;            // 从最早真实数据月开始，覆盖全期
-      const isBuild = t < buildMonths;
+    for (let t = 0; t < ticks; t++) {
+      const isOverlay = (t === overlayIdx);        // 进行中月份（MTD 估算）
+      const isBuild = !isOverlay && t < buildMonths;
 
       // 月初：把现金余额并入现金持仓，统一处理
       holdings[CASH_ASSET] += cashBalance;
@@ -242,10 +285,15 @@ const BacktestEngine = (() => {
       for (const asset of ASSETS) {
         let ret;
         if (asset === CASH_ASSET) {
-          ret = cashMonthly;
-        } else {
+          // 现金按月计息（入场月也计，与 rolling.js 一致）
+          ret = (isOverlay && overlay.returns[CASH_ASSET] != null) ? overlay.returns[CASH_ASSET] : cashMonthly;
+        } else if (isOverlay) {
+          ret = overlay.returns[asset] != null ? overlay.returns[asset] : 0;
+        } else if (t >= 1) {
           const arr = rr.asset_returns[asset];
-          ret = (arr && idx < arr.length) ? arr[idx] : 0;
+          ret = (arr && (t - 1) < arr.length) ? arr[t - 1] : 0;
+        } else {
+          ret = 0;   // 入场月（months[0]）：无真实收益
         }
         holdings[asset] *= (1 + ret);
       }
@@ -271,7 +319,9 @@ const BacktestEngine = (() => {
       }
 
       // 再平衡期：偏离目标市值超过 ±阈值触发（按 rebalanceEveryMonths 间隔检查）
-      if (!isBuild && rebalanceEvery > 0 && (t % rebalanceEvery === 0)) {
+      //   ⚠️ 进行中月份不做再平衡：恒市值法只在月末调仓，MTD 估算必须严格等于
+      //      「上月末持仓 × (1+MTD)」，才能与 progress.json 的 est_total 及日志末行逐位对得上。
+      if (!isBuild && !isOverlay && rebalanceEvery > 0 && (Math.max(0, t - 1) % rebalanceEvery === 0)) {
         for (const asset of ASSETS) {
           if (asset === CASH_ASSET) continue;
           const tv = targetValues[asset];
@@ -302,10 +352,10 @@ const BacktestEngine = (() => {
       monthlyReturns.push(mr);
     }
 
-    // 指标计算
+    // 指标计算（定义与 rolling.js 完全一致：年数含入场月、胜率分母为迭代月数）
     const finalValue = totalValue;
     const totalReturn = (finalValue / totalCapital - 1) * 100;
-    const nYears = n / 12;
+    const nYears = ticks / 12;
     const annual = (Math.pow(finalValue / totalCapital, 1 / nYears) - 1) * 100;
     const meanR = monthlyReturns.length ? monthlyReturns.reduce((x, y) => x + y, 0) / monthlyReturns.length : 0;
     const variance = monthlyReturns.length > 1
@@ -321,10 +371,10 @@ const BacktestEngine = (() => {
     const posMonths = monthlyReturns.filter(r => r > 0).length;
     const winRate = monthlyReturns.length ? posMonths / monthlyReturns.length : 0;
 
-    // 年度统计：按月份标签年份聚合，仅计满 12 个月的完整年
+    // 年度统计：按日历月标签年份聚合（labelOf 已处理进行中月），仅计满 12 个月的完整年
     const byYear = {};
     for (let i = 0; i < monthlyReturns.length; i++) {
-      const m = months[i];
+      const m = labelOf(i);
       const y = m ? String(m).slice(0, 4) : '?';
       (byYear[y] = byYear[y] || []).push(monthlyReturns[i]);
     }
@@ -347,14 +397,20 @@ const BacktestEngine = (() => {
       monthlyReturns,
       positiveMonths: posMonths,
       totalMonths: monthlyReturns.length,
+      // 口径元信息：给前端区分「含进行中月估算」与「截至最新完整月固化」
+      liveOverlay: !!overlay,
+      overlayMonth: overlay ? overlay.month : null,
+      frozenMonths: arrLen,          // 固化口径下的真实收益月数（不含入场月）
       yearly: { fullYears: fullYears.length, negativeYears, worstYear }
     };
   }
 
   /**
    * 主计算函数
+   * @param {Object} sliders - 百分比配置（如 {'沪深300':15}）
+   * @param {Object} [opts]  - 透传给 simulateCMV，如 { liveOverlay: false }
    */
-  function compute(sliders) {
+  function compute(sliders, opts) {
     // 缺额补到现金·货币基金，确保恒市值法满仓匹配
     const sum = Object.values(sliders).reduce((a, b) => a + b, 0);
     const normalized = { ...sliders };
@@ -365,7 +421,7 @@ const BacktestEngine = (() => {
     // 主路径：基于全量真实数据的恒市值法回测（反映最新月份，无前视偏差）
     const alloc = {};
     for (const asset of ASSETS) alloc[asset] = (normalized[asset] || 0) / 100;
-    const realResult = simulateCMV(alloc);
+    const realResult = simulateCMV(alloc, opts);
     if (realResult) {
       return {
         sliders: { ...sliders },
@@ -448,7 +504,12 @@ const BacktestEngine = (() => {
       drawdownCurve.push((c / peak - 1) * 100);
     }
 
-    return { equityCurve, drawdownCurve, months: monthlyReturns.length, monthLabels: rr.months.slice(0, monthlyReturns.length) };
+    // 月份标签：与「returns[i] = months[i+1]」同源 —— 曲线第 1 点（入场月）对应 months[0]，
+    // 之后的第 i 个收益点对应 months[i]。有进行中叠加月时补上其标签，保证 x 轴不缺口。
+    const monthLabels = rr.months.slice(0, Math.min(monthlyReturns.length, rr.months.length));
+    if (monthlyReturns.length > rr.months.length && sim.overlayMonth) monthLabels.push(sim.overlayMonth);
+
+    return { equityCurve, drawdownCurve, months: monthlyReturns.length, monthLabels, liveOverlay: !!sim.liveOverlay, overlayMonth: sim.overlayMonth || null };
   }
 
   /**
@@ -795,14 +856,17 @@ const BacktestEngine = (() => {
     return set;
   }
 
-  function getDefaultResult() {
-    return compute(DEFAULT_CONFIG);
+  function getDefaultResult(opts) {
+    return compute(DEFAULT_CONFIG, opts);
   }
 
   return {
     compute,
     getDefaultResult,
     simulateCMV,
+    setLiveOverlay,
+    getLiveOverlay,
+    clearLiveOverlay,
     simulateCMV_daily,
     buildRebalanceSet,
     generateMonthlyReturns,

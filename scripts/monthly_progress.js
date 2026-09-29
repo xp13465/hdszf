@@ -202,7 +202,8 @@ function cashMTD() {
       degraded: fetchOk === 0,
       assets: rows.map((r) => ({
         name: r.asset,
-        mtd: Number((r.mtd * 100).toFixed(2)),
+        mtd: Number((r.mtd * 100).toFixed(2)),        // 百分比，展示用（保留 2 位）
+        mtd_raw: Number(r.mtd.toFixed(8)),            // 小数收益率（引擎叠加层用，避免四舍五入带来 ±3 元漂移）
         base_holding: Number(r.baseH.toFixed(2)),
         est_value: Number(r.est.toFixed(2)),
         last_day: r.lastDay || null

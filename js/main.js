@@ -48,7 +48,10 @@
   }
 
   // --- 更新指标卡片 ---
-  function updateMetrics(currentResult, lockedResult) {
+  //   currentResult = 当前配置（含当月估算，若已拿到进行中快照）
+  //   lockedResult  = 锁定配置（同样含当月，保证与当前配置可比）
+  //   frozenResult  = 当前配置的固化口径（截至最新完整月），仅用于 hover 对照
+  function updateMetrics(currentResult, lockedResult, frozenResult) {
     if (!currentResult) return;
 
     const m = currentResult.metrics;
@@ -66,6 +69,24 @@
     setMetric('metric-sharpe', m.sharpe, v => v.toFixed(4), 'neutral');
     setMetric('metric-sortino', m.sortino, v => v.toFixed(4), 'neutral');
     setMetric('metric-total', m.total, v => v.toFixed(1) + '%', m.total >= 0 ? 'positive' : 'negative');
+
+    // 总收益标题里的月数跟随口径（含当月估算时 +1 个月），避免写死「132个月」
+    const totalLabel = document.getElementById('metric-total-label');
+    if (totalLabel && m.totalMonths != null) totalLabel.textContent = `总收益（${m.totalMonths}个月）`;
+
+    // 「含当月估算」悬浮说明
+    if (LIVE_INFO) {
+      const fr = (frozenResult && frozenResult.metrics) ? frozenResult.metrics : null;
+      const p1 = (v) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
+      const p2 = (v) => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+      const L = `含 ${LIVE_INFO.month}（估算）`;
+      const B = `截至 ${LIVE_INFO.baseMonth}（固化）`;
+      tipLive('metric-annual', [[L, p2(m.annual)], [B, fr ? p2(fr.annual) : '—']]);
+      tipLive('metric-dd', [[L, m.maxDd.toFixed(2) + '%'], [B, fr ? fr.maxDd.toFixed(2) + '%' : '—']]);
+      tipLive('metric-sharpe', [[L, m.sharpe.toFixed(4)], [B, fr ? fr.sharpe.toFixed(4) : '—']]);
+      tipLive('metric-total', [[L, p1(m.total)], [B, fr ? p1(fr.total) : '—']]);
+      bindTips();
+    }
 
     // 更新匹配指示器
     const matchEl = document.getElementById('match-indicator');
@@ -104,19 +125,28 @@
     }
   }
 
-  // --- 首屏 Hero 统计卡片（动态，随回测数据自动更新）---
-  function updateHeroStats(result) {
+  // --- 首屏 Hero 统计卡片（动态；有进行中快照时显示「含当月估算」，悬停可看固化值）---
+  function updateHeroStats(result, frozen) {
     if (!result || !result.metrics) return;
     const m = result.metrics;
+    const f = (frozen && frozen.metrics) ? frozen.metrics : null;
     const capital = APP_DATA.finalConfig?.total_capital || 500000;
+    const wan = (v) => (v / 10000).toFixed(1) + '万';
+    const pct = (v, d) => (v >= 0 ? '+' : '') + v.toFixed(d == null ? 1 : d) + '%';
 
     const elFinal = document.getElementById('hero-final-value');
     const elFinalSub = document.getElementById('hero-final-sub');
-    if (elFinal) elFinal.textContent = (m.finalValue / 10000).toFixed(1) + '万';
+    if (elFinal) elFinal.textContent = wan(m.finalValue);
     if (elFinalSub && m.totalMonths != null) {
       const ratio = m.finalValue / capital;
       const gainLabel = ratio >= 2 ? '翻倍' : (ratio >= 1 ? '增长' : '亏损');
       elFinalSub.textContent = `${Math.round(m.totalMonths / 12)}年${gainLabel} · 年化${m.annual.toFixed(1)}%`;
+    }
+    if (f) {
+      tipLive('hero-final', [
+        [`含 ${LIVE_INFO.month}（估算）`, `¥${wan(m.finalValue)} · 累计 ${pct(m.total, 2)} · 年化 ${m.annual.toFixed(2)}%`],
+        [`截至 ${LIVE_INFO.baseMonth}（固化）`, `¥${wan(f.finalValue)} · 累计 ${pct(f.total, 2)} · 年化 ${f.annual.toFixed(2)}%`]
+      ]);
     }
 
     const elWinLabel = document.getElementById('hero-winrate-label');
@@ -125,32 +155,69 @@
     if (elWinValue && m.positiveMonths != null && m.totalMonths != null) {
       elWinValue.textContent = `${m.positiveMonths} / ${m.totalMonths}月`;
     }
+    if (f) {
+      tipLive('hero-winrate', [
+        [`含 ${LIVE_INFO.month}（估算）`, `${(m.monthlyWinRate * 100).toFixed(1)}%（赚钱 ${m.positiveMonths} / 共 ${m.totalMonths} 个月）`],
+        [`截至 ${LIVE_INFO.baseMonth}（固化）`, `${(f.monthlyWinRate * 100).toFixed(1)}%（赚钱 ${f.positiveMonths} / 共 ${f.totalMonths} 个月）`]
+      ]);
+    }
 
     const elWinSub = document.getElementById('hero-winrate-sub');
     if (elWinSub && m.yearly) {
-      elWinSub.textContent = `${m.yearly.fullYears}年仅${m.yearly.negativeYears}年亏损 · 最多亏${Math.abs(m.yearly.worstYear * 100).toFixed(1)}%`;
+      elWinSub.textContent = `${m.yearly.fullYears}年有${m.yearly.negativeYears}年亏损 · 最多亏${Math.abs(m.yearly.worstYear * 100).toFixed(1)}%`;
     }
 
     const elDd = document.getElementById('hero-dd-value');
     const elDdSub = document.getElementById('hero-dd-sub');
     if (elDd) elDd.textContent = m.maxDd.toFixed(1) + '%';
     if (elDdSub) elDdSub.textContent = `50万最多浮亏约${Math.abs(capital * m.maxDd / 100 / 10000).toFixed(1)}万`;
+    if (f) {
+      tipLive('hero-dd', [
+        [`含 ${LIVE_INFO.month}（估算）`, m.maxDd.toFixed(2) + '%'],
+        [`截至 ${LIVE_INFO.baseMonth}（固化）`, f.maxDd.toFixed(2) + '%']
+      ]);
+    }
 
     const elCash = document.getElementById('hero-cash-value');
     if (elCash) elCash.textContent = Math.round((result.alloc?.['现金·货币基金'] || 0) * 100) + '%';
+
+    document.body.classList.toggle('has-live-estimate', !!LIVE_INFO);
+    renderLiveNotes();
+    bindTips();
   }
 
   // --- 回测回调 ---
+  let lastBacktestArgs = null;    // ['当前配置', '锁定配置']，供拿到进行中快照后重算
+
   function onBacktestChange(currentValues, lockedValues) {
+    lastBacktestArgs = [currentValues, lockedValues];
     const currentResult = BacktestEngine.compute(currentValues);
+    const frozenResult = BacktestEngine.compute(currentValues, { liveOverlay: false });
     let lockedResult = null;
     if (lockedValues) {
       lockedResult = BacktestEngine.compute(lockedValues);
     }
 
-    updateMetrics(currentResult, lockedResult);
+    updateMetrics(currentResult, lockedResult, frozenResult);
     ChartManager.updateEquityCurve(currentResult, lockedResult);
     ChartManager.updateDrawdownCurve(currentResult, lockedResult);
+  }
+
+  // 拿到进行中快照（live overlay 生效）后，把所有「以最新数据算出」的展示重渲染一遍
+  function refreshLiveDisplay() {
+    const live = BacktestEngine.getDefaultResult();
+    const frozen = BacktestEngine.getDefaultResult({ liveOverlay: false });
+    updateHeroStats(live, frozen);
+    initComparisonCards();
+    ChartManager.updateRadarChart();
+    ChartManager.updateCompareBarChart();
+    if (lastBacktestArgs) onBacktestChange(lastBacktestArgs[0], lastBacktestArgs[1]);
+    else {
+      updateMetrics(live, null, frozen);
+      ChartManager.updateEquityCurve(live, null);
+      ChartManager.updateDrawdownCurve(live, null);
+    }
+    bindTips();
   }
 
   // --- 基金表格填充 ---
@@ -222,6 +289,8 @@
     for (const id of ['conservative', 'balanced', 'aggressive']) {
       const alloc = BacktestEngine.PLANS[id];
       const res = BacktestEngine.simulateCMV(alloc);
+      // 固化口径（截至最新完整月）：只用于 hover 提示里的对照值
+      const resFrozen = BacktestEngine.simulateCMV(alloc, { liveOverlay: false });
 
       // 真实数据缺失时回退到静态 comparisons，保证页面不空白
       if (!res) {
@@ -242,6 +311,7 @@
         sortino: res.sortino,
         total: res.total,
         alloc,
+        frozen: resFrozen,
         featured: id === 'balanced'
       });
     }
@@ -284,6 +354,21 @@
         </div>
       `).join('');
     }
+
+    // 「含当月估算」悬浮说明（拿不到进行中快照时 tipLive 内部直接跳过）
+    if (LIVE_INFO) {
+      const pct = (v, d) => (v >= 0 ? '+' : '') + v.toFixed(d) + '%';
+      // 注意字段名：卡片对象用的是 dd（= maxDd），引擎 metrics 用的是 maxDd
+      const line = (annual, total, dd) =>
+        `年化 ${annual.toFixed(2)}% · 总收益 ${pct(total, 1)} · 回撤 ${dd.toFixed(2)}%`;
+      const pairs = [[`含 ${LIVE_INFO.month}（估算）`, line(data.annual, data.total, data.dd)]];
+      if (data.frozen) {
+        pairs.push([`截至 ${LIVE_INFO.baseMonth}（固化）`,
+          line(data.frozen.annual, data.frozen.total, data.frozen.maxDd)]);
+      }
+      tipLive(`plan-${id}`, pairs);
+      bindTips(card);
+    }
   }
 
   function setMiniCompare(id, data) {
@@ -323,10 +408,10 @@
     // 初始化滑块
     SliderPanel.init(onBacktestChange);
 
-    // 初始回测
+    // 初始回测（此时还没拿到进行中快照 → 先按固化口径渲染，避免数字闪动两遍）
     const defaultResult = BacktestEngine.getDefaultResult();
-    updateMetrics(defaultResult, null);
-    updateHeroStats(defaultResult);
+    updateMetrics(defaultResult, null, null);
+    updateHeroStats(defaultResult, null);
     ChartManager.updateEquityCurve(defaultResult, null);
     ChartManager.updateDrawdownCurve(defaultResult, null);
 
@@ -346,8 +431,10 @@
     // 滚动回测
     initRollingBacktest();
 
-    // 进行中月份进度快照（只读展示，末行追加到完整持仓日志，不参与官方指标）
-    ensureLiveProgress();
+    // 进行中月份进度快照：拿到后 ① 追加日志「🟡 进行中」行 ② 让引擎叠加该月并重渲染「含当月」指标
+    ensureLiveProgress().then((d) => {
+      if (d && LIVE_INFO) refreshLiveDisplay();
+    });
 
     // 分享图生成按钮
     if (typeof ShareImage !== 'undefined') {
@@ -387,7 +474,7 @@
     const optionsPanel = document.getElementById('theme-options');
 
     const themeMap = {
-      business: 'css/style.css?v=18',
+      business: 'css/style.css?v=19',   // ⚠️ 必须与 index.html 的 <link id=theme-style> 版本号一致（否则切回商务风会命中旧缓存）
       modern: 'css/modern.css?v=18',
       tech: 'css/tech.css?v=18'
     };
@@ -706,13 +793,16 @@
 
   // ============================================================
   //  进行中月份进度快照（数据源 js/progress.json）
-  //  ⚠️ 只读展示：绝不写入 APP_DATA、绝不参与任何回测指标计算。
-  //     展示位置：『完整持仓日志』表格末尾（正序）/ 开头（倒序）追加一行
-  //     「进行中(MTD 估算)」，按该次回测自身的末月持仓 × 各资产 MTD 推算。
-  //     取不到数据 / 非进行中 / 基准月与日志末月不符 → 不追加，静默降级。
+  //  ⚠️ 只读快照：绝不写入 APP_DATA，绝不进 data.js。
+  //     两个用途：
+  //       A. 『完整持仓日志』表格末尾（正序）/ 开头（倒序）追加一行「🟡 进行中」；
+  //       B. 作为引擎的 live overlay（BacktestEngine.setLiveOverlay），让所有由引擎算出的
+  //          指标都显示「含当月 MTD 估算」值，鼠标悬停可看「截至上月末的固化值」。
+  //     取不到数据 / 非进行中 / 基准月与主数据末月不符 → 全部退回固化口径，静默降级。
   //     正式月末定稿仍由 scripts/monthly_update.js 写入 data.js 主回测。
   // ============================================================
   let liveProgressData = null;
+  let LIVE_INFO = null;          // { month, asOf, baseMonth } —— 有进行中估算时才非空
   let liveProgressPromise = null;
 
   // 主回测数据末月（= 日志表格最后一个完整月），用于判断进度快照是否与之同步
@@ -733,12 +823,35 @@
           if (!d || !d.in_progress || !Array.isArray(d.assets) || !d.assets.length) return null;
           liveProgressData = d;
           // 只在「快照基准月 == 主数据末月」时提示（此时日志里才会真的多出「进行中行」）
-          if (!d.base_month || d.base_month === lastDataMonth()) markLiveBadges(d);
+          if (!d.base_month || d.base_month === lastDataMonth()) {
+            markLiveBadges(d);
+            applyLiveOverlay(d);
+          }
           return d;
         })
         .catch(() => null); // 静默降级：不影响任何既有功能
     }
     return liveProgressPromise;
+  }
+
+  // 把进行中月份接进引擎（live overlay）：之后所有 simulateCMV / compute 调用都会
+  // 自动多算一个月「MTD 估算」，与 progress.json 的 est_total、日志末行完全同源。
+  // ⚠️ 该叠加月不触发再平衡，故结果严格等于「上月末持仓 × (1+MTD)」。
+  function applyLiveOverlay(d) {
+    const returns = {};
+    for (const a of d.assets) {
+      const v = (a.mtd_raw != null) ? Number(a.mtd_raw) : (Number(a.mtd) / 100);
+      if (!isFinite(v)) return null;      // 任一资产数值异常 → 整体不启用，宁可不显示
+      returns[a.name] = v;
+    }
+    const applied = BacktestEngine.setLiveOverlay({
+      month: d.in_progress_month,
+      asOf: d.data_as_of || '',
+      returns
+    });
+    if (!applied) return null;
+    LIVE_INFO = { month: applied.month, asOf: applied.asOf, baseMonth: applied.baseMonth };
+    return LIVE_INFO;
   }
 
   // 滚动汇总表里每个「查看操作记录」按钮打上 🟡 角标，提示日志内含进行中数据
@@ -750,6 +863,89 @@
       b.title = `${d.in_progress_month} 尚在进行中（MTD 估算），已追加为日志末行`;
     });
   }
+
+  // ============================================================
+  //  站内通用「悬浮说明」层（含当月估算 vs 截至上月末固化）
+  //  —— 元素加 data-tip-key，内容由 tipLive() 写入 TIPS 表；
+  //     没拿到进行中快照（TIPS 为空）时不显示任何提示，也不显示「含当月」小标。
+  //  —— 单例浮层 + fixed 定位 + 视口边界收敛，三套皮肤走同一套 CSS 变量。
+  // ============================================================
+  const TIPS = {};
+  let tipLayer = null;
+  let tipAnchor = null;
+
+  function tipLive(key, pairs) {
+    if (!LIVE_INFO) { delete TIPS[key]; return; }
+    const rows = pairs.map((p) =>
+      `<div class="tip-row"><span class="tip-k">${p[0]}</span><span class="tip-v">${p[1]}</span></div>`
+    ).join('');
+    TIPS[key] =
+      `<div class="tip-title">🟡 含 ${LIVE_INFO.month} 未完整月（MTD 估算）</div>` +
+      rows +
+      `<div class="tip-note">数据截至 ${LIVE_INFO.asOf || '—'}（本月最后交易日收盘）。` +
+      `官方回测指标仍以「截至 ${LIVE_INFO.baseMonth}」的固化口径为准，月末定稿后本估算会被真实数据替换。</div>`;
+  }
+
+  function ensureTipLayer() {
+    if (!tipLayer) {
+      tipLayer = document.createElement('div');
+      tipLayer.className = 'site-tip';
+      document.body.appendChild(tipLayer);
+    }
+    return tipLayer;
+  }
+
+  function showTip(el) {
+    const key = el.getAttribute('data-tip-key');
+    const html = key ? TIPS[key] : null;
+    if (!html) return;
+    const layer = ensureTipLayer();
+    tipAnchor = el;
+    layer.innerHTML = html;
+    layer.classList.add('show');
+    const r = el.getBoundingClientRect();
+    const lw = layer.offsetWidth;
+    const lh = layer.offsetHeight;
+    let left = r.left + r.width / 2 - lw / 2;
+    left = Math.max(10, Math.min(left, window.innerWidth - lw - 10));
+    // 锚点在视口上方 35% 以内 → 放卡片下方，避免遮住导航栏
+    let top = (r.top < window.innerHeight * 0.35) ? r.bottom + 10 : r.top - lh - 10;
+    if (top + lh > window.innerHeight - 10) top = Math.max(10, r.top - lh - 10);
+    if (top < 10) top = r.bottom + 10;
+    layer.style.left = left + 'px';
+    layer.style.top = top + 'px';
+  }
+
+  function hideTip() { if (tipLayer) tipLayer.classList.remove('show'); tipAnchor = null; }
+
+  // 绑定（幂等：data-tip-bound 标记；可安全地对局部容器重复调用）
+  function bindTips(root) {
+    (root || document).querySelectorAll('[data-tip-key]').forEach((el) => {
+      if (el.getAttribute('data-tip-bound')) return;
+      el.setAttribute('data-tip-bound', '1');
+      el.addEventListener('mouseenter', () => showTip(el));
+      el.addEventListener('mouseleave', hideTip);
+      el.addEventListener('focusin', () => showTip(el));
+      el.addEventListener('focusout', hideTip);
+    });
+  }
+
+  // 板块级说明行（只在有进行中估算时显示，由 body.has-live-estimate 控制显隐）
+  function renderLiveNotes() {
+    if (!LIVE_INFO) return;
+    const tail = `未完整月（月至今 MTD 估算，数据截至 ${LIVE_INFO.asOf || '—'}）；` +
+      `鼠标移到卡片上可看「截至 ${LIVE_INFO.baseMonth} 的固化值」。官方回测口径仍以固化值为准。`;
+    const hero = document.getElementById('hero-live-note');
+    if (hero) hero.innerHTML = `🟡 上方统计卡已含 <b>${LIVE_INFO.month}</b> ${tail}`;
+    const bt = document.getElementById('backtest-live-note');
+    if (bt) bt.innerHTML = `🟡 以下指标与曲线已含 <b>${LIVE_INFO.month}</b> ${tail}`;
+    const cmp = document.getElementById('compare-live-note');
+    if (cmp) {
+      cmp.innerHTML = `🟡 上方三档卡片的年化 / 总收益已含 <b>${LIVE_INFO.month}</b> 未完整月（MTD 估算，数据截至 ${LIVE_INFO.asOf || '—'}）；` +
+        `下方「数据说明」中的年化与回撤为截至 ${LIVE_INFO.baseMonth} 的固化口径。悬停卡片可对比两者。`;
+    }
+  }
+
 
   function initLogModal() {
     const modal = document.getElementById('log-modal');

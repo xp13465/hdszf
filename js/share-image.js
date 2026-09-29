@@ -200,12 +200,14 @@ const ShareImage = (() => {
     ctx.fillText('不盯盘 · 不择时 · 每月5分钟', WIDTH / 2, 190);
 
     // 核心数据卡片（动态：直读默认稳健型 simulateCMV 结果）
+    // ⚠️ 分享图固定用「固化口径」（liveOverlay:false，截至最新完整月）：
+    //    海报是离线传播物料，不能带未完成月的 MTD 估算，也无法附悬浮说明。
     let hm = null;
-    try { hm = BacktestEngine.getDefaultResult().metrics; } catch (e) { hm = null; }
-    const heroAnnual = hm ? hm.annual : 7.49;
-    const heroDd = hm ? hm.maxDd : -6.09;
-    const heroWin = hm ? hm.monthlyWinRate * 100 : 67.9;
-    const heroFinalWan = hm ? hm.finalValue / 10000 : 110.1;
+    try { hm = BacktestEngine.getDefaultResult({ liveOverlay: false }).metrics; } catch (e) { hm = null; }
+    const heroAnnual = hm ? hm.annual : 7.42;
+    const heroDd = hm ? hm.maxDd : -6.22;
+    const heroWin = hm ? hm.monthlyWinRate * 100 : 67.7;
+    const heroFinalWan = hm ? hm.finalValue / 10000 : 110.6;
 
     const cardY = 230;
     const cardW = 200;
@@ -343,7 +345,7 @@ const ShareImage = (() => {
       const sliderValues = SliderPanel.getValues();
       currentResult = BacktestEngine.compute(sliderValues);
     } catch (e) {
-      currentResult = BacktestEngine.getDefaultResult();
+      currentResult = BacktestEngine.getDefaultResult({ liveOverlay: false });   // 同样用固化口径（海报不带未完成月估算）
     }
     const m = currentResult.metrics;
     const alloc = currentResult.alloc || {};

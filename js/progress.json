@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29 11:12",
+  "generated_at": "2026-09-29 14:02",
   "in_progress": true,
   "in_progress_month": "2026-09",
   "base_month": "2026-08",
@@ -20,6 +20,7 @@
     {
       "name": "沪深300",
       "mtd": -5.72,
+      "mtd_raw": -0.05720384,
       "base_holding": 75515.8,
       "est_value": 71196,
       "last_day": "2026-09-28"
@@ -27,6 +28,7 @@
     {
       "name": "中证500",
       "mtd": -6.66,
+      "mtd_raw": -0.06656312,
       "base_holding": 25000,
       "est_value": 23335.92,
       "last_day": "2026-09-28"
@@ -34,6 +36,7 @@
     {
       "name": "标普500",
       "mtd": -2.45,
+      "mtd_raw": -0.02447381,
       "base_holding": 75000,
       "est_value": 73164.46,
       "last_day": "2026-09-28"
@@ -41,6 +44,7 @@
     {
       "name": "纳斯达克100",
       "mtd": 2.86,
+      "mtd_raw": 0.02857143,
       "base_holding": 104921.7,
       "est_value": 107919.46,
       "last_day": "2026-09-28"
@@ -48,6 +52,7 @@
     {
       "name": "黄金",
       "mtd": -6.13,
+      "mtd_raw": -0.06134032,
       "base_holding": 100000,
       "est_value": 93865.97,
       "last_day": "2026-09-28"
@@ -55,6 +60,7 @@
     {
       "name": "现金·货币基金",
       "mtd": 0.08,
+      "mtd_raw": 0.00080189,
       "base_holding": 725373.72,
       "est_value": 725955.39,
       "last_day": null
