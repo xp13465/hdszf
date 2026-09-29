@@ -48,9 +48,9 @@
   }
 
   // --- 更新指标卡片 ---
-  //   currentResult = 当前配置（含当月估算，若已拿到进行中快照）
-  //   lockedResult  = 锁定配置（同样含当月，保证与当前配置可比）
-  //   frozenResult  = 当前配置的固化口径（截至最新完整月），仅用于 hover 对照
+  //   currentResult = 当前配置（本月至今（MTD），若已拿到进行中快照）
+  //   lockedResult  = 锁定配置（同样含本月至今，保证与当前配置可比）
+  //   frozenResult  = 当前配置的已定稿口径（截至最新完整月），仅用于 hover 对照
   function updateMetrics(currentResult, lockedResult, frozenResult) {
     if (!currentResult) return;
 
@@ -70,17 +70,17 @@
     setMetric('metric-sortino', m.sortino, v => v.toFixed(4), 'neutral');
     setMetric('metric-total', m.total, v => v.toFixed(1) + '%', m.total >= 0 ? 'positive' : 'negative');
 
-    // 总收益标题里的月数跟随口径（含当月估算时 +1 个月），避免写死「132个月」
+    // 总收益标题里的月数跟随口径（本月至今（MTD）时 +1 个月），避免写死「132个月」
     const totalLabel = document.getElementById('metric-total-label');
     if (totalLabel && m.totalMonths != null) totalLabel.textContent = `总收益（${m.totalMonths}个月）`;
 
-    // 「含当月估算」悬浮说明
+    // 「本月至今（MTD）」悬浮说明
     if (LIVE_INFO) {
       const fr = (frozenResult && frozenResult.metrics) ? frozenResult.metrics : null;
       const p1 = (v) => (v >= 0 ? '+' : '') + v.toFixed(1) + '%';
       const p2 = (v) => (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
-      const L = `含 ${LIVE_INFO.month}（估算）`;
-      const B = `截至 ${LIVE_INFO.baseMonth}（固化）`;
+      const L = `本月至今（${LIVE_INFO.month}）`;
+      const B = `已定稿（${LIVE_INFO.baseMonth}）`;
       tipLive('metric-annual', [[L, p2(m.annual)], [B, fr ? p2(fr.annual) : '—']]);
       tipLive('metric-dd', [[L, m.maxDd.toFixed(2) + '%'], [B, fr ? fr.maxDd.toFixed(2) + '%' : '—']]);
       tipLive('metric-sharpe', [[L, m.sharpe.toFixed(4)], [B, fr ? fr.sharpe.toFixed(4) : '—']]);
@@ -125,7 +125,7 @@
     }
   }
 
-  // --- 首屏 Hero 统计卡片（动态；有进行中快照时显示「含当月估算」，悬停可看固化值）---
+  // --- 首屏 Hero 统计卡片（动态；有进行中快照时显示「本月至今（MTD）」，悬停可看已定稿值）---
   function updateHeroStats(result, frozen) {
     if (!result || !result.metrics) return;
     const m = result.metrics;
@@ -144,8 +144,8 @@
     }
     if (f) {
       tipLive('hero-final', [
-        [`含 ${LIVE_INFO.month}（估算）`, `¥${wan(m.finalValue)} · 累计 ${pct(m.total, 2)} · 年化 ${m.annual.toFixed(2)}%`],
-        [`截至 ${LIVE_INFO.baseMonth}（固化）`, `¥${wan(f.finalValue)} · 累计 ${pct(f.total, 2)} · 年化 ${f.annual.toFixed(2)}%`]
+        [`本月至今（${LIVE_INFO.month}）`, `¥${wan(m.finalValue)} · 累计 ${pct(m.total, 2)} · 年化 ${m.annual.toFixed(2)}%`],
+        [`已定稿（${LIVE_INFO.baseMonth}）`, `¥${wan(f.finalValue)} · 累计 ${pct(f.total, 2)} · 年化 ${f.annual.toFixed(2)}%`]
       ]);
     }
 
@@ -157,8 +157,8 @@
     }
     if (f) {
       tipLive('hero-winrate', [
-        [`含 ${LIVE_INFO.month}（估算）`, `${(m.monthlyWinRate * 100).toFixed(1)}%（赚钱 ${m.positiveMonths} / 共 ${m.totalMonths} 个月）`],
-        [`截至 ${LIVE_INFO.baseMonth}（固化）`, `${(f.monthlyWinRate * 100).toFixed(1)}%（赚钱 ${f.positiveMonths} / 共 ${f.totalMonths} 个月）`]
+        [`本月至今（${LIVE_INFO.month}）`, `${(m.monthlyWinRate * 100).toFixed(1)}%（赚钱 ${m.positiveMonths} / 共 ${m.totalMonths} 个月）`],
+        [`已定稿（${LIVE_INFO.baseMonth}）`, `${(f.monthlyWinRate * 100).toFixed(1)}%（赚钱 ${f.positiveMonths} / 共 ${f.totalMonths} 个月）`]
       ]);
     }
 
@@ -173,8 +173,8 @@
     if (elDdSub) elDdSub.textContent = `50万最多浮亏约${Math.abs(capital * m.maxDd / 100 / 10000).toFixed(1)}万`;
     if (f) {
       tipLive('hero-dd', [
-        [`含 ${LIVE_INFO.month}（估算）`, m.maxDd.toFixed(2) + '%'],
-        [`截至 ${LIVE_INFO.baseMonth}（固化）`, f.maxDd.toFixed(2) + '%']
+        [`本月至今（${LIVE_INFO.month}）`, m.maxDd.toFixed(2) + '%'],
+        [`已定稿（${LIVE_INFO.baseMonth}）`, f.maxDd.toFixed(2) + '%']
       ]);
     }
 
@@ -220,7 +220,7 @@
       ChartManager.updateEquityCurve(live, null);
       ChartManager.updateDrawdownCurve(live, null);
     }
-    // 滚动回测：汇总表 / 完整持仓日志弹窗 / 折线图也要切到「含当月估算」口径
+    // 滚动回测：汇总表 / 完整持仓日志弹窗 / 折线图也要切到「本月至今（MTD）」口径
     if (rollingReady) rerunRollingLive();
     bindTips();
   }
@@ -294,7 +294,7 @@
     for (const id of ['conservative', 'balanced', 'aggressive']) {
       const alloc = BacktestEngine.PLANS[id];
       const res = BacktestEngine.simulateCMV(alloc);
-      // 固化口径（截至最新完整月）：只用于 hover 提示里的对照值
+      // 已定稿口径（截至最新完整月）：只用于 hover 提示里的对照值
       const resFrozen = BacktestEngine.simulateCMV(alloc, { liveOverlay: false });
 
       // 真实数据缺失时回退到静态 comparisons，保证页面不空白
@@ -360,15 +360,15 @@
       `).join('');
     }
 
-    // 「含当月估算」悬浮说明（拿不到进行中快照时 tipLive 内部直接跳过）
+    // 「本月至今（MTD）」悬浮说明（拿不到进行中快照时 tipLive 内部直接跳过）
     if (LIVE_INFO) {
       const pct = (v, d) => (v >= 0 ? '+' : '') + v.toFixed(d) + '%';
       // 注意字段名：卡片对象用的是 dd（= maxDd），引擎 metrics 用的是 maxDd
       const line = (annual, total, dd) =>
         `年化 ${annual.toFixed(2)}% · 总收益 ${pct(total, 1)} · 回撤 ${dd.toFixed(2)}%`;
-      const pairs = [[`含 ${LIVE_INFO.month}（估算）`, line(data.annual, data.total, data.dd)]];
+      const pairs = [[`本月至今（${LIVE_INFO.month}）`, line(data.annual, data.total, data.dd)]];
       if (data.frozen) {
-        pairs.push([`截至 ${LIVE_INFO.baseMonth}（固化）`,
+        pairs.push([`已定稿（${LIVE_INFO.baseMonth}）`,
           line(data.frozen.annual, data.frozen.total, data.frozen.maxDd)]);
       }
       tipLive(`plan-${id}`, pairs);
@@ -413,7 +413,7 @@
     // 初始化滑块
     SliderPanel.init(onBacktestChange);
 
-    // 初始回测（此时还没拿到进行中快照 → 先按固化口径渲染，避免数字闪动两遍）
+    // 初始回测（此时还没拿到进行中快照 → 先按已定稿口径渲染，避免数字闪动两遍）
     const defaultResult = BacktestEngine.getDefaultResult();
     updateMetrics(defaultResult, null, null);
     updateHeroStats(defaultResult, null);
@@ -436,7 +436,7 @@
     // 滚动回测
     initRollingBacktest();
 
-    // 进行中月份进度快照：拿到后 ① 追加日志「🟡 进行中」行 ② 让引擎叠加该月并重渲染「含当月」指标
+    // 进行中月份进度快照：拿到后 ① 追加日志「🟡 进行中」行 ② 让引擎叠加该月并重渲染「含本月至今」指标
     ensureLiveProgress().then((d) => {
       if (d && LIVE_INFO) refreshLiveDisplay();
     });
@@ -575,10 +575,11 @@
   let rollingResults = null;
   let rollingCharts = {};
 
-  // 滚动回测统一渲染入口：固化与「含当月估算」都走这里，避免两条路径分叉
+  // 滚动回测统一渲染入口：已定稿与「本月至今（MTD）」都走这里，避免两条路径分叉
   function renderRollingAll() {
     rollingResults = RollingBacktest.runAll();
     renderRollingSummary(rollingResults);
+    renderLiveProgressBlock(rollingResults);
     renderRollingEquityChart(rollingResults);
     if (!rollingModalInited) { initLogModal(); rollingModalInited = true; }
     rollingReady = true;
@@ -596,7 +597,7 @@
         if (isFinite(i) && rollingResults[i]) showLogDetail(rollingResults[i], i);
       }
     } catch (e) {
-      console.error('滚动回测（含当月估算）重算失败:', e);
+      console.error('滚动回测（本月至今（MTD））重算失败:', e);
     }
   }
 
@@ -619,7 +620,7 @@
     const tbody = document.getElementById('rolling-summary-body');
     if (!tbody || !results || results.length === 0) return;
 
-    // 显示口径：有进行中估算（r.live）就用含当月结果，否则用固化结果
+    // 显示口径：有本月至今数据（r.live）就用含本月至今结果，否则用固化结果
     const shown = results.map(r => r.live || r);
 
     // 找最佳值用于高亮（按显示口径，保证与页面数字一致）
@@ -627,28 +628,28 @@
     const bestSharpe = Math.max(...shown.map(r => r.sharpe));
     const bestDD = Math.max(...shown.map(r => r.maxDrawdown)); // 最大回撤（最不负面）
 
-    tbody.innerHTML = results.map((r, i) => {
+    const rowsHTML = results.map((r, i) => {
       const isEstimated = r.hasEstimatedData;
-      const d = shown[i];                      // 显示用指标（含当月估算）
+      const d = shown[i];                      // 显示用指标（本月至今（MTD））
       const hasLive = !!r.live;
       const startLabel = r.startPoint.label;
       const yearsAgo = r.startPoint.yearsAgo;
       const buildMonths = r.startPoint.buildMonths || 12;
 
-      // 含当月估算 → 悬停对照固化值（与首屏 Hero / 三档卡同口径同提示）
+      // 本月至今（MTD） → 悬停对照已定稿值（与首屏 Hero / 三档卡同口径同提示）
       if (hasLive) {
         tipLive('roll-' + i, [
-          ['含估 终值', '¥' + RollingBacktest.fmtMoney(d.finalValue)],
-          ['固化 终值', '¥' + RollingBacktest.fmtMoney(r.finalValue)],
-          ['含估 累计', RollingBacktest.fmtPct(d.totalReturn)],
-          ['固化 累计', RollingBacktest.fmtPct(r.totalReturn)],
-          ['含估 年化', d.annualReturn.toFixed(2) + '%'],
-          ['固化 年化', r.annualReturn.toFixed(2) + '%'],
-          ['含估 回撤', d.maxDrawdown.toFixed(2) + '%'],
-          ['固化 回撤', r.maxDrawdown.toFixed(2) + '%'],
-          ['含估 月胜率', d.winRate.toFixed(1) + '%'],
-          ['固化 月胜率', r.winRate.toFixed(1) + '%'],
-          ['回测月数', d.totalMonths + '（固化 ' + r.frozenMonths + '）']
+          ['本月至今 终值', '¥' + RollingBacktest.fmtMoney(d.finalValue)],
+          ['已定稿 终值', '¥' + RollingBacktest.fmtMoney(r.finalValue)],
+          ['本月至今 累计', RollingBacktest.fmtPct(d.totalReturn)],
+          ['已定稿 累计', RollingBacktest.fmtPct(r.totalReturn)],
+          ['本月至今 年化', d.annualReturn.toFixed(2) + '%'],
+          ['已定稿 年化', r.annualReturn.toFixed(2) + '%'],
+          ['本月至今 回撤', d.maxDrawdown.toFixed(2) + '%'],
+          ['已定稿 回撤', r.maxDrawdown.toFixed(2) + '%'],
+          ['本月至今 月胜率', d.winRate.toFixed(1) + '%'],
+          ['已定稿 月胜率', r.winRate.toFixed(1) + '%'],
+          ['回测月数', d.totalMonths + '（已定稿 ' + r.frozenMonths + '）']
         ]);
       } else {
         delete TIPS['roll-' + i];
@@ -659,18 +660,18 @@
       const sharpeClass = d.sharpe === bestSharpe ? 'cell-positive' : '';
       const ddClass = d.maxDrawdown === bestDD ? 'cell-negative' : 'cell-negative';
 
-      // 构建周期字符串 + 建仓方式（含估时终点顺延到进行中月）
+      // 构建周期字符串 + 建仓方式（含本月至今时终点顺延到进行中月）
       const endYM = hasLive ? r.live.month : (RollingBacktest.CONFIG.endYear + '-' + String(RollingBacktest.CONFIG.endMonth).padStart(2, '0'));
       const endParts = endYM.split('-');
       const endLabel = endParts[0] + '年' + parseInt(endParts[1], 10) + '月';
       const periodStr = startLabel + ' → ' + endLabel;
-      const liveTag = hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : '';
+      const liveTag = hasLive ? '<span class="live-tag tag-inline">含本月至今</span>' : '';
       const buildTag = buildMonths === 1
         ? '<span style="display:inline-block;background:#c53030;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">⚡一次建仓</span>'
         : (r.startPoint.isComparison
           ? '<span style="display:inline-block;background:#e8890c;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;font-weight:600;">🔶分批建仓(' + buildMonths + '次)</span>'
           : '<span style="display:inline-block;background:#5a9fd4;color:#fff;font-size:0.7rem;padding:2px 7px;border-radius:4px;">📅分批建仓(' + buildMonths + '次)</span>');
-      // 月数 + 「含当月估」小标 + 建仓方式挤在同一行，避免格子被撑高
+      // 月数 + 「含本月至今」小标 + 建仓方式挤在同一行，避免格子被撑高
       const buildStr = d.totalMonths + '个月' + liveTag + ' · ' + buildTag;
 
       return `
@@ -690,6 +691,119 @@
         </tr>
       `;
     }).join('');
+
+    // ---- 表末追加「进行中月份」行 ----
+    // 本表原本只按「N 年前入场」聚合，本月口径的差异只能靠悬停才看得出；
+    // 单独成行后，访客在表内一眼就能找到最新数据（用户 2026-09-29 要求的「外部可见」）。
+    // 取值：完整历史 · 一次建仓那条（results[0]，与首屏 Hero 同源）的 live 口径。
+    let liveRowHTML = '';
+    const refIdx = results.findIndex((r) => r.live && r.startPoint && r.startPoint.isEarliest);
+    if (refIdx >= 0) {
+      const ref = results[refIdx];
+      const lv = ref.live;
+      const lStart = ref.startPoint.label;
+      const lParts = String(lv.month).split('-');
+      const lPeriod = lStart + ' → ' + lParts[0] + '年' + parseInt(lParts[1], 10) + '月';
+      const lBuildTag = (ref.startPoint.buildMonths === 1)
+        ? '⚡一次建仓'
+        : '📅分批建仓(' + ref.startPoint.buildMonths + '次)';
+      tipLive('roll-live', [
+        ['本月至今 终值', '¥' + RollingBacktest.fmtMoney(lv.finalValue)],
+        ['已定稿 终值', '¥' + RollingBacktest.fmtMoney(ref.finalValue)],
+        ['本月至今 累计', RollingBacktest.fmtPct(lv.totalReturn)],
+        ['已定稿 累计', RollingBacktest.fmtPct(ref.totalReturn)],
+        ['本月至今 年化', lv.annualReturn.toFixed(2) + '%'],
+        ['已定稿 年化', ref.annualReturn.toFixed(2) + '%'],
+        ['本月至今 回撤', lv.maxDrawdown.toFixed(2) + '%'],
+        ['已定稿 回撤', ref.maxDrawdown.toFixed(2) + '%'],
+        ['本月至今 月胜率', lv.winRate.toFixed(1) + '%'],
+        ['已定稿 月胜率', ref.winRate.toFixed(1) + '%'],
+        ['回测月数', lv.totalMonths + '（已定稿 ' + ref.frozenMonths + '）']
+      ]);
+      liveRowHTML = `
+        <tr class="live-month-row" data-tip-key="roll-live">
+          <td class="cell-start">🟡 进行中月份<br><small style="color:var(--color-text-muted)">${lv.month} · 截至 ${lv.asOf || '—'}</small></td>
+          <td>${lPeriod}<br><small style="color:var(--color-text-muted)">${lv.totalMonths}个月<span class="live-tag tag-inline">含本月至今</span> · ${lBuildTag}</small></td>
+          <td class="${lv.finalValue >= 500000 ? 'cell-positive' : 'cell-negative'}">¥${RollingBacktest.fmtMoney(lv.finalValue)}</td>
+          <td class="${lv.totalReturn >= 0 ? 'cell-positive' : 'cell-negative'}">${RollingBacktest.fmtPct(lv.totalReturn)}</td>
+          <td class="${lv.annualReturn >= 0 ? 'cell-positive' : 'cell-negative'}">${lv.annualReturn.toFixed(2)}%</td>
+          <td class="cell-negative">${lv.maxDrawdown.toFixed(2)}%</td>
+          <td>${lv.sharpe.toFixed(4)}</td>
+          <td>${lv.winRate.toFixed(1)}%<br><small style="color:var(--color-text-muted);font-size:0.7rem;">年${lv.yearWinRate.toFixed(0)}%</small></td>
+          <td>0次<br><small style="color:var(--color-text-muted);font-size:0.7rem;">本月不调仓</small></td>
+          <td><span style="font-weight:600;">${(lv.finalPosition * 100).toFixed(0)}%</span><br><small style="color:var(--color-text-muted);font-size:0.7rem;">期末仓位</small></td>
+          <td class="cell-estimated">本月至今<br><small style="color:var(--color-text-muted);font-size:0.65rem;">真实行情</small></td>
+          <td><button class="btn-detail" onclick="window.showRollingLog(${refIdx})">📋 查看进行中月</button></td>
+        </tr>`;
+    } else {
+      delete TIPS['roll-live'];
+    }
+    tbody.innerHTML = rowsHTML + liveRowHTML;
+  }
+
+  // ============================================================
+  //  本月至今（MTD）明细块 —— 页面外部直接可见，无需点开「完整持仓日志」弹窗
+  //   数据源：results[0].live.snapshot.assetDetails（完整历史 · 一次建仓，与首屏 Hero 同源）
+  //   恒市值法仅在月末调仓 → 进行中月份不产生任何买卖；该月未定稿，不参与官方指标。
+  //   无 live 数据（未取到 / 降级 / 基准月不匹配）时内容清空，整块由 body.has-live-estimate 隐藏。
+  // ============================================================
+  function renderLiveProgressBlock(results) {
+    const titleEl = document.getElementById('live-progress-title');
+    const bodyEl = document.getElementById('live-progress-body');
+    const footEl = document.getElementById('live-progress-foot');
+    if (!titleEl || !bodyEl || !footEl) return;
+
+    const ref = (results || []).find((r) => r.live && r.startPoint && r.startPoint.isEarliest);
+    if (!ref) { titleEl.innerHTML = ''; bodyEl.innerHTML = ''; footEl.innerHTML = ''; return; }
+
+    const lv = ref.live;
+    const snap = lv.snapshot;
+    const details = snap.assetDetails || [];
+    const cap = RollingBacktest.CONFIG.totalCapital;
+
+    const money = (v) => '¥' + RollingBacktest.fmtMoney(v);
+    // 涨红跌绿（A 股习惯），配色走 CSS 变量以适配三套皮肤
+    const cls = (v) => (v > 0 ? 'up' : (v < 0 ? 'down' : ''));
+    const signed = (v, d) => (v >= 0 ? '+' : '') + v.toFixed(d) + '%';
+
+    titleEl.innerHTML =
+      `🟡 ${lv.month} 本月至今（MTD）· 组合实时持仓` +
+      `<span class="asof">数据截至 ${lv.asOf || '—'}（本月最后交易日收盘）· 与首屏统计卡同源</span>`;
+
+    bodyEl.innerHTML = details.map((d) => {
+      const mtdPct = ((d.monthReturn && d.monthReturn.value) || 0) * 100;
+      const dev = (d.deviationFromTarget || 0) * 100;
+      return `<tr>
+        <td style="text-align:left;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${LIVE_ASSET_COLORS[d.asset] || '#94a3b8'};margin-right:4px;"></span>${d.asset}</td>
+        <td>${(d.targetPct * 100).toFixed(0)}%</td>
+        <td>${money(d.holdingBefore)}</td>
+        <td class="${cls(mtdPct)}">${signed(mtdPct, 2)}</td>
+        <td style="font-weight:600;">${money(d.holdingAfter)}</td>
+        <td>${(d.actualPct * 100).toFixed(1)}%</td>
+        <td class="${Math.abs(dev) > 5 ? 'warn' : ''}">${signed(dev, 1)}</td>
+      </tr>`;
+    }).join('');
+
+    // 组合合计：月初市值 = 各资产 holdingBefore 之和（锚定月度基准）
+    // ⚠️ 收益比例统一 ÷固定基准本金 50 万（项目铁律），不用「上月末总市值」当分母，
+    //    这样月/年/累计各分段口径一致、可直接相加。
+    const baseTotal = details.reduce((s, d) => s + d.holdingBefore, 0);
+    const delta = snap.totalValue - baseTotal;
+    const deltaPctBase = cap > 0 ? (delta / cap) * 100 : 0;
+    const cumPctBase = cap > 0 ? (snap.totalValue / cap - 1) * 100 : 0;
+    const yuan = (v) => (v >= 0 ? '+' : '-') + '¥' + Math.round(Math.abs(v)).toLocaleString('zh-CN');
+    footEl.innerHTML = `<tr>
+      <td style="text-align:left;">合计（组合）</td>
+      <td>100%</td>
+      <td>${money(baseTotal)}</td>
+      <td class="${cls(deltaPctBase)}">${signed(deltaPctBase, 2)}<div style="font-size:0.66rem;font-weight:400;opacity:0.85;">${yuan(delta)}</div></td>
+      <td>${money(snap.totalValue)}</td>
+      <td>100%</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td colspan="7" style="text-align:left;font-weight:500;background:transparent;border-top:none;">自 ${ref.startPoint.label} 入场累计 <b class="${cls(cumPctBase)}">${signed(cumPctBase, 2)}</b> · 第 ${snap.monthIndex} 个月 · 本月无交易（恒市值法仅在月末调仓）</td>
+    </tr>`;
   }
 
   function renderRollingEquityChart(results) {
@@ -711,8 +825,8 @@
         data.push([j, (snapshots[j].totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100]);
       }
 
-      // 含当月估算（live overlay）：把进行中月作为末点接上。
-      // 该点是 MTD 估算，末端用空心圆标出，与固化月区分（表头说明行 + 悬停提示同步解释）。
+      // 本月至今（MTD）（live overlay）：把进行中月作为末点接上。
+      // 该点是 本月至今 MTD，末端用空心圆标出，与固化月区分（表头说明行 + 悬停提示同步解释）。
       let liveCoord = null;
       if (r.live) {
         liveCoord = [snapshots.length, (r.live.finalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100];
@@ -738,8 +852,8 @@
           type: isComparison ? 'dashed' : 'solid'
         },
         emphasis: { focus: 'series' },
-        // 终点打点：最早起点用 pin（带 +X% 标签，含估时自动落在估算点上）；
-        // 其余起点含估时用空心圆，标出「这个末点是估算」
+        // 终点打点：最早起点用 pin（带 +X% 标签，含本月至今时自动落在估算点上）；
+        // 其余起点含本月至今时用空心圆，标出「这个末点是本月至今」
         markPoint: isEarliest ? {
           data: [{
             name: '终点',
@@ -867,13 +981,20 @@
   //     两个用途：
   //       A. 『完整持仓日志』表格末尾（正序）/ 开头（倒序）追加一行「🟡 进行中」；
   //       B. 作为引擎的 live overlay（BacktestEngine.setLiveOverlay），让所有由引擎算出的
-  //          指标都显示「含当月 MTD 估算」值，鼠标悬停可看「截至上月末的固化值」。
-  //     取不到数据 / 非进行中 / 基准月与主数据末月不符 → 全部退回固化口径，静默降级。
+  //          指标都显示「本月至今 MTD」值，鼠标悬停可看「截至上月末的已定稿值」。
+  //     取不到数据 / 非进行中 / 基准月与主数据末月不符 → 全部退回已定稿口径，静默降级。
   //     正式月末定稿仍由 scripts/monthly_update.js 写入 data.js 主回测。
   // ============================================================
   let liveProgressData = null;
-  let LIVE_INFO = null;          // { month, asOf, baseMonth } —— 有进行中估算时才非空
+  let LIVE_INFO = null;          // { month, asOf, baseMonth } —— 有本月至今数据时才非空
   let liveProgressPromise = null;
+
+  // 资产配色（与弹窗日志表格一致），用于「本月至今」明细块
+  const LIVE_ASSET_COLORS = {
+    '沪深300': '#3b82f6', '中证500': '#60a5fa',
+    '标普500': '#06b6d4', '纳斯达克100': '#22d3ee',
+    '黄金': '#c9a84c', '现金·货币基金': '#94a3b8'
+  };
 
   // 主回测数据末月（= 日志表格最后一个完整月），用于判断进度快照是否与之同步
   function lastDataMonth() {
@@ -892,12 +1013,12 @@
         .then((d) => {
           if (!d || !d.in_progress || !Array.isArray(d.assets) || !d.assets.length) return null;
           // 降级快照（本月行情取数不完整、估算字段为 null）→ 一律不展示任何估算：
-          // 不叠加 live overlay、不加 🟡 角标、不插日志末行，站点回退到固化口径。
+          // 不叠加 live overlay、不加 🟡 角标、不插日志末行，站点回退到已定稿口径。
           // 若照常展示，会把「当月持平」这种由 0 拼出来的假数字当成估算发到全站
           // （项目铁律：不凭空造月收益）。
           if (d.degraded) {
             console.warn('[progress] 进度快照为降级状态（' + (d.in_progress_month || '?') +
-              ' 行情取数不完整）→ 不展示当月估算，回退到固化口径');
+              ' 行情取数不完整）→ 不展示本月至今数据，回退到已定稿口径');
             return d;
           }
           liveProgressData = d;
@@ -914,7 +1035,7 @@
   }
 
   // 把进行中月份接进引擎（live overlay）：之后所有 simulateCMV / compute 调用都会
-  // 自动多算一个月「MTD 估算」，与 progress.json 的 est_total、日志末行完全同源。
+  // 自动多算一个月「本月至今 MTD」，与 progress.json 的 est_total、日志末行完全同源。
   // ⚠️ 该叠加月不触发再平衡，故结果严格等于「上月末持仓 × (1+MTD)」。
   function applyLiveOverlay(d) {
     if (d.degraded) return null;      // 降级快照不含真实 MTD → 绝不叠加（双保险）
@@ -953,14 +1074,14 @@
   function markLiveBadges(d) {
     document.body.classList.add('has-live-progress');
     document.querySelectorAll('.btn-detail').forEach((b) => {
-      b.title = `${d.in_progress_month} 尚在进行中（MTD 估算），已追加为日志末行`;
+      b.title = `${d.in_progress_month} 尚在进行中（本月至今 MTD），已追加为日志末行`;
     });
   }
 
   // ============================================================
-  //  站内通用「悬浮说明」层（含当月估算 vs 截至上月末固化）
+  //  站内通用「悬浮说明」层（本月至今（MTD） vs 截至上月末固化）
   //  —— 元素加 data-tip-key，内容由 tipLive() 写入 TIPS 表；
-  //     没拿到进行中快照（TIPS 为空）时不显示任何提示，也不显示「含当月」小标。
+  //     没拿到进行中快照（TIPS 为空）时不显示任何提示，也不显示「含本月至今」小标。
   //  —— 单例浮层 + fixed 定位 + 视口边界收敛，三套皮肤走同一套 CSS 变量。
   // ============================================================
   const TIPS = {};
@@ -973,10 +1094,11 @@
       `<div class="tip-row"><span class="tip-k">${p[0]}</span><span class="tip-v">${p[1]}</span></div>`
     ).join('');
     TIPS[key] =
-      `<div class="tip-title">🟡 含 ${LIVE_INFO.month} 未完整月（MTD 估算）</div>` +
+      `<div class="tip-title">🟡 含 ${LIVE_INFO.month} 本月至今（MTD）</div>` +
       rows +
-      `<div class="tip-note">数据截至 ${LIVE_INFO.asOf || '—'}（本月最后交易日收盘）。` +
-      `官方回测指标仍以「截至 ${LIVE_INFO.baseMonth}」的固化口径为准，月末定稿后本估算会被真实数据替换。</div>`;
+      `<div class="tip-note">本月至今 = 真实已发生的每日行情累积，数据截至 ${LIVE_INFO.asOf || '—'}（本月最后交易日收盘）。` +
+      `该月尚未定稿（恒市值法仅在月末调仓），故不计入官方回测指标 —— 官方口径为「已定稿（${LIVE_INFO.baseMonth}）」。` +
+      `月末定稿后本行会被替换为月末正式数据。</div>`;
   }
 
   function ensureTipLayer() {
@@ -1023,25 +1145,33 @@
     });
   }
 
-  // 板块级说明行（只在有进行中估算时显示，由 body.has-live-estimate 控制显隐）
+  // 板块级说明行（只在有进行中数据时显示，由 body.has-live-estimate 控制显隐）
   function renderLiveNotes() {
     if (!LIVE_INFO) return;
-    const tail = `未完整月（月至今 MTD 估算，数据截至 ${LIVE_INFO.asOf || '—'}）；` +
-      `鼠标移到卡片上可看「截至 ${LIVE_INFO.baseMonth} 的固化值」。官方回测口径仍以固化值为准。`;
+    const tail = `本月至今（MTD，数据截至 ${LIVE_INFO.asOf || '—'}，真实已发生行情）。` +
+      `该月尚未定稿，故官方回测口径仍为「已定稿（${LIVE_INFO.baseMonth}）」；鼠标移到卡片上可对比两者。`;
     const hero = document.getElementById('hero-live-note');
     if (hero) hero.innerHTML = `🟡 上方统计卡已含 <b>${LIVE_INFO.month}</b> ${tail}`;
     const bt = document.getElementById('backtest-live-note');
     if (bt) bt.innerHTML = `🟡 以下指标与曲线已含 <b>${LIVE_INFO.month}</b> ${tail}`;
     const cmp = document.getElementById('compare-live-note');
     if (cmp) {
-      cmp.innerHTML = `🟡 上方三档卡片的年化 / 总收益已含 <b>${LIVE_INFO.month}</b> 未完整月（MTD 估算，数据截至 ${LIVE_INFO.asOf || '—'}）；` +
-        `下方「数据说明」中的年化与回撤为截至 ${LIVE_INFO.baseMonth} 的固化口径。悬停卡片可对比两者。`;
+      cmp.innerHTML = `🟡 上方三档卡片的年化 / 总收益已含 <b>${LIVE_INFO.month}</b> 本月至今（MTD，数据截至 ${LIVE_INFO.asOf || '—'}）；` +
+        `下方「数据说明」中的年化与回撤为「已定稿（${LIVE_INFO.baseMonth}）」口径。悬停卡片可对比两者。`;
     }
     const roll = document.getElementById('rolling-live-note');
     if (roll) {
-      roll.innerHTML = `🟡 下方汇总表与曲线的<b>末点为 ${LIVE_INFO.month} 估算</b>（MTD 估算，数据截至 ${LIVE_INFO.asOf || '—'}）；` +
-        `悬停任意一行可看「截至 ${LIVE_INFO.baseMonth} 的固化值」。` +
-        `弹窗内「完整持仓日志」正文与 CSV 导出仍为固化口径，仅额外标注一行「🟡 进行中」。`;
+      roll.innerHTML = `🟡 下方汇总表、曲线<b>末点</b>、表末「进行中月份」行、以及本月至今明细块，均为 <b>${LIVE_INFO.month}</b> 本月至今（MTD，数据截至 ${LIVE_INFO.asOf || '—'}）；` +
+        `悬停任意一行可看「已定稿（${LIVE_INFO.baseMonth}）」对照。` +
+        `弹窗内「完整持仓日志」正文与 CSV 导出仍为已定稿口径，仅额外标注一行「🟡 进行中」。`;
+    }
+    const lp = document.getElementById('live-progress-note');
+    if (lp) {
+      lp.innerHTML = `🟡 上表是 <b>${LIVE_INFO.month}</b> 本月至今（MTD）的实时持仓，数据截至 <b>${LIVE_INFO.asOf || '—'}</b> —— ` +
+        `由每日真实行情累积得出，不是预测值。因其月末尚未收口、且恒市值法只在月末调仓，故<b>本月不产生任何买卖</b>，` +
+        `也不计入官方回测指标；月末定稿后再由月度更新流程写入正式回测数据。` +
+        `<br>注：恒定市值法把每个风险资产的目标市值钉死，超额收益持续切出到「现金·货币基金」池，` +
+        `因此现金的「偏离目标」天然为正且会逐年放大（属正常现象，非异常）。`;
     }
   }
 
@@ -1111,31 +1241,31 @@
     title.textContent = `📋 完整持仓日志 — ${result.startPoint.label}入场${yearsLabel}${buildTag}`;
 
     // 汇总信息
-    // 顶部汇总口径：拿到进行中估算（result.live）就显示「含当月」，悬停看固化对照；
+    // 顶部汇总口径：拿到本月至今数据（result.live）就显示「含本月至今」，悬停看固化对照；
     // 否则纯固化展示。与首屏 Hero / 三档卡 / 滚动汇总表同一套口径与提示。
     const dsum = result.live || result;
     const hasLive = !!result.live;
     if (hasLive) {
       tipLive('log-months', [
-        ['含估 回测月数', dsum.totalMonths + ' 个月'],
-        ['固化 回测月数', result.totalMonths + ' 个月'],
+        ['本月至今 回测月数', dsum.totalMonths + ' 个月'],
+        ['已定稿 回测月数', result.totalMonths + ' 个月'],
         ['进行中月', result.live.month + '（第 ' + result.live.snapshot.monthIndex + ' 个月）']
       ]);
       tipLive('log-final', [
-        ['含估 最终市值', '¥' + RollingBacktest.fmtMoney(dsum.finalValue)],
-        ['固化 最终市值', '¥' + RollingBacktest.fmtMoney(result.finalValue)],
-        ['含估 累计收益', RollingBacktest.fmtPct(dsum.totalReturn)],
-        ['固化 累计收益', RollingBacktest.fmtPct(result.totalReturn)]
+        ['本月至今 最终市值', '¥' + RollingBacktest.fmtMoney(dsum.finalValue)],
+        ['已定稿 最终市值', '¥' + RollingBacktest.fmtMoney(result.finalValue)],
+        ['本月至今 累计收益', RollingBacktest.fmtPct(dsum.totalReturn)],
+        ['已定稿 累计收益', RollingBacktest.fmtPct(result.totalReturn)]
       ]);
       tipLive('log-annual', [
-        ['含估 年化收益', dsum.annualReturn.toFixed(2) + '%'],
-        ['固化 年化收益', result.annualReturn.toFixed(2) + '%'],
-        ['含估 月胜率', dsum.winRate.toFixed(1) + '%'],
-        ['固化 月胜率', result.winRate.toFixed(1) + '%']
+        ['本月至今 年化收益', dsum.annualReturn.toFixed(2) + '%'],
+        ['已定稿 年化收益', result.annualReturn.toFixed(2) + '%'],
+        ['本月至今 月胜率', dsum.winRate.toFixed(1) + '%'],
+        ['已定稿 月胜率', result.winRate.toFixed(1) + '%']
       ]);
       tipLive('log-dd', [
-        ['含估 最大回撤', dsum.maxDrawdown.toFixed(2) + '%'],
-        ['固化 最大回撤', result.maxDrawdown.toFixed(2) + '%']
+        ['本月至今 最大回撤', dsum.maxDrawdown.toFixed(2) + '%'],
+        ['已定稿 最大回撤', result.maxDrawdown.toFixed(2) + '%']
       ]);
     } else {
       ['log-months', 'log-final', 'log-annual', 'log-dd'].forEach((k) => delete TIPS[k]);
@@ -1148,23 +1278,23 @@
           <div class="value accent">${result.startPoint.label}</div>
         </div>
         <div class="log-summary-item"${hasLive ? ' data-tip-key="log-months"' : ''}>
-          <div class="label">回测月数${hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : ''}</div>
+          <div class="label">回测月数${hasLive ? '<span class="live-tag tag-inline">含本月至今</span>' : ''}</div>
           <div class="value">${dsum.totalMonths}个月</div>
         </div>
         <div class="log-summary-item"${hasLive ? ' data-tip-key="log-final"' : ''}>
-          <div class="label">最终市值${hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : ''}</div>
+          <div class="label">最终市值${hasLive ? '<span class="live-tag tag-inline">含本月至今</span>' : ''}</div>
           <div class="value ${dsum.finalValue >= 500000 ? 'green' : 'red'}">¥${RollingBacktest.fmtMoney(dsum.finalValue)}</div>
         </div>
         <div class="log-summary-item"${hasLive ? ' data-tip-key="log-final"' : ''}>
-          <div class="label">总收益率${hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : ''}</div>
+          <div class="label">总收益率${hasLive ? '<span class="live-tag tag-inline">含本月至今</span>' : ''}</div>
           <div class="value ${dsum.totalReturn >= 0 ? 'green' : 'red'}">${RollingBacktest.fmtPct(dsum.totalReturn)}</div>
         </div>
         <div class="log-summary-item"${hasLive ? ' data-tip-key="log-annual"' : ''}>
-          <div class="label">年化收益${hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : ''}</div>
+          <div class="label">年化收益${hasLive ? '<span class="live-tag tag-inline">含本月至今</span>' : ''}</div>
           <div class="value ${dsum.annualReturn >= 0 ? 'green' : 'red'}">${dsum.annualReturn.toFixed(2)}%</div>
         </div>
         <div class="log-summary-item"${hasLive ? ' data-tip-key="log-dd"' : ''}>
-          <div class="label">最大回撤${hasLive ? '<span class="live-tag tag-inline">含当月估</span>' : ''}</div>
+          <div class="label">最大回撤${hasLive ? '<span class="live-tag tag-inline">含本月至今</span>' : ''}</div>
           <div class="value red">${dsum.maxDrawdown.toFixed(2)}%</div>
         </div>
         <div class="log-summary-item">
@@ -1177,8 +1307,8 @@
         </div>
       </div>
       ${(hasLive && LIVE_INFO) ? `<div class="live-note-line" style="display:block;margin-top:0.6rem;">` +
-        `🟡 上方汇总的「回测月数 / 最终市值 / 总收益率 / 年化收益 / 最大回撤」已含 <b>${LIVE_INFO.month}</b> 未完整月` +
-        `（MTD 估算，数据截至 ${LIVE_INFO.asOf || '—'}）。下方持仓明细正文与 CSV 导出仍为截至 ${LIVE_INFO.baseMonth} 的固化口径，` +
+        `🟡 上方汇总的「回测月数 / 最终市值 / 总收益率 / 年化收益 / 最大回撤」已含 <b>${LIVE_INFO.month}</b> 本月至今` +
+        `（MTD，数据截至 ${LIVE_INFO.asOf || '—'}，真实已发生行情）。下方持仓明细正文与 CSV 导出仍为「已定稿（${LIVE_INFO.baseMonth}）」口径，` +
         `仅额外标注一行「🟡 进行中」；悬停任一汇总项可对比两者。</div>` : ''}
     `;
 
@@ -1228,9 +1358,9 @@
     const SEP_ROW = '<tr class="month-separator"><td colspan="16" style="padding:0;border:none;height:4px;background:var(--color-bg);"></td></tr>';
 
     // ============================================================
-    //  进行中月份行（MTD 估算）—— 追加到日志末行，数据源 js/progress.json
+    //  进行中月份行（本月至今 MTD）—— 追加到日志末行，数据源 js/progress.json
     //  口径：
-    //    · 各资产「估算现值」= 该次回测末月持仓 × (1 + 该资产本月至今 MTD%)
+    //    · 各资产「本月至今现值」= 该次回测末月持仓 × (1 + 该资产本月至今 MTD%)
     //      （progress.json 只提供 MTD%，持仓取本次回测自身，因此任意起点都能自洽）
     //    · 收益比例一律 ÷ 固定基准本金 50 万（与「累计收益」「年度收益率」两列同口径）
     //    · 无操作（恒市值法在月末才调仓，进行中不产生任何买卖）
@@ -1305,7 +1435,7 @@
           html += `<td rowspan="6" style="font-weight:700;color:var(--color-warning,#c05600);">${liveMonth}` +
             `<div style="font-size:0.66rem;font-weight:600;opacity:0.9;">🟡 进行中</div></td>`;
           html += `<td rowspan="6" style="color:var(--color-warning,#c05600);font-weight:600;">进行中` +
-            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;">MTD 估算</div></td>`;
+            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;">本月至今</div></td>`;
         }
 
         html += `<td style="text-align:left;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ASSET_COLORS[name]};margin-right:4px;"></span>${name}</td>`;
@@ -1325,7 +1455,7 @@
             `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${ly}年${lm}月 MTD</div>` +
             `${mtdBasePct >= 0 ? '+' : ''}${mtdBasePct.toFixed(2)}%` +
             `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;line-height:1.3;">${yuan(monthAmount)}</div></td>`;
-          // 累计收益：第 N 个月 + 比例 + 金额（均为估算）
+          // 累计收益：第 N 个月 + 比例 + 金额（均为本月至今口径，÷固定基准 50 万）
           html += `<td rowspan="6" class="${cumCls}" style="font-weight:600;text-align:right;">` +
             `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">第 ${cumNo} 个月</div>` +
             `${cumPct >= 0 ? '+' : ''}${cumPct.toFixed(2)}%` +
@@ -1454,7 +1584,7 @@
       <div style="margin-top:12px;font-size:0.75rem;color:var(--color-text-muted);display:flex;flex-wrap:wrap;gap:12px;">
         <span>📘 蓝色行 = 建仓期</span>
         <span>📋 白色行 = 再平衡期</span>
-        <span style="color:var(--color-warning,#c05600);">🟡 进行中行 = 本月尚未结束的 MTD 估算（不参与官方指标）</span>
+        <span style="color:var(--color-warning,#c05600);">🟡 进行中行 = 本月至今 MTD（真实已发生行情；该月尚未定稿，不参与官方指标）</span>
         <span style="color:var(--color-success);">🔴 买入（涨）</span>
         <span style="color:var(--color-danger);">🟢 卖出（跌）</span>
         <span>— = 无操作</span>
@@ -1467,7 +1597,7 @@
     bindTips(body);   // 弹窗内容每次重建 → 需重新绑定汇总项的悬停说明
     modal.style.display = 'flex';
 
-    // ---- 进行中月份（MTD 估算）行：追加到表格首/末（跟随排序方向）----
+    // ---- 进行中月份（本月至今 MTD）行：追加到表格首/末（跟随排序方向）----
     const liveToken = ++logRenderToken;
     function insertLiveRow() {
       if (liveToken !== logRenderToken) return;              // 已被更新的渲染取代

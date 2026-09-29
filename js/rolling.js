@@ -35,7 +35,7 @@ const RollingBacktest = (() => {
   //  ● 由 js/progress.json 的 MTD 驱动；months 之外的「未完整月」按 MTD 重估，
   //    该月**不触发再平衡**（恒市值法只在月末调仓），故结果 = 上月末持仓 × (1+MTD)。
   //  ● 本引擎的 monthlySnapshots **保持固化**（绝不 append 叠加月）：
-  //    完整持仓日志表格 / CSV 导出 / 既有图表仍走固化口径，零回归风险；
+  //    完整持仓日志表格 / CSV 导出 / 既有图表仍走已定稿口径，零回归风险；
   //    叠加结果单独挂在 result.live 上，供「弹窗顶部汇总 / 滚动汇总表 / 折线图」使用。
   //  ● 校验：月份格式合法、必须**晚于**数据末月、且**不在** months 里，否则静默拒绝。
   // ============================================================
@@ -466,7 +466,7 @@ const RollingBacktest = (() => {
     // ============================================================
     //  进行中月份叠加层（live overlay）—— 与 engine.js#simulateCMV 同源同口径
     //  ⚠️ 绝不动 monthlySnapshots：叠加结果只挂在 result.live 上，
-    //     日志表格 / CSV 导出 / 既有图表因此保持固化口径、零回归。
+    //     日志表格 / CSV 导出 / 既有图表因此保持已定稿口径、零回归。
     // ============================================================
     let live = null;
     const ov = (opts && opts.liveOverlay === false) ? null : LIVE_OVERLAY;
@@ -553,7 +553,7 @@ const RollingBacktest = (() => {
       finalPosition: metrics.finalPosition,
       monthlySnapshots,    // 每月完整快照（含全部资产详情）—— 恒为固化序列
       hasEstimatedData,
-      live,                // 含当月估算的口径（无叠加时为 null）
+      live,                // 含本月至今估算的口径（无叠加时为 null）
       overlayMonth: live ? live.month : null,
       frozenMonths: monthlySnapshots.length
     };
@@ -561,7 +561,7 @@ const RollingBacktest = (() => {
 
   /**
    * 由月度快照序列计算全部指标
-   * 固化口径与叠加口径共用同一函数 —— 从根上杜绝「两套数字」再次分叉。
+   * 已定稿口径与叠加口径共用同一函数 —— 从根上杜绝「两套数字」再次分叉。
    * @param {Array} snaps 月度快照序列（month / totalValue / drawdown / monthReturn / holdings / opCount）
    * @param {number} totalCapital 固定基准本金（50 万）
    */

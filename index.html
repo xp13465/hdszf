@@ -110,7 +110,7 @@
     .log-table .has-action { background: rgba(184,134,11,0.04); }
     .log-table .month-separator td { pointer-events: none; }
 
-    /* === 跨皮肤通用：完整持仓日志中的「进行中月份」行（js/progress.json 驱动，非完整月估算，不参与官方指标） === */
+    /* === 跨皮肤通用：完整持仓日志中的「进行中月份」行（js/progress.json 驱动，本月至今 MTD 为真实已发生行情，但该月未定稿，不参与官方指标） === */
     .log-table .live-month-row td {
       background: rgba(192,86,0,0.06);
       border-top: 1px dashed var(--color-warning, #c05600);
@@ -171,9 +171,35 @@
     .compliance-modal .modal-body p { margin: 0.5rem 0; }
     .compliance-modal .modal-body ul { padding-left: 1.2rem; margin: 0.5rem 0; }
     .compliance-modal .modal-body li { margin: 0.25rem 0; }
-    /* === 跨皮肤通用：「含当月估算」标记 + 站内悬浮说明层（数据源 js/progress.json） === */
+    /* === 跨皮肤通用：滚动汇总表的「进行中月份」行 + 板块内「本月至今」明细块（数据源 js/progress.json） === */
+    /* 汇总表末行：与其它起点行同列结构，用橙色虚线框标出「这行是本月的实时口径」 */
+    .rolling-summary-table tr.live-month-row td {
+      background: rgba(192,86,0,0.07);
+      border-top: 1px dashed var(--color-warning, #c05600);
+      border-bottom: 1px dashed var(--color-warning, #c05600);
+      font-weight: 500;
+    }
+    .rolling-summary-table tr.live-month-row td.cell-start { font-weight: 700; }
+    /* 本月至今明细块（页面外部可见，不需点开弹窗） */
+    .live-progress-card { display: none; }
+    body.has-live-estimate .live-progress-card { display: block; }
+    .live-progress-head { display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+    .live-progress-head .asof { font-size: 0.72rem; font-weight: 500; color: var(--color-text-muted, #94989e); }
+    .live-progress-wrap { overflow-x: auto; border: 1px solid var(--color-border, #e8e8ed); border-radius: 8px; }
+    .live-progress-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; line-height: 1.5; }
+    .live-progress-table thead th { background: var(--color-primary, #1a3555); color: #fff; padding: 0.5rem; text-align: center; font-weight: 600; font-size: 0.72rem; white-space: nowrap; }
+    .live-progress-table tbody td { padding: 0.4rem 0.5rem; text-align: center; border-bottom: 1px solid var(--color-border-light, #eee); white-space: nowrap; }
+    .live-progress-table tbody tr:hover td { background: rgba(184,134,11,0.05); }
+    .live-progress-table tfoot td { padding: 0.5rem; text-align: center; font-weight: 700; white-space: nowrap; background: rgba(192,86,0,0.08); border-top: 2px solid rgba(192,86,0,0.35); }
+    /* 涨红跌绿（A 股习惯），走 CSS 变量以适配 business/modern/tech 三套皮肤 */
+    .live-progress-table .up { color: var(--color-rise, #c53030); font-weight: 600; }
+    .live-progress-table .down { color: var(--color-fall, #1a7d3a); font-weight: 600; }
+    /* 「偏离目标」列专用：|偏离| > 阈值只表示「离目标远」，与涨跌无关，故用中性告警色 */
+    .live-progress-table .warn { color: var(--color-warning, #c05600); font-weight: 600; }
+
+    /* === 跨皮肤通用：站内悬浮说明层（数据源 js/progress.json） === */
     .stat-card, .compare-card, .metric-card { position: relative; }
-    /* 卡片右上角「含当月估」小标：仅当引擎已叠加进行中月（body.has-live-estimate）时出现 */
+    /* 卡片右上角「含本月至今」小标：仅当引擎已叠加进行中月（body.has-live-estimate）时出现 */
     .live-tag { display: none; position: absolute; top: 8px; right: 8px; font-size: 0.62rem; font-weight: 600; line-height: 1; padding: 3px 6px; border-radius: 999px; color: var(--color-warning, #c05600); background: rgba(192,86,0,0.10); border: 1px solid rgba(192,86,0,0.35); letter-spacing: 0.02em; white-space: nowrap; }
     body.has-live-estimate .live-tag { display: inline-block; }
     /* 行内变体：用于表格行 / 弹窗汇总项等非「绝对定位到卡片右上角」的场景 */
@@ -190,7 +216,7 @@
     .site-tip .tip-k { color: var(--color-text-muted, #94989e); white-space: nowrap; }
     .site-tip .tip-v { font-weight: 600; white-space: nowrap; }
     .site-tip .tip-note { margin-top: 0.45rem; padding-top: 0.4rem; border-top: 1px dashed var(--color-border-light, #f0ede8); font-size: 0.68rem; line-height: 1.5; color: var(--color-text-muted, #94989e); white-space: normal; }
-    /* 板块级「含当月」说明行 */
+    /* 板块级「本月至今」说明行 */
     .live-note-line { display: none; margin-top: 0.85rem; font-size: 0.75rem; line-height: 1.6; color: var(--color-text-secondary, #5f6368); background: rgba(192,86,0,0.07); border: 1px solid rgba(192,86,0,0.25); border-radius: 8px; padding: 0.55rem 0.8rem; }
     body.has-live-estimate .live-note-line { display: block; }
   </style>
@@ -265,19 +291,19 @@
 
         <div class="hero-stats fade-in delay-2">
           <div class="stat-card primary" data-tip-key="hero-final">
-            <span class="live-tag">含当月估</span>
+            <span class="live-tag">含本月至今</span>
             <div class="stat-label">💰 50万 → 最终变成</div>
             <div class="stat-value accent" id="hero-final-value">110.6万</div>
             <div class="stat-sub" id="hero-final-sub">11年翻倍 · 年化7.4%</div>
           </div>
           <div class="stat-card" data-tip-key="hero-winrate">
-            <span class="live-tag">含当月估</span>
+            <span class="live-tag">含本月至今</span>
             <div class="stat-label" id="hero-winrate-label">📅 月胜率 67.7%</div>
             <div class="stat-value accent" id="hero-winrate-value">90 / 133月</div>
             <div class="stat-sub" id="hero-winrate-sub">10年有2年亏损 · 最多亏5.0%</div>
           </div>
           <div class="stat-card" data-tip-key="hero-dd">
-            <span class="live-tag">含当月估</span>
+            <span class="live-tag">含本月至今</span>
             <div class="stat-label">🛡️ 最大回撤</div>
             <div class="stat-value accent" id="hero-dd-value">-6.2%</div>
             <div class="stat-sub" id="hero-dd-sub">50万最多浮亏约3.1万</div>
@@ -369,8 +395,33 @@
             </tbody>
           </table>
         </div>
-        <!-- 含当月估算说明行（body.has-live-estimate 控制显隐，由 main.js#renderLiveNotes 写入） -->
+        <!-- 本月至今（MTD）说明行（body.has-live-estimate 控制显隐，由 main.js#renderLiveNotes 写入） -->
         <div class="live-note-line" id="rolling-live-note"></div>
+      </div>
+
+      <!-- ===== 本月至今（MTD）明细块：页面外部直接可见，无需点开「完整持仓日志」弹窗 =====
+           数据源：results[0].live.snapshot.assetDetails（完整历史 · 一次建仓，与首屏 Hero 同源）
+           恒市值法仅在月末调仓 → 进行中月份不产生任何买卖；该月未定稿，不参与官方指标。 -->
+      <div class="chart-card live-progress-card" id="live-progress-card" style="margin-bottom:var(--space-lg);">
+        <div class="chart-title live-progress-head" id="live-progress-title"></div>
+        <div class="live-progress-wrap">
+          <table class="live-progress-table">
+            <thead>
+              <tr>
+                <th>资产</th>
+                <th>目标权重</th>
+                <th>月初市值</th>
+                <th>本月至今</th>
+                <th>最新市值</th>
+                <th>当前权重</th>
+                <th>偏离目标</th>
+              </tr>
+            </thead>
+            <tbody id="live-progress-body"></tbody>
+            <tfoot id="live-progress-foot"></tfoot>
+          </table>
+        </div>
+        <div class="live-note-line" id="live-progress-note"></div>
       </div>
 
       <!-- 滚动回测可视化图表 -->
@@ -540,25 +591,25 @@
           <!-- 指标卡片 -->
           <div class="metrics-row">
             <div class="metric-card highlight" data-tip-key="metric-annual">
-              <span class="live-tag">含当月估</span>
+              <span class="live-tag">含本月至今</span>
               <div class="metric-label">年化收益</div>
               <div id="metric-annual" class="metric-value positive">7.42%</div>
               <div id="diff-annual" class="metric-diff"></div>
             </div>
             <div class="metric-card" data-tip-key="metric-dd">
-              <span class="live-tag">含当月估</span>
+              <span class="live-tag">含本月至今</span>
               <div class="metric-label">最大回撤</div>
               <div id="metric-dd" class="metric-value negative">-6.22%</div>
               <div id="diff-dd" class="metric-diff"></div>
             </div>
             <div class="metric-card" data-tip-key="metric-sharpe">
-              <span class="live-tag">含当月估</span>
+              <span class="live-tag">含本月至今</span>
               <div class="metric-label">Sharpe比率</div>
               <div id="metric-sharpe" class="metric-value neutral">0.8661</div>
               <div id="diff-sharpe" class="metric-diff"></div>
             </div>
             <div class="metric-card" data-tip-key="metric-total">
-              <span class="live-tag">含当月估</span>
+              <span class="live-tag">含本月至今</span>
               <div class="metric-label" id="metric-total-label">总收益（133个月）</div>
               <div id="metric-total" class="metric-value positive">121.2%</div>
             </div>
@@ -594,7 +645,7 @@
         <div class="compare-grid fade-in">
           <!-- 保守型 -->
           <div class="compare-card" id="compare-conservative" data-tip-key="plan-conservative">
-            <span class="live-tag">含当月估</span>
+            <span class="live-tag">含本月至今</span>
             <div class="compare-card-header">
               <span class="compare-card-badge balanced">保守型</span>
               <h3>🛡️ 保守型</h3>
@@ -607,7 +658,7 @@
 
           <!-- 稳健型 ★推荐 -->
           <div class="compare-card featured" id="compare-balanced" data-tip-key="plan-balanced">
-            <span class="live-tag">含当月估</span>
+            <span class="live-tag">含本月至今</span>
             <div class="compare-card-header">
               <span class="compare-card-badge final">⭐ 推荐方案</span>
               <h3>🔧 稳健型</h3>
@@ -620,7 +671,7 @@
 
           <!-- 进取型 -->
           <div class="compare-card" id="compare-aggressive" data-tip-key="plan-aggressive">
-            <span class="live-tag">含当月估</span>
+            <span class="live-tag">含本月至今</span>
             <div class="compare-card-header">
               <span class="compare-card-badge aggressive">进取型</span>
               <h3>🚀 进取型</h3>
@@ -773,12 +824,12 @@
 
   <!-- Scripts -->
   <script src="js/data.js?v=21"></script>
-  <script src="js/engine.js?v=23"></script>
+  <script src="js/engine.js?v=24"></script>
   <script src="js/sliders.js?v=9"></script>
   <script src="js/charts.js?v=17"></script>
-  <script src="js/rolling.js?v=18"></script>
+  <script src="js/rolling.js?v=19"></script>
   <script src="js/share-image.js?v=6"></script>
-  <script src="js/main.js?v=54"></script>
+  <script src="js/main.js?v=56"></script>
 
 
   <!-- ===== SEO 静态文本（爬虫可见） ===== -->

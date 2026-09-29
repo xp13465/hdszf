@@ -293,6 +293,31 @@ if (typeof PROG !== 'undefined' && fs.existsSync(PROG)) {
         rEarliest.live.snapshot.monthIndex === rEarliest.frozenMonths + 1,
         `monthIndex=${rEarliest.live.snapshot.monthIndex} frozen=${rEarliest.frozenMonths}`);
 
+      // ---- 滚动板块「本月至今明细块」/ 汇总表末行的数据源守卫 ----
+      // 明细块与汇总表末行都直接吃 rEarliest.live.snapshot.assetDetails，
+      // 所以这里必须锁死「各资产之和 = 组合合计 = progress.est_total」这条链，
+      // 否则页面外部展示的数字与弹窗 / 首屏会再次分叉。
+      const lpDetails = rEarliest.live.snapshot.assetDetails;
+      const lpBase = lpDetails.reduce((s, d) => s + d.holdingBefore, 0);
+      const lpAfter = lpDetails.reduce((s, d) => s + d.holdingAfter, 0);
+      const SMOKE_CAP = RB.CONFIG.totalCapital;
+      check('本月至今明细块：各资产最新市值之和 = 组合合计 = progress.est_total',
+        Math.abs(lpAfter - rEarliest.live.snapshot.totalValue) < 1e-6 &&
+        Math.abs(lpAfter - prog.est_total) < 0.05,
+        `sum=${lpAfter.toFixed(2)} snap=${rEarliest.live.snapshot.totalValue.toFixed(2)} progress=${prog.est_total}`);
+      check('本月至今明细块：各资产月初市值之和 = progress.base_total（锚定已定稿月）',
+        Math.abs(lpBase - prog.base_total) < 0.05,
+        `sum=${lpBase.toFixed(2)} progress=${prog.base_total}`);
+      check('本月至今明细块：合计比例 = progress.est_change_pct_base（÷固定基准 50 万）',
+        Math.abs((rEarliest.live.snapshot.totalValue - lpBase) / SMOKE_CAP * 100 - prog.est_change_pct_base) < 0.005,
+        `计算=${((rEarliest.live.snapshot.totalValue - lpBase) / SMOKE_CAP * 100).toFixed(4)} progress=${prog.est_change_pct_base}`);
+      check('本月至今明细块：资产条数 = 6',
+        lpDetails.length === 6, `n=${lpDetails.length}`);
+      const colorBlock = (read('js/main.js').match(/const LIVE_ASSET_COLORS = \{[\s\S]*?\};/) || [''])[0];
+      const missingColor = lpDetails.map(d => d.asset).filter(a => !colorBlock.includes(`'${a}'`));
+      check('本月至今明细块：每种资产都有配色（LIVE_ASSET_COLORS 无遗漏）',
+        missingColor.length === 0, '缺: ' + missingColor.join(','));
+
       const crossLive = (tag, eng, rl) => {
         const rows = [
           ['终值', eng.finalValue, rl.finalValue],
@@ -330,6 +355,41 @@ if (typeof PROG !== 'undefined' && fs.existsSync(PROG)) {
     check('clearLiveOverlay 后回到固化口径',
       Math.abs(B.simulateCMV(B.PLANS.balanced).finalValue - earliest.finalValue) < 0.01);
   }
+}
+
+// ---- 11) 展示层骨架与措辞守卫 ----
+//  用户 2026-09-29 拍板两条约定，都属于「容易悄悄回潮」的文案/结构：
+//   (1) 最新月份数据必须在页面外部可见（滚动汇总表末行 + 本月至今明细块），不必点开弹窗；
+//   (2) 措辞统一为「本月至今（MTD）」——它是真实已发生的行情，不是预测/估算。
+{
+  const html = read('index.html');
+  const mainSrc = read('js/main.js');
+
+  ['live-progress-card', 'live-progress-title', 'live-progress-body', 'live-progress-foot', 'live-progress-note']
+    .forEach((id) => check(`本月至今明细块骨架存在 · #${id}`, html.includes(`id="${id}"`)));
+
+  check('本月至今明细块由 body.has-live-estimate 控制显隐',
+    /\.live-progress-card \{ display: none; \}/.test(html) &&
+    /body\.has-live-estimate \.live-progress-card \{ display: block; \}/.test(html));
+  check('汇总表末行样式存在（.rolling-summary-table tr.live-month-row）',
+    /\.rolling-summary-table tr\.live-month-row td \{/.test(html));
+  check('明细块渲染已接入统一入口 renderRollingAll',
+    /renderLiveProgressBlock\(rollingResults\)/.test(mainSrc));
+
+  const stale = ['含当月估', '含当月估算', 'MTD 估算', '当月估算'];
+  const hits = [];
+  ['index.html', 'js/main.js', 'js/rolling.js', 'js/engine.js', 'js/progress.json', 'scripts/monthly_progress.js']
+    .forEach((f) => {
+      const src = read(f);
+      stale.forEach((w) => { if (src.includes(w)) hits.push(`${f}: ${w}`); });
+    });
+  check('旧措辞未回潮（含当月估 / 含当月估算 / MTD 估算 / 当月估算）',
+    hits.length === 0, hits.join(' | '));
+
+  // 「含估计值」是另一件事：rolling 的 hasEstimatedData = 历史数据缺失时的插值兜底，
+  // 与「本月至今」无关，不得被顺带改名或删除。
+  check('数据质量列的「含估计值」语义未被误改（hasEstimatedData 仍独立存在）',
+    mainSrc.includes('含估计值') && read('js/rolling.js').includes('hasEstimatedData'));
 }
 
 console.log(failures === 0 ? '\n全部通过 ✓' : `\n${failures} 项失败 ✗`);

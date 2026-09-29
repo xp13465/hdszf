@@ -202,12 +202,12 @@ investment-advisor/
 | modern.css | v=18 | main.js themeMap |
 | tech.css | v=18 | main.js themeMap |
 | data.js | v=21 | index.html |
-| engine.js | v=23 | index.html |
+| engine.js | v=24 | index.html |
 | sliders.js | v=9 | index.html |
 | charts.js | v=17 | index.html |
-| rolling.js | v=18 | index.html |
+| rolling.js | v=19 | index.html |
 | share-image.js | v=6 | index.html |
-| main.js | v=54 | index.html |
+| main.js | v=55 | index.html |
 
 > 查当前值：`grep -o "js/[a-z_-]*\.js?v=[0-9]*\|css/[a-z_-]*\.css?v=[0-9]*" index.html`
 
@@ -263,7 +263,7 @@ investment-advisor/
   1. `getMonthReturnsWithFallback` / `getMonthReturns` 改为 `ridx = idx - 1`；入场标记月（`idx===0`）无真实收益，按 **0** 处理（不计入"估计值"，保持全量回测"全部真实"徽章）。
   2. `totalMonthsNeeded` 改为 `months.length - monthIdx`（自动覆盖到 `months` 末位，含 2026-08），每月补数后自动延伸，无需再手改 `CONFIG.endMonth`。
   3. `main.js` 的 `showLogDetail` 新增 **「年度收益率」列**：对每条记录按日历年聚合，展示该年"至今"的**收益金额(¥)** 与**收益比例(%)**（区别于"年化收益=均值"）。yearStartValue = 上一年末总市值（首年=初始资金 50 万），故 12 月行=全年收益、进行中月=年迄今收益。CSV 导出（`exportLogCSV`）同步加了「年度收益率(%) / 年收益金额(元)」两列。
-- **新增脚本 `scripts/monthly_progress.js`（进行中月份进度快照）**：每周/每交易日跑，取"当前未完成月"的**月至今(MTD)**收益（新浪前复权日 K 线，与 `fetch_returns.py` 同源），把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的组合进度报告，同时写 `js/progress.json` 供站点**『完整持仓日志』末行**展示（2026-09-29 起；此前是首页独立区块，已被用户否掉）。**绝不写 `data.js`/`real_returns.json`**，不污染主回测；真正的月末定稿仍由 `monthly_update.js`（每月 3 号）负责。用法：`node scripts/monthly_progress.js [--out 报告.md] [--no-fetch]`。**取数不完整时判为降级（退出码 2）：所有估算字段写 `null`、不写入/不推送任何当月估算**，站点自动回退到固化口径（详见「G. 降级闸门」）。
+- **新增脚本 `scripts/monthly_progress.js`（进行中月份进度快照）**：每周/每交易日跑，取"当前未完成月"的**月至今(MTD)**收益（新浪前复权日 K 线，与 `fetch_returns.py` 同源），把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的组合进度报告，同时写 `js/progress.json` 供站点**『完整持仓日志』末行**展示（2026-09-29 起；此前是首页独立区块，已被用户否掉）。**绝不写 `data.js`/`real_returns.json`**，不污染主回测；真正的月末定稿仍由 `monthly_update.js`（每月 3 号）负责。用法：`node scripts/monthly_progress.js [--out 报告.md] [--no-fetch]`。**取数不完整时判为降级（退出码 2）：所有本月至今字段写 `null`、不写入/不推送任何本月数据**，站点自动回退到已定稿口径（详见「G. 降级闸门」）。
 
 ### 数据起点固化 2015-08（2026-09-29 · 用户拍板）
 - **结论**：回测**起点（入场月）永久固化 `2015-08`**，首个可算收益月 = `2015-09`，全 12 个入场起点（2015-08 ~ 2025-08）窗口全部真实数据覆盖，无任何估计值泄漏。
@@ -440,13 +440,22 @@ investment-advisor/
 
 ---
 
-### 全站默认「含当月估算」+ hover 显示固化对照（2026-09-29 · 用户拍板）
+### 全站默认「本月至今（MTD）」+ hover 显示已定稿对照（2026-09-29 · 用户三轮拍板）
 
-**需求原文**：「既然完整持仓里可以有最新的预估的累计收益，那就以最新数据算出的累计收益等都可以展示出来了；hover 时提示数据是包含不完整的当前余额数据，截止到上月的固化数据是多少」
+**需求原文（三轮，口语顺序）**
+1. 「既然完整持仓里可以有最新的预估的累计收益，那就以最新数据算出的累计收益等都可以展示出来了；hover 时提示数据是包含不完整的当前余额数据，截止到上月的固化数据是多少」
+2. 「完整持仓日志弹窗里……顶部的总收益等、以及滚动回测汇总下都没看到最新的预估数据，反而是首屏右侧的小卡看到了含当月结的数据以及 hover 看到提示」（→ 第二轮：滚动引擎同源叠加）
+3. 「我希望外部展示出来，而不是切到详细才看到最新数据。哪怕预估的……其实也不存在什么预估，毕竟数据每天都出来呀」（→ 第三轮：外部可见 + 否掉「预估」措辞）
 
-**两个决策（用户从推荐项拍板）**
+**术语约定（第三轮定稿，务必遵守）**
+- 该口径统一叫 **「本月至今（MTD）」**，不叫「估算 / 预估」——它是**每日真实行情累积出的已发生数据，不是预测**。
+- 它不进官方指标的唯一原因是：**该月月末尚未收口，且恒市值法只在月末调仓**，所以这个月的收口值还不能确定。
+- 对照值统一叫 **「已定稿（YYYY-MM）」**（此前文档里叫「固化」，指 `monthly_update.js` 月度定稿后的正式数据）。
+- ⚠️ **不要**把 `RollingBacktest` 的 `hasEstimatedData`（历史数据缺失时的插值兜底，UI 文案「含估计值」）一并改掉 —— 那是另一个概念，与本月无关。
+
+**三个决策（用户从推荐项逐轮拍板）**
 1. **口径统一**：`engine.js#simulateCMV` 的月份映射改为与 `rolling.js` **完全一致**（消除此前两套引擎两套数字）。
-2. **展示范围**：Hero 4 卡 + 三档方案卡片 + 交互回测指标卡，默认全部显示「含当月估算」，悬停弹出固化对照。
+2. **展示范围**：Hero 4 卡 + 三档方案卡片 + 交互回测指标卡，默认全部显示「本月至今」，悬停弹出已定稿对照。
 
 #### A. 引擎口径统一（这是本次最关键的修复）
 
@@ -460,65 +469,90 @@ investment-advisor/
 - `nYears = ticks / 12`（年数含入场月）；胜率分母 = 实际迭代月数。
 - `generateMonthlyReturns` 的月份标签改为 `rr.months.slice(0, min(月收益条数, months 长度))`，保证曲线点数与月度收益一一对应。
 
-#### B. live overlay（含当月估算的叠加层）
+#### B. live overlay（本月至今的叠加层）
 
 | 环节 | 做法 |
 |---|---|
 | 入口 | `BacktestEngine.setLiveOverlay({month, asOf, returns})` —— 校验月份格式、必须**晚于**数据末月、且**不在** `months` 里（已定稿月会被拒绝） |
 | 生效 | `simulateCMV(alloc, opts)` 里作为**最后一个额外汇总月**处理：`ticks = arrLen + 1 + 1`；该月用 `overlay.returns[asset]`，**跳过再平衡**（恒市值法只在月末调仓）；返回体新增 `liveOverlay / overlayMonth / frozenMonths` |
-| 关闸 | `simulateCMV(alloc, {liveOverlay:false})` 强制固化口径；`clearLiveOverlay()` 全局复位 |
+| 关闸 | `simulateCMV(alloc, {liveOverlay:false})` 强制已定稿口径；`clearLiveOverlay()` 全局复位 |
 | 精度 | `progress.json` 新增 **`mtd_raw`（8 位小数）**；引擎只用 `mtd_raw`，用 2 位 `mtd` 会产生 **±3 元漂移**（已实测：1095440.28 vs 1095437.21，改后差 0.0046 元） |
 | 三处一致 | 叠加结果的终值必须 = `progress.json#est_total` = 日志末行「🟡 进行中」的累计金额（smoke_check 第 9 项守卫生效） |
 
-**B2. 滚动引擎同源叠加（2026-09-29 第二轮 · 用户追问「弹窗顶部与滚动汇总下都没有预估数据」）**
+**B2. 滚动引擎同源叠加（2026-09-29 第二轮 · 用户追问「弹窗顶部与滚动汇总下都没看到最新数据」）**
 
 背景：第一轮只把 overlay 接进了 `engine.js`。结果同一个弹窗里数字打架 —— 日志表格有「🟡 进行中」行，
-但顶部汇总、下方的滚动汇总表、折线图、CSV 全部还停在固化口径（首屏 Hero 却已含估算）。
+但顶部汇总、下方的滚动汇总表、折线图、CSV 全部还停在已定稿口径（首屏 Hero 却已含本月至今）。
 
 | 环节 | 做法 |
 |---|---|
 | 入口 | `RollingBacktest.setLiveOverlay({month, asOf, mtd})` —— 校验规则与 engine 完全一致（晚于数据末月 + 未定稿 + 数值合法） |
-| 输出 | **绝不 append 到 `monthlySnapshots`**！叠加结果单独挂在 `result.live = {month, asOf, baseMonth, snapshot, ...computeMetrics(...)}`，`result.frozenMonths` 记录固化月数 |
-| 为什么 | `monthlySnapshots` 保持固化 → **日志表格正文 / CSV 导出 / 既有图表零回归**（已用脚本比对 12 个起点 × 14 个指标，逐位不变） |
-| 共用 | 指标计算抽成 `computeMetrics(snaps, totalCapital)`，固化与叠加共用同一函数 —— 从根上杜绝「两套数字」再分叉 |
+| 输出 | **绝不 append 到 `monthlySnapshots`**！叠加结果单独挂在 `result.live = {month, asOf, baseMonth, snapshot, ...computeMetrics(...)}`，`result.frozenMonths` 记录已定稿月数 |
+| 为什么 | `monthlySnapshots` 保持已定稿 → **日志表格正文 / CSV 导出 / 既有图表零回归**（已用脚本比对 12 个起点 × 14 个指标，逐位不变） |
+| 共用 | 指标计算抽成 `computeMetrics(snaps, totalCapital)`，已定稿与叠加共用同一函数 —— 从根上杜绝「两套数字」再分叉 |
 | 叠加月 | `opCount = 0`、各资产 `action` 全为「无操作」（恒市值法只在月末调仓）；`monthIndex = frozenMonths + 1`（累加月序，入场月 = 第 1 个月） |
 | 严格闸门 | `setLiveOverlay` 与前端 `applyLiveOverlay` 都**显式拒绝 `null`/`undefined`/`''`/布尔/数组/非有限数**。⚠️ 必须显式拦 —— `Number(null) === 0`，「没有数据」会被静默当成「当月持平」发布到全站 |
-| 消费点 | ① 弹窗顶部汇总卡（5 项含估算 + 悬停对照）② 滚动汇总表 12 行（数值含估算 + `data-tip-key` + 「含当月估」小标 + 周期终点顺延到进行中月）③ 折线图（每条线末点 = 估算点；最早起点用 pin、其余用空心圆标记）④ 弹窗内新增 `live-note-line` 说明行 ⑤ `#rolling-live-note` |
-| 仍然固化 | 日志表格**正文各行**（只额外多一行「🟡 进行中」，该行**直接渲染 `result.live.snapshot`**，不再本地复算 MTD）、CSV 导出、分享图 |
+| 消费点 | ① 弹窗顶部汇总卡（5 项含本月至今 + 悬停对照）② 滚动汇总表 12 行（数值含本月至今 + `data-tip-key` + 「含本月至今」小标 + 周期终点顺延到进行中月）③ 折线图（每条线末点 = 本月点；最早起点用 pin、其余用空心圆标记）④ 弹窗内新增 `live-note-line` 说明行 ⑤ `#rolling-live-note` |
+| 仍然已定稿 | 日志表格**正文各行**（只额外多一行「🟡 进行中」，该行**直接渲染 `result.live.snapshot`**，不再本地复算 MTD）、CSV 导出、分享图 |
+
+**B3. 滚动板块「外部可见」+ 措辞统一（2026-09-29 第三轮 · 本轮）**
+
+背景：第二轮做完了口径统一，但「本月各资产涨跌多少」这份明细**仍然只锁在弹窗里**（要点「查看操作记录」），
+且全站把它叫「估算 / 含当月估」。用户否掉了这两点。
+
+| 环节 | 做法 |
+|---|---|
+| 明细块（新增） | `index.html#live-progress-card` + `main.js#renderLiveProgressBlock(results)`：页面外部直接可见，逐资产给出**目标权重 / 月初市值 / 本月至今 / 最新市值 / 当前权重 / 偏离目标**，表尾两行合计（组合本月至今金额+比例、自入场累计、第 N 个月、本月无交易） |
+| 数据源 | **直接吃 `results[0].live.snapshot.assetDetails`**（完整历史 · 一次建仓，与首屏 Hero 同源），不在前端另算 —— 避免出现第三条计算路径 |
+| 合计口径 | 月初市值 = 各资产 `holdingBefore` 之和；本月至今比例 = `(最新市值 − 月初市值) ÷ 固定基准 50 万`（**铁律：不用上月末总市值当分母**），因此与 `progress.json#est_change_pct_base` 逐位一致（smoke 第 9 项锁定） |
+| 汇总表末行（新增） | `renderRollingSummary` 末尾追加 `<tr class="live-month-row">`：起点列「🟡 进行中月份 + 月份 + 截至日」、周期列「自数据最早月 → 进行中月」、12 列结构与既有行完全相同；`data-tip-key="roll-live"` 悬停对照已定稿；详情按钮打开该条完整日志弹窗 |
+| 配色 | `LIVE_ASSET_COLORS`（模块级常量，与弹窗日志表格一致）；`smoke_check` 守卫「每种资产都有配色」，防止改资产名后静默丢色 |
+| 显隐 | 整块由 `body.has-live-estimate` 控制（`display:none → block`）；无 live 数据时 `renderLiveProgressBlock` 清空内容且**不渲染**汇总表末行 → 降级 / 未取到数时零残留 |
+| 措辞 | 「含当月估」→「含本月至今」；提示层键名「含估 / 固化」→「本月至今 / 已定稿」；说明行改写为「由每日真实行情累积得出，不是预测值」 |
 
 > 弹窗内「进行中」行的旧实现自己在 `main.js#buildLiveRows` 里复算 MTD（用的是 2 位小数的 `progress.mtd`），
 > 与引擎的 `mtd_raw` 差几元 → 同一弹窗里顶部 ¥109.54万 vs 行内 ¥1095440。**已改为直接消费引擎快照**，现在逐位一致。
 
 **两个 body class 必须分清（易踩坑）**
 - `has-live-progress`：日志表「🟡」角标，来自 `ensureLiveProgress()` + `markLiveBadges()`。
-- `has-live-estimate`：全站「含当月估」小标 + 虚线 + 底部说明行，只在**引擎成功 applyLiveOverlay** 时由 `updateHeroStats()` 末尾切换。
-  两者解耦：progress.json 存在但叠加失败时，只出角标不出「含当月估」标记。
+- `has-live-estimate`：全站「含本月至今」小标 + 虚线 + 底部说明行 + **明细块显隐**，只在**引擎成功 applyLiveOverlay** 时由 `updateHeroStats()` 末尾切换。
+  两者解耦：progress.json 存在但叠加失败时，只出角标不出「含本月至今」标记、也不显示明细块。
 
 #### C. 悬浮说明层（单例）
 
 - 单例 `position:fixed` 浮层 + `data-tip-key` 锚点；`TIPS` 表 + `tipLive(key, lines)` 动态写入。
 - **视口边界收敛**：锚点在视口上 35% 内则浮层放下方，否则放上方（避免被 Hero 顶部裁掉）。
-- 内容统一为「含当月 vs 固化」对照，例如：
-  `含 2026-09 未完整月估算 · 终值 109.5 万 / 年化 7.28%` + `截至 2026-08 固化 · 110.6 万 / 年化 7.42%`。
+- 内容统一为「本月至今 vs 已定稿」对照，例如：
+  `本月至今 · 终值 109.5 万 / 年化 7.28%` + `已定稿（2026-08）· 110.6 万 / 年化 7.42%`。
+  浮层标题与脚注已改为「本月至今 = 真实已发生的每日行情累积…不是预测」。
 - 三档卡片字段名注意：卡片对象用 **`dd`** 而非 `maxDd`（曾因此 `toFixed` 崩溃，见"已修 bug"）。
-- 新增三个说明行：`#hero-live-note` / `#compare-live-note` / `#backtest-live-note`，由 `renderLiveNotes()` 写入。
+- 说明行：`#hero-live-note` / `#compare-live-note` / `#backtest-live-note` / `#rolling-live-note` / `#live-progress-note`，
+  全部由 `renderLiveNotes()` 写入（**新增展示块时记得在这里补文案**）。
 
-#### D. 仍用固化口径的地方（有意为之）
-- **分享图**：`share-image.js#getDefaultResult()` 显式传 `{liveOverlay:false}` —— 海报不放未完成月的估算。
-- **完整持仓日志表格的正文行**：`result.monthlySnapshots` 恒为固化序列（叠加月只进 `result.live`），
-  故仅在末尾**额外加一行**「🟡 进行中」；官方回测指标以固化口径为准。
-- **CSV 导出（日志 CSV / 汇总 CSV）**：仍只导正式月份 —— 屏幕上看得到估算，但导出物保持"官方口径"。
+#### D. 仍用已定稿口径的地方（有意为之）
+- **分享图**：`share-image.js#getDefaultResult()` 显式传 `{liveOverlay:false}` —— 海报不放未完成月的数据。
+- **完整持仓日志表格的正文行**：`result.monthlySnapshots` 恒为已定稿序列（叠加月只进 `result.live`），
+  故仅在末尾**额外加一行**「🟡 进行中」；官方回测指标以已定稿口径为准。
+- **CSV 导出（日志 CSV / 汇总 CSV）**：仍只导正式月份 —— 屏幕上看得到本月至今，但导出物保持"官方口径"。
 
-#### E. 回归守卫（`scripts/smoke_check.js` 已加）
+#### E. 回归守卫（`scripts/smoke_check.js` 已加，共 72 项断言）
 - 第 5 项：`simulateCMV` 窗口 = 入场月 + 真实收益月（`totalMonths === assetLen + 1`）。
 - 第 8 项：**两引擎口径逐项一致**（一次建仓版 & 分批建仓版）。
-- 第 9 项：**live overlay 与 progress.json 逐位一致**（终值=est_total、月数 +1、累计%=`cum_return_pct_base`、不污染固化、非法叠加被拒、clear 后复位）。
+- 第 9 项：**live overlay 与 progress.json 逐位一致**（终值=est_total、月数 +1、累计%=`cum_return_pct_base`、不污染已定稿、非法叠加被拒、clear 后复位）。
   第二轮追加：**滚动引擎** `live overlay 被接受` / `一次建仓版终值=est_total` / `monthlySnapshots 未被污染` /
   `进行中月 opCount=0` / `累计月序=冻结月数+1` / **两引擎叠加口径逐项一致（一次建仓版 & 分批建仓版）** /
   `clearLiveOverlay 后 live=null`。
+  第三轮追加（明细块数据源链）：**各资产最新市值之和 = 组合合计 = `progress.est_total`** /
+  **各资产月初市值之和 = `progress.base_total`** / **合计比例 = `progress.est_change_pct_base`（÷固定基准 50 万）** /
+  **资产条数 = 6** / **每种资产都有配色（`LIVE_ASSET_COLORS` 无遗漏）**。
 - 第 11 项（空值闸门，第二轮加）：**`null` / 空表绝不能被当成 0** —— 两个引擎都必须**拒绝**含 `null` 的收益表与空表。
   （`Number(null) === 0`，不拦就会把「没有数据」变成「当月持平」。）
-- 第 10 项：降级闸门 —— `progress.json` 正常时必须含 `mtd_raw`；**若标记 `degraded: true`，则所有估算字段（`est_total` / `est_change_*` / `cum_return_pct_base` / `mtd` / `mtd_raw` / `est_value`）必须为 `null`**、各资产 `ok` 必须为 `false`、身份仍自洽（基准月 = 主数据末月、进行中月未定稿）。
+- 第 10 项：降级闸门 —— `progress.json` 正常时必须含 `mtd_raw`；**若标记 `degraded: true`，则所有本月至今字段（`est_total` / `est_change_*` / `cum_return_pct_base` / `mtd` / `mtd_raw` / `est_value`）必须为 `null`**、各资产 `ok` 必须为 `false`、身份仍自洽（基准月 = 主数据末月、进行中月未定稿）。
+  ⚠️ 字段名沿用 `est_*` 历史命名，语义即「本月至今」；改名会影响 `monthly_progress.js` 与前端两处，故保持不动。
+- 第 12 项（第三轮加，**展示层骨架 + 措辞守卫**）：明细块 5 个 ID 必须存在、显隐 CSS 必须成对、
+  汇总表末行样式必须存在、`renderLiveProgressBlock` 必须挂在 `renderRollingAll` 上；
+  **旧措辞不得回潮**（扫 `index.html` / `js/*.js` / `progress.json` / `monthly_progress.js`，不得出现
+  「含当月估」「含当月估算」「MTD 估算」「当月估算」）；且「含估计值」语义未被误改。
 > 一次全绿验证：`node scripts/smoke_check.js`（退出码 0）。
 
 #### F. 已修 bug（防回归）
@@ -542,7 +576,7 @@ investment-advisor/
    换端口重试会累积出多个僵尸服务。**必须用后台任务参数启动**，验证完 `TaskStop` 并核对端口释放。
 
 #### G. 降级闸门（degraded gate，2026-09-29 加 —— 数据完整性关键）
-**背景**：`progress.json` 的 MTD 经 live overlay 驱动全站「含当月估算」（Hero / 三档卡 / 指标卡）。
+**背景**：`progress.json` 的 MTD 经 live overlay 驱动全站「本月至今」口径（Hero / 三档卡 / 指标卡 / 滚动汇总表末行 / 本月至今明细块）。
 若取数失败时用 `0` 填补，等于对外发布「**当月持平**」这个假数字 —— 直接违反铁律「不凭空造月收益」。
 改动前该脚本会「先写占位、再 push、最后才 `exit 2`」，即**假数据一定会先上线**。
 
@@ -554,9 +588,9 @@ investment-advisor/
 | 字段 | 降级时 `est_total` / `est_change_amount` / `est_change_pct_base` / `est_change_pct_prev` / `cum_return_pct_base` / 各资产 `mtd` / `mtd_raw` / `est_value` 全为 `null`，各资产 `ok = false`；`base_total`（基准月持仓，与本月行情无关）仍保留真实值 |
 | 写盘 | 新增 `existingIdentityValid()`：降级且现有快照身份仍有效（进行中月未定稿 + 基准月 = 主数据末月）→ **完全不写、不推送**，保留上一版真实快照；身份已失效 → 写 null 占位把身份推进（不卡定稿） |
 | 推送 | `if (PUSH && !keepExisting)` —— 只推「含真实 MTD」或「明确标记 degraded、估算全为 null」的占位；**绝不推 0 填补的估算** |
-| 前端 | `js/main.js#ensureLiveProgress`：`d.degraded` → 直接 return（不设 `liveProgressData`、不 `markLiveBadges`、不 `applyLiveOverlay`）；`applyLiveOverlay` 内再加一道 `if (d.degraded) return null` 双保险 → 站点回退到固化口径 |
+| 前端 | `js/main.js#ensureLiveProgress`：`d.degraded` → 直接 return（不设 `liveProgressData`、不 `markLiveBadges`、不 `applyLiveOverlay`）；`applyLiveOverlay` 内再加一道 `if (d.degraded) return null` 双保险 → 站点回退到已定稿口径 |
 | 守卫 | `smoke_check.js` 第 10 项新增 degraded 分支（不含任何估算数值 + 身份自洽 + 可追溯原因 + `ok` 全 false） |
-| 退出码 | `2` = 降级（本次未发布任何当月估算，需重跑）；`--no-fetch` 属离线自检，仍为 `0` |
+| 退出码 | `2` = 降级（本次未发布任何本月至今数据，需重跑）；`--no-fetch` 属离线自检，仍为 `0` |
 
 **为什么前端看标志而不是看数值**：已验证「`degraded: true` 但数值被填成 0」（模拟修复前的伪数据）时前端**仍不展示估算** —— 闸门挂在标志上，即使将来有人写错数值也不会漏出去。
 

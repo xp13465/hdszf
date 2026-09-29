@@ -236,7 +236,7 @@ const BacktestEngine = (() => {
    * @param {Object} alloc - 资产配置（小数比例，如 {'沪深300':0.15}），缺额自动补现金
    * @param {Object} opts  - {buildMonths, threshold, feeRate, totalCapital, rebalanceEveryMonths, liveOverlay}
    *                         liveOverlay 默认 true（有进行中快照时叠加该月，见 setLiveOverlay）；
-   *                         传 false 可强制只看「截至最新完整月」的固化口径。
+   *                         传 false 可强制只看「截至最新完整月」的已定稿口径。
    * @returns {Object|null} 指标对象；realReturns 缺失时返回 null
    */
   function simulateCMV(alloc, opts) {
@@ -289,7 +289,7 @@ const BacktestEngine = (() => {
     const monthlyReturns = [];
 
     for (let t = 0; t < ticks; t++) {
-      const isOverlay = (t === overlayIdx);        // 进行中月份（MTD 估算）
+      const isOverlay = (t === overlayIdx);        // 进行中月份（本月至今 MTD）
       const isBuild = !isOverlay && t < buildMonths;
 
       // 月初：把现金余额并入现金持仓，统一处理
@@ -334,7 +334,7 @@ const BacktestEngine = (() => {
       }
 
       // 再平衡期：偏离目标市值超过 ±阈值触发（按 rebalanceEveryMonths 间隔检查）
-      //   ⚠️ 进行中月份不做再平衡：恒市值法只在月末调仓，MTD 估算必须严格等于
+      //   ⚠️ 进行中月份不做再平衡：恒市值法只在月末调仓，本月至今 MTD必须严格等于
       //      「上月末持仓 × (1+MTD)」，才能与 progress.json 的 est_total 及日志末行逐位对得上。
       if (!isBuild && !isOverlay && rebalanceEvery > 0 && (Math.max(0, t - 1) % rebalanceEvery === 0)) {
         for (const asset of ASSETS) {
@@ -415,7 +415,7 @@ const BacktestEngine = (() => {
       // 口径元信息：给前端区分「含进行中月估算」与「截至最新完整月固化」
       liveOverlay: !!overlay,
       overlayMonth: overlay ? overlay.month : null,
-      frozenMonths: arrLen,          // 固化口径下的真实收益月数（不含入场月）
+      frozenMonths: arrLen,          // 已定稿口径下的真实收益月数（不含入场月）
       yearly: { fullYears: fullYears.length, negativeYears, worstYear }
     };
   }
