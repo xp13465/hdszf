@@ -895,7 +895,7 @@
           const annPct = yearStartValue > 0 ? (annAmount / yearStartValue) * 100 : 0;
           const annClass = annAmount >= 0 ? 'action-buy' : 'action-sell';
           tableHTML += `<td rowspan="${rowSpan}" class="${annClass}" style="font-weight:600;text-align:right;">` +
-            `<span style="font-size:0.72rem;font-weight:500;opacity:0.7;margin-right:3px;">${annYear}年</span>` +
+            `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${annYear}年</div>` +
             `${annPct >= 0 ? '+' : ''}${annPct.toFixed(2)}%` +
             `<div style="font-size:0.7rem;font-weight:400;opacity:0.85;">¥${annAmount >= 0 ? '+' : ''}${Math.round(annAmount).toLocaleString()}</div></td>`;
           // 仓位占比 = 排除现金后的权益 / 总市值
