@@ -13,6 +13,8 @@
  *  7) progress.json 不污染主回测（基准月/资产名/÷50万口径）
  *  8) 两套引擎口径一致（simulateCMV == RollingBacktest，一次建仓版 & 分批建仓版）
  *  9) 进行中月份叠加层 == progress.json（est_total / 累计% / 月数 +1、非法叠加被拒）
+ * 10) 降级快照闸门：progress.json 若标记 degraded，估算字段必须全为 null，
+ *     绝不允许出现用 0 填补出来的「当月持平」（会被 live overlay 当成真估算发到全站）
  *
  * 退出码：0 通过；1 失败。供 CI / 发布前调用。
  */
@@ -197,7 +199,31 @@ crossCheck('分批建仓版(同起点)', B.simulateCMV(B.PLANS.balanced, { build
 if (typeof PROG !== 'undefined' && fs.existsSync(PROG)) {
   let prog = null;
   try { prog = JSON.parse(fs.readFileSync(PROG, 'utf8')); } catch (e) { prog = null; }
-  if (prog && prog.in_progress) {
+  // 降级快照（本月行情取数不完整）的分支：必须不含任何估算数值。
+  // null = 「本次没有数据」；0 = 伪造出来的「当月持平」—— 后者会被前端 live overlay
+  // 当成真实估算发到全站（Hero / 三档卡 / 指标卡），直接违反铁律「不凭空造月收益」。
+  if (prog && prog.in_progress && prog.degraded) {
+    const numFields = ['est_total', 'est_change_amount', 'est_change_pct_base', 'est_change_pct_prev', 'cum_return_pct_base'];
+    const badTop = numFields.filter((k) => prog[k] != null);
+    const badAssets = prog.assets
+      .filter((a) => a.mtd != null || a.mtd_raw != null || a.est_value != null)
+      .map((a) => a.name);
+    check('降级快照的上层估算字段必须为 null（不得用 0 伪装「当月持平」）', badTop.length === 0,
+      badTop.length ? badTop.map((k) => `${k}=${prog[k]}`).join(', ') : '全部为 null ✓');
+    check('降级快照的各资产 MTD / est_value 必须为 null', badAssets.length === 0,
+      badAssets.length ? badAssets.join(', ') : '全部为 null ✓');
+    check('降级快照身份仍自洽（基准月=主数据末月、进行中月未定稿）',
+      prog.base_month === lastMonthInData && !rr.months.includes(prog.in_progress_month),
+      `base_month=${prog.base_month} 末月=${lastMonthInData} month=${prog.in_progress_month}`);
+    check('降级快照可追溯原因（fetch.fail > 0 或 offline 自检）',
+      Number(prog.fetch && prog.fetch.fail) > 0 || (prog.fetch && prog.fetch.offline === true),
+      `fetch=${JSON.stringify(prog.fetch)}`);
+    check('降级快照各资产 ok 必须为 false（不得声称取到了 MTD）',
+      prog.assets.every((a) => a.ok === false),
+      JSON.stringify(prog.assets.map((a) => a.ok)));
+  }
+
+  if (prog && prog.in_progress && !prog.degraded) {
     const returns = {};
     let rawOk = true;
     for (const a of prog.assets) {

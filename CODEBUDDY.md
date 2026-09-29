@@ -263,7 +263,7 @@ investment-advisor/
   1. `getMonthReturnsWithFallback` / `getMonthReturns` 改为 `ridx = idx - 1`；入场标记月（`idx===0`）无真实收益，按 **0** 处理（不计入"估计值"，保持全量回测"全部真实"徽章）。
   2. `totalMonthsNeeded` 改为 `months.length - monthIdx`（自动覆盖到 `months` 末位，含 2026-08），每月补数后自动延伸，无需再手改 `CONFIG.endMonth`。
   3. `main.js` 的 `showLogDetail` 新增 **「年度收益率」列**：对每条记录按日历年聚合，展示该年"至今"的**收益金额(¥)** 与**收益比例(%)**（区别于"年化收益=均值"）。yearStartValue = 上一年末总市值（首年=初始资金 50 万），故 12 月行=全年收益、进行中月=年迄今收益。CSV 导出（`exportLogCSV`）同步加了「年度收益率(%) / 年收益金额(元)」两列。
-- **新增脚本 `scripts/monthly_progress.js`（进行中月份进度快照）**：每周/每交易日跑，取"当前未完成月"的**月至今(MTD)**收益（新浪前复权日 K 线，与 `fetch_returns.py` 同源），把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的组合进度报告，同时写 `js/progress.json` 供站点**『完整持仓日志』末行**展示（2026-09-29 起；此前是首页独立区块，已被用户否掉）。**绝不写 `data.js`/`real_returns.json`**，不污染主回测；真正的月末定稿仍由 `monthly_update.js`（每月 3 号）负责。用法：`node scripts/monthly_progress.js [--out 报告.md] [--no-fetch]`。取数全失败时降级为 MTD=0 占位仍输出。
+- **新增脚本 `scripts/monthly_progress.js`（进行中月份进度快照）**：每周/每交易日跑，取"当前未完成月"的**月至今(MTD)**收益（新浪前复权日 K 线，与 `fetch_returns.py` 同源），把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的组合进度报告，同时写 `js/progress.json` 供站点**『完整持仓日志』末行**展示（2026-09-29 起；此前是首页独立区块，已被用户否掉）。**绝不写 `data.js`/`real_returns.json`**，不污染主回测；真正的月末定稿仍由 `monthly_update.js`（每月 3 号）负责。用法：`node scripts/monthly_progress.js [--out 报告.md] [--no-fetch]`。**取数不完整时判为降级（退出码 2）：所有估算字段写 `null`、不写入/不推送任何当月估算**，站点自动回退到固化口径（详见「G. 降级闸门」）。
 
 ### 数据起点固化 2015-08（2026-09-29 · 用户拍板）
 - **结论**：回测**起点（入场月）永久固化 `2015-08`**，首个可算收益月 = `2015-09`，全 12 个入场起点（2015-08 ~ 2025-08）窗口全部真实数据覆盖，无任何估计值泄漏。
@@ -493,7 +493,7 @@ investment-advisor/
 - 第 5 项：`simulateCMV` 窗口 = 入场月 + 真实收益月（`totalMonths === assetLen + 1`）。
 - 第 8 项：**两引擎口径逐项一致**（一次建仓版 & 分批建仓版）。
 - 第 9 项：**live overlay 与 progress.json 逐位一致**（终值=est_total、月数 +1、累计%=`cum_return_pct_base`、不污染固化、非法叠加被拒、clear 后复位）。
-- 第 10 项：`progress.json` 必须含 `mtd_raw`。
+- 第 10 项：降级闸门 —— `progress.json` 正常时必须含 `mtd_raw`；**若标记 `degraded: true`，则所有估算字段（`est_total` / `est_change_*` / `cum_return_pct_base` / `mtd` / `mtd_raw` / `est_value`）必须为 `null`**、各资产 `ok` 必须为 `false`、身份仍自洽（基准月 = 主数据末月、进行中月未定稿）。
 > 一次全绿验证：`node scripts/smoke_check.js`（退出码 0）。
 
 #### F. 已修 bug（防回归）
@@ -508,6 +508,27 @@ investment-advisor/
    - **累计月序文案用 `V.nCum`**（当前 133）：Hero「90 / 133月」、指标卡「总收益（133个月）」，与 `main.js` 的 `m.totalMonths` 同源。
    - Hero 副标题「翻倍/增长/亏损」由 `main.js` 按 `终值÷50万 ≥ 2` 判定，静态回退需同步为 **「11年翻倍」**。
    - 发布前用 `node scripts/monthly_update.js --dry-run --strict` 确认「全部规则命中」。
+
+#### G. 降级闸门（degraded gate，2026-09-29 加 —— 数据完整性关键）
+**背景**：`progress.json` 的 MTD 经 live overlay 驱动全站「含当月估算」（Hero / 三档卡 / 指标卡）。
+若取数失败时用 `0` 填补，等于对外发布「**当月持平**」这个假数字 —— 直接违反铁律「不凭空造月收益」。
+改动前该脚本会「先写占位、再 push、最后才 `exit 2`」，即**假数据一定会先上线**。
+
+**核心原则：`null` = 本次无数据（可发布）；`0` = 伪造的持平（绝不可发布）。**
+
+| 环节 | 行为 |
+|---|---|
+| 降级判定 | `scripts/monthly_progress.js`：**任一**风险资产取数失败（或 `--no-fetch`）→ `degraded = true`（不再是「全部失败才降级」） |
+| 字段 | 降级时 `est_total` / `est_change_amount` / `est_change_pct_base` / `est_change_pct_prev` / `cum_return_pct_base` / 各资产 `mtd` / `mtd_raw` / `est_value` 全为 `null`，各资产 `ok = false`；`base_total`（基准月持仓，与本月行情无关）仍保留真实值 |
+| 写盘 | 新增 `existingIdentityValid()`：降级且现有快照身份仍有效（进行中月未定稿 + 基准月 = 主数据末月）→ **完全不写、不推送**，保留上一版真实快照；身份已失效 → 写 null 占位把身份推进（不卡定稿） |
+| 推送 | `if (PUSH && !keepExisting)` —— 只推「含真实 MTD」或「明确标记 degraded、估算全为 null」的占位；**绝不推 0 填补的估算** |
+| 前端 | `js/main.js#ensureLiveProgress`：`d.degraded` → 直接 return（不设 `liveProgressData`、不 `markLiveBadges`、不 `applyLiveOverlay`）；`applyLiveOverlay` 内再加一道 `if (d.degraded) return null` 双保险 → 站点回退到固化口径 |
+| 守卫 | `smoke_check.js` 第 10 项新增 degraded 分支（不含任何估算数值 + 身份自洽 + 可追溯原因 + `ok` 全 false） |
+| 退出码 | `2` = 降级（本次未发布任何当月估算，需重跑）；`--no-fetch` 属离线自检，仍为 `0` |
+
+**为什么前端看标志而不是看数值**：已验证「`degraded: true` 但数值被填成 0」（模拟修复前的伪数据）时前端**仍不展示估算** —— 闸门挂在标志上，即使将来有人写错数值也不会漏出去。
+
+验证脚本（不进仓库）：`C:\Users\23405\.workbuddy\binaries\node\workspace\_check_degraded.js`（jsdom 四场景：正常 / 降级全 null / 降级含伪 0 / 老快照无 degraded 字段）。
 
 ---
 

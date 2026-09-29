@@ -821,6 +821,15 @@
         .then((r) => (r.ok ? r.json() : null))
         .then((d) => {
           if (!d || !d.in_progress || !Array.isArray(d.assets) || !d.assets.length) return null;
+          // 降级快照（本月行情取数不完整、估算字段为 null）→ 一律不展示任何估算：
+          // 不叠加 live overlay、不加 🟡 角标、不插日志末行，站点回退到固化口径。
+          // 若照常展示，会把「当月持平」这种由 0 拼出来的假数字当成估算发到全站
+          // （项目铁律：不凭空造月收益）。
+          if (d.degraded) {
+            console.warn('[progress] 进度快照为降级状态（' + (d.in_progress_month || '?') +
+              ' 行情取数不完整）→ 不展示当月估算，回退到固化口径');
+            return d;
+          }
           liveProgressData = d;
           // 只在「快照基准月 == 主数据末月」时提示（此时日志里才会真的多出「进行中行」）
           if (!d.base_month || d.base_month === lastDataMonth()) {
@@ -838,6 +847,7 @@
   // 自动多算一个月「MTD 估算」，与 progress.json 的 est_total、日志末行完全同源。
   // ⚠️ 该叠加月不触发再平衡，故结果严格等于「上月末持仓 × (1+MTD)」。
   function applyLiveOverlay(d) {
+    if (d.degraded) return null;      // 降级快照不含真实 MTD → 绝不叠加（双保险）
     const returns = {};
     for (const a of d.assets) {
       const v = (a.mtd_raw != null) ? Number(a.mtd_raw) : (Number(a.mtd) / 100);

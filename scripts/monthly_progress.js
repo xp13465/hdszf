@@ -16,7 +16,16 @@
  *   node scripts/monthly_progress.js --out 报告.md 同时把报告写入文件
  *   node scripts/monthly_progress.js --no-fetch    不联网（离线/测试），MTD 记为 0，仅展示结构
  *
- * 退出码：0 成功（含"进行中"标记）；2 取数全部失败（已降级为占位，仍可输出）。
+ * 降级闸门（重要，2026-09-29 加）：
+ *   progress.json 的 MTD 会被前端 live overlay 叠加成全站「含当月估算」（Hero / 三档卡 / 指标卡），
+ *   所以【任何】风险资产取数失败都判定为 degraded，此时：
+ *     - 所有随行情变化的字段写成 null（不是 0）→ null = 无数据，0 = 伪造的「当月持平」；
+ *     - 现有快照身份仍有效（进行中月未定稿 + 基准月 = 主数据末月）→ 完全不写、不推送，保留上一版真实快照；
+ *     - 身份已失效（月末定稿把该月写进了 months）→ 写 null 占位把身份推进，避免卡住定稿流程；
+ *     - 前端识别 degraded 后一律不展示估算，自动回退到固化口径。
+ *   绝不允许把「MTD=0」当作当月估算发布到线上（项目铁律：不凭空造月收益）。
+ *
+ * 退出码：0 正常（含 --no-fetch 的离线结构自检）；2 降级（本次未发布任何当月估算，需重跑）。
  */
 'use strict';
 
@@ -105,6 +114,20 @@ function cashMTD() {
   return cashMonthly * (elapsed / daysInMonth);
 }
 
+// 现有 js/progress.json 的「身份」是否仍然有效：
+//   进行中月尚未定稿（不在 months 里）且 = 数据末月的下一个月，基准月 = 数据末月。
+// 有效 → 降级时保留它（真实但滞后一天/一周，前端会照实显示其数据截至日）；
+// 无效 → 必须写入 null 占位把身份推进，否则 smoke_check 第 7 项会拦、定稿流程被卡住。
+function existingIdentityValid() {
+  try {
+    const o = JSON.parse(fs.readFileSync(path.join(ROOT, JSON_OUT), 'utf8'));
+    return !!o.in_progress
+      && o.base_month === lastCompleteMonth
+      && o.in_progress_month === inProgressMonth
+      && !rr.months.includes(o.in_progress_month);
+  } catch (e) { return false; }
+}
+
 // ---------------- 主流程 ----------------
 (async () => {
   const mtdMap = {};
@@ -122,11 +145,16 @@ function cashMTD() {
       mtdMap[r.asset] = r;
       if (r.ok) fetchOk++; else { fetchFail++; console.error(`  ✗ ${r.asset} 取数失败: ${r.err}`); }
     }
-    if (fetchFail > 0 && fetchOk === 0) {
-      console.error('  ⚠ 全部资产取数失败，已降级为 MTD=0 占位');
-      for (const asset of Object.keys(ASSETS)) mtdMap[asset] = { ok: false, mtd: 0, lastDay: null, sym: '(降级)', asset };
+    if (fetchFail > 0) {
+      console.error(`  ⚠ ${fetchFail} 个风险资产取数失败 → 本快照判为降级（不会写入/推送任何当月估算）`);
+      for (const asset of Object.keys(ASSETS)) {
+        if (!mtdMap[asset].ok) mtdMap[asset] = { ok: false, mtd: null, lastDay: null, sym: '(失败)', asset };
+      }
     }
   }
+  // 降级判定：任一风险资产取数失败（或 --no-fetch 离线）→ 组合 MTD 不完整，
+  // 不能作为「当月估算」对外展示（宁可不显示，也不给一个由 0 拼出来的假数字）。
+  const DEGRADED = NO_FETCH || fetchFail > 0;
   mtdMap[CASH] = { ok: true, mtd: cashMTD(), lastDay: null, sym: 'cash', asset: CASH };
 
   // 估算当前市值：基准持仓 × (1 + MTD)
@@ -134,10 +162,11 @@ function cashMTD() {
   const rows = [];
   for (const asset of Object.keys(ASSETS).concat([CASH])) {
     const baseH = baseHoldings[asset] || 0;
-    const mtd = mtdMap[asset].ok ? mtdMap[asset].mtd : 0;
+    const mtdKnown = !!mtdMap[asset].ok;                  // 该资产是否拿到了真实 MTD
+    const mtd = mtdKnown ? mtdMap[asset].mtd : 0;         // 仅用于报告排版，降级时不对外输出
     const est = baseH * (1 + mtd);
     estTotal += est;
-    rows.push({ asset, mtd, baseH, est, lastDay: mtdMap[asset].lastDay || null, pct: baseTotal > 0 ? baseH / baseTotal : 0 });
+    rows.push({ asset, mtd, mtdKnown, baseH, est, lastDay: mtdMap[asset].lastDay || null, pct: baseTotal > 0 ? baseH / baseTotal : 0 });
   }
   const delta = estTotal - baseTotal;
   // 口径：与站内「月收益/年度收益率/累计收益」一致 → 一律 ÷ 固定基准本金 50 万（各分段可加）
@@ -161,21 +190,34 @@ function cashMTD() {
   md += `- 固定基准本金：¥${fmtMoney(CAP)}（所有收益比例的统一分母，与站内各收益列同口径）\n`;
   md += `- 进行中月：**${inProgressMonth}（非完整月，以下为月至今 MTD 估算，待月末收盘后由 monthly_update.js 定稿）**\n`;
   md += `- 取数状态：${fetchOk}/${Object.keys(ASSETS).length} 个风险资产实时成功` +
-        (fetchFail > 0 ? `（${fetchFail} 个失败/降级）` : '') + `\n\n`;
+        (fetchFail > 0 ? `（${fetchFail} 个失败）` : '') + `\n`;
+  if (DEGRADED) {
+    md += `- ⚠️ **本快照已降级：不含任何当月估算**（所有 MTD / 估算市值字段为 null）。` +
+          `站点会自动回退到「截至 ${lastCompleteMonth}」的固化口径，不展示任何当月数字。` +
+          `原因：取数不完整时用 0 填补会伪造出「当月持平」的假收益（项目铁律禁止）。\n\n`;
+  } else {
+    md += `\n`;
+  }
 
   md += `## 各资产月至今(MTD)收益\n\n`;
   md += `| 资产 | MTD | 基准持仓(${lastCompleteMonth}) | 估算现值 |\n`;
   md += `| --- | --- | --- | --- |\n`;
   for (const r of rows) {
-    md += `| ${r.asset} | ${sign(r.mtd * 100)}${(r.mtd * 100).toFixed(2)}% | ¥${fmtMoney(r.baseH)} | ¥${fmtMoney(r.est)} |\n`;
+    const mtdCell = (!DEGRADED && r.mtdKnown) ? `${sign(r.mtd * 100)}${(r.mtd * 100).toFixed(2)}%` : '—';
+    const estCell = (!DEGRADED && r.mtdKnown) ? `¥${fmtMoney(r.est)}` : '—';
+    md += `| ${r.asset} | ${mtdCell} | ¥${fmtMoney(r.baseH)} | ${estCell} |\n`;
   }
   md += `\n`;
 
   md += `## 组合估算（进行中）\n\n`;
-  md += `- 估算当前市值：**¥${fmtMoney(estTotal)}**（对固定基准 ¥${fmtMoney(CAP)} → 累计 ${sign(cumPctBase)}${cumPctBase.toFixed(2)}%）\n`;
-  md += `- 本月至今收益：**${sign(deltaPctBase)}${deltaPctBase.toFixed(2)}%**（${sign(delta)}¥${fmtMoney(Math.abs(delta))} 变更，即 ${sign(delta)}${Math.abs(delta).toFixed(0)} 元）— ÷固定基准50万\n`;
-  md += `  - 参考：同一变更金额若按上月末总市值 ¥${fmtMoney(baseTotal)} 计，为 ${sign(deltaPctPrev)}${deltaPctPrev.toFixed(2)}%（站内各收益列统一采用 ÷固定基准50万，故以 ${sign(deltaPctBase)}${deltaPctBase.toFixed(2)}% 为准）\n`;
-  md += `- 状态：🟡 **进行中（非完整月）** — 本快照不写入主回测数据，仅作进度参考\n`;
+  if (DEGRADED) {
+    md += `- ⚠️ 取数不完整，**本次不提供组合估算**（不写入 js/progress.json 的估算字段）。重跑本脚本即可。\n`;
+  } else {
+    md += `- 估算当前市值：**¥${fmtMoney(estTotal)}**（对固定基准 ¥${fmtMoney(CAP)} → 累计 ${sign(cumPctBase)}${cumPctBase.toFixed(2)}%）\n`;
+    md += `- 本月至今收益：**${sign(deltaPctBase)}${deltaPctBase.toFixed(2)}%**（${sign(delta)}¥${fmtMoney(Math.abs(delta))} 变更，即 ${sign(delta)}${Math.abs(delta).toFixed(0)} 元）— ÷固定基准50万\n`;
+    md += `  - 参考：同一变更金额若按上月末总市值 ¥${fmtMoney(baseTotal)} 计，为 ${sign(deltaPctPrev)}${deltaPctPrev.toFixed(2)}%（站内各收益列统一采用 ÷固定基准50万，故以 ${sign(deltaPctBase)}${deltaPctBase.toFixed(2)}% 为准）\n`;
+  }
+  md += `- 状态：${DEGRADED ? '⚠️ **降级（无估算）**' : '🟡 **进行中（非完整月）**'} — 本快照不写入主回测数据，仅作进度参考\n`;
 
   console.log(md);
   if (OUT) {
@@ -185,30 +227,36 @@ function cashMTD() {
 
   // ---------------- 写前端数据源 js/progress.json ----------------
   if (!NO_JSON) {
+    // 降级时所有随行情变化的字段一律写 null（不是 0）：
+    // null = 「本次没有数据」，0 = 伪造出来的「当月持平」，后者会被 live overlay 当成真的估算发到全站。
+    const n2 = (v) => (DEGRADED ? null : Number(v.toFixed(2)));
     const payload = {
       generated_at: ts,
       in_progress: true,
       in_progress_month: inProgressMonth,
       base_month: lastCompleteMonth,
-      data_as_of: dataAsOf,
+      data_as_of: DEGRADED ? null : dataAsOf,
       base_capital: CAP,
-      base_total: Number(baseTotal.toFixed(2)),
-      est_total: Number(estTotal.toFixed(2)),
-      est_change_amount: Number(delta.toFixed(2)),
-      est_change_pct_base: Number(deltaPctBase.toFixed(2)),   // ÷固定基准50万（站内统一口径）
-      est_change_pct_prev: Number(deltaPctPrev.toFixed(2)),   // ÷上月末总市值（参考）
-      cum_return_pct_base: Number(cumPctBase.toFixed(2)),
-      fetch: { ok: fetchOk, fail: fetchFail },
-      degraded: fetchOk === 0,
+      base_total: Number(baseTotal.toFixed(2)),   // 基准月持仓，与本月行情无关 → 始终有效
+      est_total: n2(estTotal),
+      est_change_amount: n2(delta),
+      est_change_pct_base: n2(deltaPctBase),      // ÷固定基准50万（站内统一口径）
+      est_change_pct_prev: n2(deltaPctPrev),      // ÷上月末总市值（参考）
+      cum_return_pct_base: n2(cumPctBase),
+      fetch: { ok: fetchOk, fail: fetchFail, offline: NO_FETCH },   // offline=true 表示本次为 --no-fetch 离线结构自检
+      degraded: DEGRADED,
       assets: rows.map((r) => ({
         name: r.asset,
-        mtd: Number((r.mtd * 100).toFixed(2)),        // 百分比，展示用（保留 2 位）
-        mtd_raw: Number(r.mtd.toFixed(8)),            // 小数收益率（引擎叠加层用，避免四舍五入带来 ±3 元漂移）
+        ok: DEGRADED ? false : r.mtdKnown,          // 该资产本次是否取到可用 MTD（降级时一律 false）
+        mtd: (DEGRADED || !r.mtdKnown) ? null : Number((r.mtd * 100).toFixed(2)),  // 百分比，展示用（2 位）
+        mtd_raw: (DEGRADED || !r.mtdKnown) ? null : Number(r.mtd.toFixed(8)),      // 小数收益率（引擎叠加层用，避免 ±3 元漂移）
         base_holding: Number(r.baseH.toFixed(2)),
-        est_value: Number(r.est.toFixed(2)),
+        est_value: (DEGRADED || !r.mtdKnown) ? null : Number(r.est.toFixed(2)),
         last_day: r.lastDay || null
       })),
-      note: '非完整月（月至今 MTD）估算，不计入官方回测；月末收盘后由月度定稿流程写入正式数据。收益比例统一按固定基准 50 万口径。'
+      note: DEGRADED
+        ? '⚠ 降级快照：本月行情取数不完整，本文件不含任何当月估算（估算字段为 null）。前端与引擎必须忽略估算字段，站点回退到「截至基准月」的固化口径；重跑 scripts/monthly_progress.js 即可恢复。'
+        : '非完整月（月至今 MTD）估算，不计入官方回测；月末收盘后由月度定稿流程写入正式数据。收益比例统一按固定基准 50 万口径。'
     };
     const jpath = path.join(ROOT, JSON_OUT);
     // 仅当"数据内容"变化才重写（时间戳单独比较），避免每周无意义地产生 diff 与部署
@@ -222,17 +270,26 @@ function cashMTD() {
         unchanged = (JSON.stringify(prevObj, null, 2) + '\n') === nextBody;
       } catch (_) { unchanged = false; }
     }
-    if (unchanged) {
+    // 降级 + 现有快照身份仍有效 → 保留上一版「真实」快照，不用一份无估算的占位去覆盖它。
+    const keepExisting = DEGRADED && existingIdentityValid();
+    if (keepExisting) {
+      console.error('[skip] 取数降级且现有快照仍有效 → 保留上一版真实快照（未写入、未推送）');
+    } else if (unchanged) {
       console.error(`[skip] ${JSON_OUT} 数据无变化，未重写（保留原快照时间）`);
     } else {
       payload.generated_at = ts;
       fs.writeFileSync(jpath, JSON.stringify(payload, null, 2) + '\n', 'utf8');
-      console.error(`[ok] ${JSON_OUT} 已更新（${inProgressMonth} 估算 ¥${fmtMoney(estTotal)}，${sign(deltaPctBase)}${deltaPctBase.toFixed(2)}%）`);
+      console.error(DEGRADED
+        ? `[ok] ${JSON_OUT} 已写入降级占位（${inProgressMonth} 无估算，估算字段全为 null）`
+        : `[ok] ${JSON_OUT} 已更新（${inProgressMonth} 估算 ¥${fmtMoney(estTotal)}，${sign(deltaPctBase)}${deltaPctBase.toFixed(2)}%）`);
     }
-    if (PUSH) gitPushJson(JSON_OUT);
+    // 推送闸门：只为「含真实 MTD 的快照」或「明确标记 degraded、估算字段全为 null 的占位」推送。
+    // 绝不允许把用 0 填补出来的估算推上线（keepExisting 时文件根本没动，也无需推送）。
+    if (PUSH && !keepExisting) gitPushJson(JSON_OUT);
   }
 
-  process.exit(fetchFail > 0 && fetchOk === 0 ? 2 : 0);
+  // 退出码：2 = 降级（本次未发布任何当月估算）→ 自动化应如实上报并安排重跑。
+  process.exit(DEGRADED && !NO_FETCH ? 2 : 0);
 })();
 
 // 仅提交并推送进度 JSON（有变化才提交），推后核对远程 tip

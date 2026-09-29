@@ -356,9 +356,10 @@ must(process.execPath, ['scripts/diff_data_update.js', '--md', reportPath], `输
 //   smoke_check.js 第 7 项会因此 FAIL，而下面阶段 10 遇 FAIL 会「不 commit、不 push」，
 //   于是整个月度定稿在自检阶段被自己的旧快照卡死（2026-10-03 起必然触发）。
 //   所以定稿后必须立刻把快照滚到「新的进行中月」= nextMonthLabel(新末月)。
-// 容错：取数全失败时 monthly_progress.js 退出码为 2（降级为 MTD=0 占位），
-//       此时 JSON 结构仍合法（in_progress:true / base_month==末月 / 月份不在 months 里），
-//       故按「成功但降级」处理，只告警不中断。
+// 容错：取数降级（任一风险资产失败或全部失败）时 monthly_progress.js 退出码为 2，
+//       写入的是「估算字段全为 null」的降级占位（绝不写 MTD=0，那会伪造「当月持平」），
+//       此时 JSON 结构仍合法（in_progress:true / base_month==末月 / 月份不在 months 里 /
+//       degraded:true），故按「成功但降级」处理，只告警不中断；前端会自动回退到固化口径。
 P('\n=== 阶段 9.5 · 刷新进行中月份快照 (js/progress.json) ===');
 if (DRY) {
   P('  [dry-run] 跳过 monthly_progress.js');
@@ -370,7 +371,8 @@ if (DRY) {
   } catch (e) {
     const code = typeof e.status === 'number' ? e.status : -1;
     if (code === 2) {
-      P('  ⚠ progress.json 已刷新，但取数全部失败 → 降级为 MTD=0 占位（站点会显示 0.00% 估算）');
+      P('  ⚠ progress.json 降级：取数不完整 → 已写「估算字段全为 null」的占位（站点回退到固化口径，不会显示假数字）');
+      P('     建议稍后手工重跑 node scripts/monthly_progress.js --push 恢复当月估算。');
     } else {
       snapOk = false;
       P(`  ✗ monthly_progress.js 异常退出 (code=${code})`);

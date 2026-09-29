@@ -130,8 +130,12 @@
 - **脚本**：`scripts/monthly_progress.js`（Node，自包含，用全局 `fetch` 取新浪日 K 线）。
   - 作用：取"当前未完成月"的**月至今(MTD)**收益，把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的组合进度报告。
   - **绝不写 `js/data.js` / `js/real_returns.json`**，不污染主回测口径；真正的月末定稿仍由 `monthly_update.js`（每月 3 号）负责。
-  - 用法：`node scripts/monthly_progress.js [--out 报告.md] [--json js/progress.json] [--no-json] [--no-fetch] [--push]`。取数全失败时降级为 MTD=0 占位仍输出（退出码 2）。
-  - 实时取数需联网；若自动化环境无外网，会降级为占位并在报告里标明。
+  - 用法：`node scripts/monthly_progress.js [--out 报告.md] [--json js/progress.json] [--no-json] [--no-fetch] [--push]`。
+  - **降级闸门（2026-09-29 加）**：任一风险资产取数失败 → `degraded: true`、退出码 2，
+    所有估算字段写 **`null`**（不是 `0`）、**不写入也不推送**任何当月估算。
+    `null` = 本次无数据（可发布）；`0` = 伪造的「当月持平」（绝不可发布，会被 live overlay
+    当成真估算发到全站 Hero / 三档卡 / 指标卡）。前端识别 `degraded` 后自动回退固化口径。
+  - 实时取数需联网；若自动化环境无外网，会降级并在报告里标明。
 - **口径（与站内一致）**：组合"本月至今"百分比 = 变更金额 ÷ **固定基准本金 50 万**（不是 ÷ 上月末总市值），与日志表「月收益 / 年度收益率 / 累计收益」三列同口径、可加。JSON 里 `est_change_pct_prev` 是 ÷ 上月末总市值的**参考值**，页面仅在日志行里以极小字标注。
 - **站点展示**：`--push` 会把 `js/progress.json` 提交并推送 → CF 自动部署 → 打开**「完整持仓日志」**即可看到表格**末行**（倒序时为首行）的「🟡 进行中」行（`js/main.js` 的 `ensureLiveProgress()` + `buildLiveRows()`）。
   - 2026-09-29 用户否掉了"首页独立区块"形态，改为**日志表格内一行**；旧的 `index.html#live-progress` 区块与 `.live-*` 样式、`initLiveProgress()`/`renderLiveProgress()` 已删除。
@@ -146,7 +150,8 @@
   （不带 `--push`，由外层统一 commit + push）。原因：定稿把 `TARGET` 月写进 `data.js` 后，旧快照立刻"过期"
   （月份落进 `months`、`base_month` 落后一月），`smoke_check` 第 7 项必然 FAIL，而阶段 10 遇 FAIL 会 **不 commit、不 push** ——
   整个月度定稿会被自己的旧快照卡死。
-  - 容错：取数全失败时 `monthly_progress.js` 退出码为 2（降级 MTD=0 占位），JSON 结构仍合法 → 只告警不中断；
+  - 容错：取数降级时 `monthly_progress.js` 退出码为 2，写成「估算字段全为 null」的降级占位
+    （**绝不写 MTD=0**，那会伪造「当月持平」），JSON 结构仍合法 → 只告警不中断，并提示手工重跑；
     其它非零退出码才中止定稿。
   - 手工定稿时若跳过此步，先自己跑一次 `node scripts/monthly_progress.js` 再提交。
 
@@ -226,7 +231,44 @@ node scripts/monthly_progress.js     # 刷新 progress.json（--push 才提交�
   一次建仓版 & 分批建仓版（同起点）下逐项相等。这是本次最核心的防回归。
 - `scripts/smoke_check.js` 第 9 项（2026-09-29 新增）：**live overlay 与 progress.json 逐位一致** ——
   叠加终值 == `est_total`、月数 +1、累计% == `cum_return_pct_base`、不污染固化口径、非法叠加被拒、`clearLiveOverlay` 后复位。
-- `scripts/smoke_check.js` 第 10 项（2026-09-29 新增）：`progress.json` 必须含 **`mtd_raw`**（高精度 MTD，防 ±3 元漂移）。
+- `scripts/smoke_check.js` 第 10 项（2026-09-29 新增，同日扩展降级分支）：`progress.json` 正常时必须含 **`mtd_raw`**（高精度 MTD，防 ±3 元漂移）；
+  **若标记 `degraded: true`**，则断言所有估算字段（`est_total` / `est_change_amount` / `est_change_pct_base` /
+  `est_change_pct_prev` / `cum_return_pct_base` / 各资产 `mtd` / `mtd_raw` / `est_value`）**必须为 `null`**、
+  各资产 `ok === false`、身份仍自洽（`base_month` == 主数据末月、进行中月未定稿）、原因可追溯（`fetch.fail > 0` 或 `fetch.offline === true`）。
+  这一项专门防「用 0 填补出『当月持平』并推到线上」——见下节。
+
+---
+
+## 降级闸门（degraded gate，2026-09-29 新增 —— 数据完整性）
+
+**为什么加**：`progress.json` 的 MTD 经前端 live overlay 驱动**全站**「含当月估算」（Hero / 三档卡 / 指标卡）。
+旧实现在取数全部失败时用 `MTD=0` 占位，并且**先 `gitPushJson` 再 `exit 2`** —— 也就是假数据一定会先上线。
+一旦某个周一新浪抽风，全站就会显示「当月估算 = 0.00%（持平）」，等于凭空造月收益（违反铁律）。
+
+**核心原则：`null` = 本次无数据（可发布）；`0` = 伪造的持平（绝不可发布）。**
+
+| 环节 | 行为 |
+|---|---|
+| 降级判定 | `scripts/monthly_progress.js`：**任一**风险资产取数失败（或 `--no-fetch`）→ `degraded = true`（不再是「全部失败才降级」） |
+| 字段 | 降级时上层 `est_*` / `cum_return_pct_base` 与各资产 `mtd` / `mtd_raw` / `est_value` 全为 `null`，各资产 `ok = false`；`base_total`（基准月持仓，与本月行情无关）保留真实值 |
+| 写盘 | 新增 `existingIdentityValid()`：降级且现有快照身份仍有效 → **不写、不推**，保留上一版真实快照；身份已失效（月末定稿把该月写进 `months`）→ 写 null 占位把身份推进，不卡定稿 |
+| 推送 | `if (PUSH && !keepExisting)` —— 只推「含真实 MTD」或「明确 `degraded`、估算全为 null」的占位；**绝不推 0 填补的估算** |
+| 前端 | `js/main.js#ensureLiveProgress`：`d.degraded` → 直接处理为不可用（不设 `liveProgressData`、不 `markLiveBadges`、不 `applyLiveOverlay`）；`applyLiveOverlay` 内再加 `if (d.degraded) return null` 双保险 → 站点静默回退固化口径 |
+| 退出码 | `2` = 降级（本次未发布任何当月估算，需重跑）；`--no-fetch` 是离线结构自检，仍为 `0` |
+| 定稿容错 | `monthly_update.js` 阶段 9.5 遇退出码 2 只告警不中断，并提示手工重跑 `--push` 恢复估算 |
+
+**闸门挂在 `degraded` 标志上、而不是挂在数值上** —— 已验证「`degraded: true` 但数值被填成 0」（模拟修复前的伪数据）时前端**仍不展示估算**。
+
+**手工复现验证**（`js/progress.json` 是已提交文件，改完记得还原）：
+```bash
+cd <repo>
+cp js/progress.json /tmp/real.json            # 备份（或直接用 git checkout 还原）
+node scripts/monthly_progress.js --no-fetch --json /tmp/degraded.json    # 生成降级快照
+cp /tmp/degraded.json js/progress.json
+node scripts/smoke_check.js                   # 应出现 5 条「降级快照…」PASS 且整体全绿
+cp /tmp/real.json js/progress.json            # 还原
+node -e "..." # 或用 jsdom 场景化脚本：_check_degraded.js（见 CODEBUDDY.md「G. 降级闸门」）
+```
 
 ---
 
