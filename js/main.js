@@ -943,7 +943,6 @@
       // 口径（用户指定）：本月至今收益金额 ÷ 固定基准本金 50 万
       //   -1.04万 / 50万 = -2.07%（不是 ÷上月末总市值 的 -0.94%，后者仅作参考对照）
       const mtdBasePct = baseCapital > 0 ? (monthAmount / baseCapital) * 100 : 0;
-      const monthPctPrev = last.totalValue > 0 ? (estTotal / last.totalValue - 1) * 100 : 0; // 参考：÷上月末总市值
       const yearStartValue = yearStartMap[ly] || baseCapital;
       const annAmount = estTotal - yearStartValue;
       const annPct = baseCapital > 0 ? (annAmount / baseCapital) * 100 : 0;
@@ -972,8 +971,8 @@
         if (ai === 0) {
           html += `<td rowspan="6" style="font-weight:700;color:var(--color-warning,#c05600);">${liveMonth}` +
             `<div style="font-size:0.66rem;font-weight:600;opacity:0.9;">🟡 进行中</div></td>`;
-          html += `<td rowspan="6" style="color:var(--color-warning,#c05600);font-weight:600;">进行中估算` +
-            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;">月至今 MTD</div></td>`;
+          html += `<td rowspan="6" style="color:var(--color-warning,#c05600);font-weight:600;">进行中` +
+            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;">MTD 估算</div></td>`;
         }
 
         html += `<td style="text-align:left;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ASSET_COLORS[name]};margin-right:4px;"></span>${name}</td>`;
@@ -987,24 +986,22 @@
         html += `<td style="color:var(--color-text-muted);">—</td>`;
 
         if (ai === 0) {
-          html += `<td rowspan="6" style="font-weight:700;">¥${estTotal.toFixed(0)}` +
-            `<div style="font-size:0.64rem;font-weight:400;opacity:0.7;">估算</div></td>`;
-          // 月收益：月份 + 比例（÷固定基准50万）+ 金额
+          html += `<td rowspan="6" style="font-weight:700;">¥${estTotal.toFixed(0)}</td>`;
+          // 月收益：月份 + 比例（口径 = 本月金额 ÷ 固定基准 50 万）+ 金额
           html += `<td rowspan="6" class="${mCls}" style="font-weight:700;text-align:right;">` +
             `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${ly}年${lm}月 MTD</div>` +
             `${mtdBasePct >= 0 ? '+' : ''}${mtdBasePct.toFixed(2)}%` +
-            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;line-height:1.3;">${yuan(monthAmount)} · ÷50万</div>` +
-            `<div style="font-size:0.6rem;font-weight:400;opacity:0.55;line-height:1.3;">参考 ÷上月末 ${monthPctPrev >= 0 ? '+' : ''}${monthPctPrev.toFixed(2)}%</div></td>`;
+            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;line-height:1.3;">${yuan(monthAmount)}</div></td>`;
           // 累计收益：第 N 个月 + 比例 + 金额（均为估算）
           html += `<td rowspan="6" class="${cumCls}" style="font-weight:600;text-align:right;">` +
             `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">第 ${cumNo} 个月</div>` +
             `${cumPct >= 0 ? '+' : ''}${cumPct.toFixed(2)}%` +
-            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;line-height:1.3;">${yuan(cumAmount)} · 估算</div></td>`;
+            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;line-height:1.3;">${yuan(cumAmount)}</div></td>`;
           // 年度收益率：当年至今 + 比例 + 金额
           html += `<td rowspan="6" class="${annCls}" style="font-weight:600;text-align:right;">` +
-            `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${ly}年 至今</div>` +
+            `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${ly}年至今</div>` +
             `${annPct >= 0 ? '+' : ''}${annPct.toFixed(2)}%` +
-            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;line-height:1.3;">${yuan(annAmount)} · 估算</div></td>`;
+            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;line-height:1.3;">${yuan(annAmount)}</div></td>`;
           html += `<td rowspan="6" class="${posCls}" style="font-weight:600;">${positionPct.toFixed(0)}%</td>`;
         }
 
@@ -1129,7 +1126,7 @@
         <span style="color:var(--color-danger);">🟢 卖出（跌）</span>
         <span>— = 无操作</span>
         <span>偏离≥±5% → 触发调仓</span>
-        <span>收益比例口径：÷固定基准本金 ¥50 万（各段可加）</span>
+        <span>收益比例口径：÷固定基准本金 ¥50 万（进行中行亦然，故与各段收益可加）</span>
       </div>
     `;
 

@@ -25,3 +25,6 @@ scripts/_daily_cache.json
 
 # 进行中月份进度快照（monthly_progress.js 输出，每周/每交易日重新生成，时效性数据不入库）
 scripts/progress_*.md
+
+# 本地实机截图（Playwright 验证产物，不入库）
+_shot/
