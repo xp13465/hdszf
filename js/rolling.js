@@ -530,7 +530,7 @@ const RollingBacktest = (() => {
    * 导出单个回测的完整日志为CSV（每月一行，含全部6资产）
    */
   function exportLogCSV(result) {
-    const header = ['月份', '阶段', '资产', '目标比例', '月初市值(元)', '本月收益率', '月末市值(元)', '实际比例', '偏离度', '操作', '操作金额(元)', '手续费(元)', '总市值(元)', '月收益率', '月收益金额(元)', '年度收益率(%)', '年收益金额(元)', '数据状态'];
+    const header = ['月份', '阶段', '资产', '目标比例', '月初市值(元)', '本月收益率', '月末市值(元)', '实际比例', '偏离度', '操作', '操作金额(元)', '手续费(元)', '总市值(元)', '月收益率', '月收益金额(元)', '年度收益率(%)', '年收益金额(元)', '累计月份', '累计收益率(%)', '累计收益金额(元)', '数据状态'];
     const rows = [header];
 
     // 年度收益率：按日历年聚合，yearStartValue = 上一年末总市值（首年=初始资金）
@@ -551,6 +551,10 @@ const RollingBacktest = (() => {
       monthPrevMap[s.month] = (prevMonthValue === null) ? CONFIG.totalCapital : prevMonthValue;
       prevMonthValue = s.totalValue;
     }
+
+    // 累计月序：入场月 = 0，首个有收益月 = 1（与前端「第 N 个月」口径一致）
+    const monthNoMap = {};
+    result.monthlySnapshots.forEach((s, i) => { monthNoMap[s.month] = i; });
 
     for (const snap of result.monthlySnapshots) {
       const yearStartValue = yearStartMap[snap.month.substring(0, 4)] || CONFIG.totalCapital;
@@ -581,6 +585,9 @@ const RollingBacktest = (() => {
           (mAmount >= 0 ? '+' : '') + mAmount.toFixed(2),
           (annPct >= 0 ? '+' : '') + annPct.toFixed(2),
           (annAmount >= 0 ? '+' : '') + annAmount.toFixed(2),
+          (monthNoMap[snap.month] || 0),
+          ((snap.totalValue / CONFIG.totalCapital - 1) * 100 >= 0 ? '+' : '') + ((snap.totalValue / CONFIG.totalCapital - 1) * 100).toFixed(2),
+          (snap.totalValue - CONFIG.totalCapital >= 0 ? '+' : '') + (snap.totalValue - CONFIG.totalCapital).toFixed(2),
           snap.estimatedMonth ? '⚠️估计值' : '真实数据'
         ]);
       }

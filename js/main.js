@@ -837,6 +837,12 @@
       prevMonthValue = s.totalValue;
     }
 
+    // 累计月序：按时间正序编号，计「已累计的真实收益月数」
+    //   入场月（首行，无收益）= 第 0 个月；首个有收益月 = 第 1 个月；末月 = 第 N 个月（= 真实数据条数）
+    //   按正序建立映射，因此倒序展示时编号依然正确
+    const monthNoMap = {};
+    result.monthlySnapshots.forEach((s, i) => { monthNoMap[s.month] = i; });
+
     for (const snap of snapshots) {
       const phaseClass = snap.phase.includes('建仓') ? 'phase-build' : 'phase-rebalance';
       const rowSpan = 6; // 6个资产
@@ -900,10 +906,18 @@
             `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${mLabel}</div>` +
             `${mrSnap >= 0 ? '+' : ''}${mrSnap.toFixed(2)}%` +
             `<div style="font-size:0.7rem;font-weight:400;opacity:0.85;">¥${mAmount >= 0 ? '+' : ''}${Math.round(mAmount).toLocaleString()}</div></td>`;
-          // 累计收益 = (当前总市值 / 初始资金 - 1) × 100%
+          // 累计收益 = 组合「累计月序 + 累计收益率 + 累计收益金额」竖向三行
+          //   累计收益率 = (当前总市值 / 初始本金 50万 − 1) × 100%
+          //   累计收益金额 = 当前总市值 − 初始本金 50万（首行入场月为 0，自身即基准）
+          const cumNo = (snap.month in monthNoMap) ? monthNoMap[snap.month] : 0;
+          const cumLabel = cumNo === 0 ? '入场月' : `第 ${cumNo} 个月`;
           const cumReturn = (snap.totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100;
+          const cumAmount = snap.totalValue - RollingBacktest.CONFIG.totalCapital;
           const cumClass = cumReturn >= 0 ? 'action-buy' : 'action-sell';
-          tableHTML += `<td rowspan="${rowSpan}" class="${cumClass}" style="font-weight:600;">${cumReturn >= 0 ? '+' : ''}${cumReturn.toFixed(1)}%</td>`;
+          tableHTML += `<td rowspan="${rowSpan}" class="${cumClass}" style="font-weight:600;text-align:right;">` +
+            `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${cumLabel}</div>` +
+            `${cumReturn >= 0 ? '+' : ''}${cumReturn.toFixed(2)}%` +
+            `<div style="font-size:0.7rem;font-weight:400;opacity:0.85;">¥${cumAmount >= 0 ? '+' : ''}${Math.round(cumAmount).toLocaleString()}</div></td>`;
           // 年度收益率 = 对应日历年至今的「收益金额 + 收益比例」（区别于年化均值）
           // 单元格内直接标注年份，避免视线来回跳回第一列
           // 比例口径：年收益金额 ÷ 固定基准本金 50万（CONFIG.totalCapital）
