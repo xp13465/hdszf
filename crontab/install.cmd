@@ -11,8 +11,8 @@ rem ============================================================================
 set "NODE=C:\Users\23405\.workbuddy\binaries\node\versions\22.22.2-2\node.exe"
 
 set "HERE=%~dp0"
-for %%I in ("%HERE%..\..") do set "ROOT=%%~fI"
-set "RUNNER=%ROOT%\automation\win\run_job.js"
+for %%I in ("%HERE%..") do set "ROOT=%%~fI"
+set "RUNNER=%ROOT%\crontab\run_job.js"
 
 if not exist "%NODE%" (
   echo [错误] 找不到 node.exe：
@@ -61,8 +61,10 @@ echo      "%NODE%" "%RUNNER%" mtd --no-status -- --no-json
 echo   1b) 想让今天的数据真实上线（会更新并推送）：
 echo      "%NODE%" "%RUNNER%" mtd --force
 echo   2) 查看健康报告：
-echo      %ROOT%\automation\win\status.cmd
-echo   3) 若电脑会关机/睡眠，可保持「仅在使用计算机时运行」；错过的时间点由
+echo      %ROOT%\crontab\status.cmd
+echo   3) 不想装计划任务？手动跑法与频率见 crontab\README.md 第 3 节
+echo      （每交易日 node crontab\run_job.js mtd --force；每月 node crontab\run_job.js finalize --force）
+echo   4) 若电脑会关机/睡眠，可保持「仅在使用计算机时运行」；错过的时间点由
 echo      运行器每小时唤醒 + 自带闸门自动补跑。
 echo.
 pause

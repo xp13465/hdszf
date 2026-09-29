@@ -6,11 +6,11 @@
  * 因此计划任务可以放心地高频触发（错过就补跑），不会重复提交、不会重复部署。
  *
  * 用法：
- *   node automation/win/run_job.js mtd                     # 本月至今（MTD）快照 → progress.json
- *   node automation/win/run_job.js finalize                # 月度定稿固化 → data.js 等全流程
- *   node automation/win/run_job.js finalize --force        # 忽略「本月已成功」闸门，强制重跑
- *   node automation/win/run_job.js mtd --no-status         # 诊断用：不写 status.json（不污染真实状态）
- *   node automation/win/run_job.js mtd -- --no-fetch       # 「--」后的参数原样透传给子脚本
+ *   node crontab/run_job.js mtd                     # 本月至今（MTD）快照 → progress.json
+ *   node crontab/run_job.js finalize                # 月度定稿固化 → data.js 等全流程
+ *   node crontab/run_job.js finalize --force        # 手动补跑：忽略全部软闸门（含时间窗口），并逐条打印警告
+ *   node crontab/run_job.js mtd --no-status         # 诊断用：不写 status.json（不污染真实状态）
+ *   node crontab/run_job.js mtd -- --no-fetch       # 「--」后的参数原样透传给子脚本
  *
  * 退出码：0 = 成功或按设计跳过；2 = 取数降级（无数据可发布，属正常告警）；其它 = 真失败
  *
@@ -28,7 +28,7 @@ const fs = require('fs');
 const path = require('path');
 const { execFileSync, spawnSync } = require('child_process');
 
-const ROOT = path.resolve(__dirname, '..', '..');
+const ROOT = path.resolve(__dirname, '..');
 // 日志与状态一律放在**仓库之外**：仓库目录是 Cloudflare Assets 的发布根，
 // 放进去会被公开上传、还会污染 git。可用 HDSZF_LOG_DIR 覆盖（测试/迁移用）。
 const LOG_DIR = process.env.HDSZF_LOG_DIR
@@ -59,6 +59,9 @@ const JOBS = {
     attemptsPerDay: 1,      // 每天只试一次，失败次日自动重试（整月循环，直到成功）
     oncePer: 'month',       // 当月成功一次即不再跑
     revertOnFailure: true,
+    // 定稿内部是 `git add -A` + commit：工作区脏会把**人工改动一起裹进「数据更新」提交并上线**。
+    // 所以定稿前置条件 = 工作区干净（mtd 只 `git add -- js/progress.json`，无需此约束）。
+    requireCleanTree: true,
   },
 };
 
@@ -146,21 +149,41 @@ function selfHealPush() {
 }
 
 // ---------------------------------------------------------------- 闸门
+// 软闸门 = 可被人为忽略的「时机约束」（时间窗口 / 月初余量 / 周末 / 已成功 / 次数上限）。
+// --force 会忽略**全部**软闸门（供手动补跑），但会逐条打印警告 —— 因为忽略时间窗意味着
+// 可能取到上一交易日的收盘，读者必须知道自己在看什么。
+// 计划任务注册的命令**不带 --force**，所以无人值守时的保护完全不受影响。
+const SOFT_WARNINGS = [];
 function gateReason(job, cfg, st) {
   const now = new Date();
   const s = st[job] || {};
+  const hit = [];
+
   if (cfg.minDayOfMonth && now.getDate() < cfg.minDayOfMonth) {
-    return `月初前 ${cfg.minDayOfMonth - 1} 天不跑（给上月末行情留发布余量），今天 ${now.getDate()} 号`;
+    hit.push(`月初前 ${cfg.minDayOfMonth - 1} 天不跑（给上月末行情留发布余量），今天 ${now.getDate()} 号`);
   }
-  if (cfg.weekdaysOnly && (now.getDay() === 0 || now.getDay() === 6)) return '周末休市，不跑';
-  if (cfg.windowFromHour && now.getHours() < cfg.windowFromHour) return `未到时间窗口（${cfg.windowFromHour}:00 之后才跑）`;
+  if (cfg.weekdaysOnly && (now.getDay() === 0 || now.getDay() === 6)) {
+    hit.push('周末休市，不跑');
+  }
+  if (cfg.windowFromHour && now.getHours() < cfg.windowFromHour) {
+    const hh = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    hit.push(
+      `未到时间窗口（${cfg.windowFromHour}:00 之后才跑；当前 ${hh}，` +
+      `新浪日 K 尚未更新，取到的可能是上一交易日收盘）`
+    );
+  }
   if (!FORCE) {
-    if (cfg.oncePer === 'day' && s.last_ok_date === dayKey(now)) return '今天已成功更新过，无需重跑';
-    if (cfg.oncePer === 'month' && s.last_ok_month === monthKey(now)) return '本月已成功定稿过，无需重跑';
+    if (cfg.oncePer === 'day' && s.last_ok_date === dayKey(now)) hit.push('今天已成功更新过，无需重跑');
+    if (cfg.oncePer === 'month' && s.last_ok_month === monthKey(now)) hit.push('本月已成功定稿过，无需重跑');
     if (s.attempt_date === dayKey(now) && (s.attempts_today || 0) >= cfg.attemptsPerDay) {
-      return `今日尝试次数用尽（${s.attempts_today}/${cfg.attemptsPerDay}），明天再试`;
+      hit.push(`今日尝试次数用尽（${s.attempts_today}/${cfg.attemptsPerDay}），明天再试`);
     }
   }
+
+  if (!hit.length) return null;
+  if (!FORCE) return hit[0];
+  SOFT_WARNINGS.length = 0;
+  hit.forEach((h) => SOFT_WARNINGS.push(h));
   return null;
 }
 
@@ -182,13 +205,17 @@ function main() {
     console.log(`
 恒市值助手 · 无人值守运行器
 
-  node automation/win/run_job.js mtd                 本月至今（MTD）快照（每交易日 18:00 后）
-  node automation/win/run_job.js finalize            月度定稿固化（每月 3 日起，成功一次即停）
-  node automation/win/run_job.js <job> --force       忽略「已成功」闸门，强制重跑
-  node automation/win/run_job.js <job> --no-status   诊断用：不改动 status.json
-  node automation/win/run_job.js <job> -- <args...>  透传参数给子脚本（如 -- --no-fetch）
+  node crontab/run_job.js mtd                 本月至今（MTD）快照（每交易日 18:00 后）
+  node crontab/run_job.js finalize            月度定稿固化（每月 3 日起，成功一次即停）
+  node crontab/run_job.js <job> --force       手动补跑：忽略**全部**软闸门（时间窗口 / 已成功 / 次数上限），并逐条打印警告
+  node crontab/run_job.js <job> --no-status   诊断用：不改动 status.json
+  node crontab/run_job.js <job> -- <args...>  透传参数给子脚本（如 -- --no-fetch）
 
-  健康检查：node automation/win/status.js
+  手动模式：不装计划任务时，自己按频率跑这两条命令即可（--force 会连时间窗口一起忽略，
+  所以可以在任何时间点手动补跑；但早于 18:00 跑 mtd 取到的可能是上一交易日收盘）。
+  手动模式下没有「已成功即跳过」之外的兜底，失败也不会有人通知你 —— 跑完请看上面的 exit。
+
+  健康检查：node crontab/status.js
   日志目录：${LOG_DIR}
 `);
     return 0;
@@ -212,6 +239,20 @@ function main() {
     log(`[${stamp()}] 按设计跳过：${reason}`);
     flush(JOB_NAME);
     return 0; // 跳过不是失败：计划任务每小时都会唤醒，静默跳过即可
+  }
+  if (SOFT_WARNINGS.length) {
+    log(`[${stamp()}] ⚠ --force 手动补跑：已忽略以下软闸门（自动化的默认保护本次不生效）`);
+    SOFT_WARNINGS.forEach((h) => log(`    ⚠ ${h}`));
+  }
+
+  // 硬闸门（--force 也不绕过）：定稿用 git add -A 提交，脏工作区会把人工改动裹进「数据更新」一起上线。
+  // 这是安全性约束，不是时机约束 —— 手动补跑同样必须先 commit / stash。
+  if (cfg.requireCleanTree && !treeClean()) {
+    log(`[${stamp()}] 按设计跳过：工作区有未提交改动`);
+    log('    · 原因：定稿内部用 git add -A 提交，脏工作区会把你的改动一起裹进「数据更新」提交并上线');
+    log('    · 处置：先 git commit 或 git stash 你的改动，再重跑本任务');
+    flush(JOB_NAME);
+    return 0;
   }
 
   // 记录尝试次数（先写盘，防止运行中途被强制结束导致计数丢失）

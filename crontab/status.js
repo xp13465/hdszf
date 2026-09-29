@@ -5,10 +5,10 @@
  * 一条命令看清「计划任务有没有在跑、数据有没有跟上、线上有没有更新」。
  *
  * 用法：
- *   node automation/win/status.js                # 完整报告
- *   node automation/win/status.js --online       # additionally 核对线上版本号与数据截止月
- *   node automation/win/status.js --tail=30      # 每个任务多打几行日志
- *   node automation/win/status.js --no-tasks     # 不调用 schtasks（沙箱/无权限时用）
+ *   node crontab/status.js                # 完整报告
+ *   node crontab/status.js --online       # additionally 核对线上版本号与数据截止月
+ *   node crontab/status.js --tail=30      # 每个任务多打几行日志
+ *   node crontab/status.js --no-tasks     # 不调用 schtasks（沙箱/无权限时用）
  *
  * 只读脚本：不修改任何文件、不执行任何写操作、不产生提交。
  */
@@ -19,7 +19,7 @@ const path = require('path');
 const vm = require('vm');
 const { execFileSync, spawnSync } = require('child_process');
 
-const ROOT = path.resolve(__dirname, '..', '..');
+const ROOT = path.resolve(__dirname, '..');
 // 日志与状态一律放在**仓库之外**：仓库目录是 Cloudflare Assets 的发布根，
 // 放进去会被公开上传、还会污染 git。可用 HDSZF_LOG_DIR 覆盖（测试/迁移用）。
 const LOG_DIR = process.env.HDSZF_LOG_DIR
@@ -108,7 +108,7 @@ function tailLog(job, n) {
   if (!st) {
     console.log(`${WARN}还没有 ${STATUS_FILE}`);
     console.log('   说明运行器从未成功执行过 → 请先确认计划任务已注册并至少跑过一次：');
-    console.log(`   node automation/win/run_job.js mtd --no-status   ${C.d}（手工试跑，不改状态）${C.x}`);
+    console.log(`   node crontab/run_job.js mtd --no-status   ${C.d}（手工试跑，不改状态）${C.x}`);
   } else {
     console.log(`记录文件：${STATUS_FILE}   最后更新：${st.updated_at}`);
     for (const job of ['mtd', 'finalize']) {
@@ -142,7 +142,7 @@ function tailLog(job, n) {
       const t = taskInfo(name);
       if (t.err) {
         console.log(`${BAD} ${padEnd(name, 16)} ${t.err}`);
-        console.log(`   ${C.d}注册命令见 automation/win/install.cmd${C.x}`);
+        console.log(`   ${C.d}注册命令见 crontab/install.cmd${C.x}`);
       } else {
         console.log(`${OK} ${padEnd(name, 16)} 状态=${t.state}  上次=${t.last}  结果=${t.lastResult}  下次=${t.next}`);
         if (t.state === 'Disabled' || t.state === '已禁用') console.log(`   ${WARN}任务被禁用 → 用 schtasks /change /tn ${name} /enable 重新启用`);
@@ -230,7 +230,7 @@ function tailLog(job, n) {
   // ---------------------------------------------------------------- 结论
   h('结论');
   const problems = [];
-  if (!st) problems.push('运行器从未执行 → 检查计划任务是否注册（automation/win/install.cmd）');
+  if (!st) problems.push('运行器从未执行 → 检查计划任务是否注册（crontab/install.cmd）');
   else {
     for (const job of ['mtd', 'finalize']) {
       const s = st[job] || {};
@@ -248,6 +248,6 @@ function tailLog(job, n) {
     console.log(`${C.d}提示：加 --online 可一并核对线上是否已部署最新版本${C.x}`);
   } else {
     problems.forEach((p) => console.log(`${WARN}${p}`));
-    console.log(`${C.d}处置方法见 automation/win/README.md 的「故障处置」一节${C.x}`);
+    console.log(`${C.d}处置方法见 crontab/README.md 的「故障处置」一节${C.x}`);
   }
 })();

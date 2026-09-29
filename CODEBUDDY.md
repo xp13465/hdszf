@@ -47,8 +47,7 @@ investment-advisor/
 │   ├── monthly_progress.js  # 本月至今（MTD）快照 → js/progress.json
 │   ├── smoke_check.js       # 72 项断言自检（发布闸门）
 │   └── generate_og_image.py # OG 预览图生成脚本（Python+Pillow）
-├── automation/
-│   └── win/                 # 纯脚本自动化（Windows 计划任务，零 AI 依赖）→ 见 §七
+├── crontab/                 # 纯脚本自动化（Windows 计划任务 + 手动模式，零 AI 依赖）→ 见 §七
 ├── sitemap.xml             # 站点地图（提交到 Google/Bing）
 ├── robots.txt              # 爬虫规则
 ├── .gitignore              # 含 .playwright-cli/ 排除
@@ -150,19 +149,25 @@ investment-advisor/
 ### 数据自动更新（纯脚本 · Windows 计划任务，零 AI 依赖）
 
 > **2026-09-29 起**：数据更新与月度固化**不再依赖 AI / WorkBuddy 会话**，改由本机 Windows 计划任务驱动。
-> 完整文档（安装命令 / 查看清单 / 维护方法 / 故障处置）见 **`automation/win/README.md`**。
+> 完整文档（安装命令 / **手动跑法与频率** / 查看清单 / 维护方法 / 故障处置）见 **`crontab/README.md`**。
+> 不装计划任务也能用：手动每交易日跑 `node crontab/run_job.js mtd --force`、每月跑 `node crontab/run_job.js finalize --force`
+> （`--force` = 手动补跑模式：忽略时间窗口等**软闸门**并逐条打印警告，可在任意时间点执行）。详见 README 第 3 节。
 
 | 计划任务 | 触发 | 执行 | 频率 |
 |---|---|---|---|
-| `hdszf-mtd` | 每天 18:00–23:59 每小时唤醒 | `node automation/win/run_job.js mtd` → `monthly_progress.js --push` | 每交易日 1 次 |
-| `hdszf-finalize` | 每天 09:00–23:59 每小时唤醒 | `node automation/win/run_job.js finalize` → `monthly_update.js --strict` | 每月 1 次（3 日起） |
+| `hdszf-mtd` | 每天 18:00–23:59 每小时唤醒 | `node crontab/run_job.js mtd` → `monthly_progress.js --push` | 每交易日 1 次 |
+| `hdszf-finalize` | 每天 09:00–23:59 每小时唤醒 | `node crontab/run_job.js finalize` → `monthly_update.js --strict` | 每月 1 次（3 日起） |
 
 **关键设计（改动前必读）**
-- 运行器 `automation/win/run_job.js` 自带闸门：**当天/当月成功一次后立即跳过**，因此可以高频唤醒（错过就补跑）而不会重复提交、重复部署。
+- 运行器 `crontab/run_job.js` 自带闸门：**当天/当月成功一次后立即跳过**，因此可以高频唤醒（错过就补跑）而不会重复提交、重复部署。
 - 时段选择有业务含义：MTD 排在 **18:00 之后**（A 股 15:00 收盘、新浪日 K 傍晚更新，早跑会取到昨日收盘）；定稿排在 **每月 3 日之后**（给上月末最后一个交易日留发布余量）。**不要随意把时间提前。**
 - 运行器只决定「何时跑、跑了记什么」，**不产出任何数值**；「月未走完不更新」仍由 `monthly_update.js` 自己把住（未走完 → exit 0）。
 - **日志与状态写在仓库之外**（`<工作区>\_hdszf_logs\`）：仓库根是 Cloudflare Assets 发布目录，放进去会被公开上传并污染 git。可用 `HDSZF_LOG_DIR` 覆盖。
-- **失败自动回滚**：定稿失败若留下未提交改动，自动 `git checkout -- .` 还原成「什么都没发生」；定稿前工作区本来就不干净则跳过本次（绝不把人工改动裹进自动提交）。
+- **定稿前置：工作区必须干净（硬闸门，`--force` 也不绕过）**：定稿内部是 `git add -A` + commit，脏工作区会把人工改动
+  一起裹进「数据更新」提交并 push 上线 → 运行器检测到不干净就**跳过并提示先 commit/stash**。
+  ⚠️ 绕过运行器直跑 `scripts/monthly_update.js` 时**没有这道保护**，务必自己先确认 `git status` 为空
+  （`monthly_progress.js` 无此风险：只 `git add -- js/progress.json` 单文件）。
+- **失败自动回滚**：定稿失败若留下未提交改动，自动 `git checkout -- .` 还原成「什么都没发生」，避免半成品被下次运行继续加工。
 - **自愈推送**：每次运行前比对本地 HEAD 与远程 tip，本地领先就先补推，防止上次 push 失败后静默卡住。
 - 退出码语义：`0` 成功或按设计跳过；`2` 降级（按铁律不写入不推送，站点回退已定稿口径）；其它为真失败。
 - ⚠️ WorkBuddy 里的两条旧自动化（每月 3 日 / 每周一）与本方案**功能重叠**，启用本方案后应停用，避免同一天两处同时 push。
@@ -462,7 +467,7 @@ investment-advisor/
 
 **自动化（每交易日跑，不进主数据）**：`node scripts/monthly_progress.js --push`
 → 更新 `js/progress.json` → 有变化才 commit + push → CF 自动部署 → 首屏与滚动板块的「本月至今」表面同步刷新。
-> 调度方式自 2026-09-29 起改为**本机 Windows 计划任务（纯脚本、零 AI 依赖）**，见 §七「数据自动更新」与 `automation/win/README.md`。
+> 调度方式自 2026-09-29 起改为**本机 Windows 计划任务（纯脚本、零 AI 依赖）**，见 §七「数据自动更新」与 `crontab/README.md`。
 
 ---
 
