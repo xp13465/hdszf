@@ -705,6 +705,7 @@
     const modal = document.getElementById('log-modal');
     const closeBtn = document.getElementById('log-modal-close');
     const closeBtn2 = document.getElementById('btn-log-modal-close');
+    const maximizeBtn = document.getElementById('btn-log-modal-maximize');
     const exportLogBtn = document.getElementById('btn-export-log-csv');
     const exportSummaryBtn = document.getElementById('btn-export-summary-csv');
 
@@ -717,12 +718,26 @@
 
     function closeModal() {
       modal.style.display = 'none';
+      const box = modal.querySelector('.log-modal-content');
+      if (box && box.classList.contains('maximized')) {
+        box.classList.remove('maximized');
+        if (maximizeBtn) { maximizeBtn.textContent = '⤢'; maximizeBtn.title = '放大 / 还原窗口'; }
+      }
     }
 
     closeBtn?.addEventListener('click', closeModal);
     closeBtn2?.addEventListener('click', closeModal);
     modal?.addEventListener('click', function(e) {
       if (e.target === modal) closeModal();
+    });
+
+    // 放大 / 还原窗口（最大化接近全屏）
+    maximizeBtn?.addEventListener('click', function() {
+      const box = modal.querySelector('.log-modal-content');
+      if (!box) return;
+      const on = box.classList.toggle('maximized');
+      maximizeBtn.textContent = on ? '⤡' : '⤢';
+      maximizeBtn.title = on ? '还原窗口' : '放大 / 还原窗口';
     });
 
     // 导出CSV — 授权拦截逻辑统一在 initAuthGate() 中实现
