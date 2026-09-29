@@ -853,8 +853,10 @@
         // 月初市值
         tableHTML += `<td>¥${ad.holdingBefore.toFixed(0)}</td>`;
 
-        // 月收益率
-        const mr = (ad.monthReturn?.value || ad.monthReturn || 0) * 100;
+        // 月收益率（monthReturn 可能是对象{value,estimated}或数字；value 为 0 时不能用 || 兜底，否则得 NaN）
+        const mrObj = ad.monthReturn;
+        const mrVal = (mrObj && typeof mrObj === 'object') ? (mrObj.value || 0) : (mrObj || 0);
+        const mr = mrVal * 100;
         const mrClass = mr > 0 ? 'action-buy' : (mr < 0 ? 'action-sell' : '');
         tableHTML += `<td class="${mrClass}">${mr >= 0 ? '+' : ''}${mr.toFixed(2)}%</td>`;
 
@@ -889,10 +891,13 @@
           tableHTML += `<td rowspan="${rowSpan}" class="${cumClass}" style="font-weight:600;">${cumReturn >= 0 ? '+' : ''}${cumReturn.toFixed(1)}%</td>`;
           // 年度收益率 = 对应日历年至今的「收益金额 + 收益比例」（区别于年化均值）
           // 单元格内直接标注年份，避免视线来回跳回第一列
+          // 比例口径：年收益金额 ÷ 固定基准本金 50万（CONFIG.totalCapital）
+          //   → 各年比例可加，逐年累加恰好等于「累计收益」；与"÷上年末总市值"的复合口径不同。
           const annYear = snap.month.substring(0, 4);
           const yearStartValue = yearStartMap[annYear] || RollingBacktest.CONFIG.totalCapital;
           const annAmount = snap.totalValue - yearStartValue;
-          const annPct = yearStartValue > 0 ? (annAmount / yearStartValue) * 100 : 0;
+          const baseCapital = RollingBacktest.CONFIG.totalCapital || 500000;
+          const annPct = baseCapital > 0 ? (annAmount / baseCapital) * 100 : 0;
           const annClass = annAmount >= 0 ? 'action-buy' : 'action-sell';
           tableHTML += `<td rowspan="${rowSpan}" class="${annClass}" style="font-weight:600;text-align:right;">` +
             `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${annYear}年</div>` +

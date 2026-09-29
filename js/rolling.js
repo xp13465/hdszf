@@ -547,18 +547,22 @@ const RollingBacktest = (() => {
     for (const snap of result.monthlySnapshots) {
       const yearStartValue = yearStartMap[snap.month.substring(0, 4)] || CONFIG.totalCapital;
       const annAmount = snap.totalValue - yearStartValue;
-      const annPct = yearStartValue > 0 ? (annAmount / yearStartValue) * 100 : 0;
+      // 年度收益率口径与前端一致：年收益金额 ÷ 固定基准本金（区别于 ÷上年末总市值的复合口径）
+      const annPct = CONFIG.totalCapital > 0 ? (annAmount / CONFIG.totalCapital) * 100 : 0;
       for (const ad of snap.assetDetails) {
+        // monthReturn 可能为对象{value,estimated}或数字；value 为 0 时不能用 || 兜底（会得 NaN）
+        const mrObj = ad.monthReturn;
+        const mrVal = (mrObj && typeof mrObj === 'object') ? (mrObj.value || 0) : (mrObj || 0);
         rows.push([
           snap.month,
           snap.phase,
           ad.asset,
           (ad.targetPct * 100).toFixed(0) + '%',
           ad.holdingBefore.toFixed(2),
-          ((ad.monthReturn?.value || ad.monthReturn || 0) * 100).toFixed(2) + '%',
+          (mrVal * 100).toFixed(2) + '%',
           ad.holdingAfter.toFixed(2),
           (ad.actualPct * 100).toFixed(2) + '%',
-          (ad.deviation * 100).toFixed(2) + '%',
+          ((ad.deviationFromTarget || 0) * 100).toFixed(2) + '%',
           ad.action,
           ad.amount > 0 ? ad.amount.toFixed(2) : '-',
           ad.fee > 0 ? ad.fee.toFixed(2) : '-',
