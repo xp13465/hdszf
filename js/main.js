@@ -888,11 +888,14 @@
           const cumClass = cumReturn >= 0 ? 'action-buy' : 'action-sell';
           tableHTML += `<td rowspan="${rowSpan}" class="${cumClass}" style="font-weight:600;">${cumReturn >= 0 ? '+' : ''}${cumReturn.toFixed(1)}%</td>`;
           // 年度收益率 = 对应日历年至今的「收益金额 + 收益比例」（区别于年化均值）
-          const yearStartValue = yearStartMap[snap.month.substring(0, 4)] || RollingBacktest.CONFIG.totalCapital;
+          // 单元格内直接标注年份，避免视线来回跳回第一列
+          const annYear = snap.month.substring(0, 4);
+          const yearStartValue = yearStartMap[annYear] || RollingBacktest.CONFIG.totalCapital;
           const annAmount = snap.totalValue - yearStartValue;
           const annPct = yearStartValue > 0 ? (annAmount / yearStartValue) * 100 : 0;
           const annClass = annAmount >= 0 ? 'action-buy' : 'action-sell';
           tableHTML += `<td rowspan="${rowSpan}" class="${annClass}" style="font-weight:600;text-align:right;">` +
+            `<span style="font-size:0.72rem;font-weight:500;opacity:0.7;margin-right:3px;">${annYear}年</span>` +
             `${annPct >= 0 ? '+' : ''}${annPct.toFixed(2)}%` +
             `<div style="font-size:0.7rem;font-weight:400;opacity:0.85;">¥${annAmount >= 0 ? '+' : ''}${Math.round(annAmount).toLocaleString()}</div></td>`;
           // 仓位占比 = 排除现金后的权益 / 总市值
