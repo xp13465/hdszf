@@ -120,8 +120,9 @@ check('12起点全真实数据(无估计泄漏)', floorOk,
   estLeak ? estLeak : '');
 
 // ---- 7) 进行中月份进度快照（js/progress.json）不得污染主回测 ----
-// 该文件只服务站内「进行中月份」区块（只读展示），其月份必须尚未进入 data.js 主数据；
-// 一旦"进行中月"出现在 months 里，说明月度定稿已完成，快照文件应立即被重写/清理。
+// 该文件只服务站内『完整持仓日志』末行的「进行中(MTD)」追加行（只读展示），
+// 其月份必须尚未进入 data.js 主数据；一旦"进行中月"出现在 months 里，
+// 说明月度定稿已完成，快照文件应立即被重写/清理。
 const PROG = path.join(ROOT, 'js/progress.json');
 if (fs.existsSync(PROG)) {
   let p = null;
@@ -136,9 +137,28 @@ if (fs.existsSync(PROG)) {
     check('progress.json 资产行数与 fund_map 一致',
       Array.isArray(p.assets) && p.assets.length === Object.keys(JSON.parse(read('scripts/fund_map.json')).assets).length + 1,
       `assets=${p.assets && p.assets.length}（应为风险资产数+现金1行）`);
+
+    // 前端 buildLiveRows 是按「资产名」匹配 MTD 的，名称不一致会静默按 0% 处理 → 必须逐字校验
+    const mainAssets = (read('js/main.js').match(/const ASSETS = \[([^\]]+)\]/) || [, ''])
+      .slice(1).join('')
+      .split(',').map(s => s.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+    check('progress.json 资产名与 main.js ASSETS 逐字一致',
+      Array.isArray(p.assets) && mainAssets.length > 0 &&
+      p.assets.length === mainAssets.length && mainAssets.every(n => p.assets.some(a => a.name === n)),
+      `main.js=[${mainAssets.join('/')}] progress=[${(p.assets || []).map(a => a.name).join('/')}]`);
+
+    // 前端仅在「基准月 = 日志末月」时才追加进行中行 → 基准月漂移会导致该行整体消失
+    check('progress.json 基准月=主数据末月', p.base_month === rr.months[rr.months.length - 1],
+      `base_month=${p.base_month} months末位=${rr.months[rr.months.length - 1]}`);
+
+    // 口径红线：本月至今比例的分母必须是「固定基准本金 50 万」，不是上月末总市值
+    const impliedBasePct = p.base_capital ? (p.est_change_amount / p.base_capital) * 100 : 0;
+    check('progress.json 本月至今比例=收益金额÷固定基准50万',
+      Math.abs((p.est_change_pct_base || 0) - impliedBasePct) < 0.05,
+      `est_change_pct_base=${p.est_change_pct_base} 应为 ${impliedBasePct.toFixed(2)}（禁止用上月末总市值作分母）`);
   }
 } else {
-  check('progress.json 存在（站点进行中区块数据源）', true, '未生成，站点该区块将自动隐藏（非致命）');
+  check('progress.json 存在（站点日志「进行中行」数据源）', true, '未生成，日志将不含进行中行（非致命）');
 }
 
 console.log(failures === 0 ? '\n全部通过 ✓' : `\n${failures} 项失败 ✗`);

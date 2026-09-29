@@ -346,8 +346,8 @@
     // 滚动回测
     initRollingBacktest();
 
-    // 进行中月份进度快照（只读展示，非完整月估算，不参与官方指标）
-    initLiveProgress();
+    // 进行中月份进度快照（只读展示，末行追加到完整持仓日志，不参与官方指标）
+    ensureLiveProgress();
 
     // 分享图生成按钮
     if (typeof ShareImage !== 'undefined') {
@@ -707,80 +707,48 @@
   // ============================================================
   //  进行中月份进度快照（数据源 js/progress.json）
   //  ⚠️ 只读展示：绝不写入 APP_DATA、绝不参与任何回测指标计算。
-  //     取不到数据或非"进行中"状态 → 整块隐藏，静默降级。
+  //     展示位置：『完整持仓日志』表格末尾（正序）/ 开头（倒序）追加一行
+  //     「进行中(MTD 估算)」，按该次回测自身的末月持仓 × 各资产 MTD 推算。
+  //     取不到数据 / 非进行中 / 基准月与日志末月不符 → 不追加，静默降级。
   //     正式月末定稿仍由 scripts/monthly_update.js 写入 data.js 主回测。
   // ============================================================
-  function initLiveProgress() {
-    const section = document.getElementById('live-progress');
-    const tbody = document.getElementById('live-tbody');
-    if (!section || !tbody) return;
+  let liveProgressData = null;
+  let liveProgressPromise = null;
 
-    // 10 分钟粒度的查询参数：兼顾新鲜度与缓存友好（配合 worker.js 的短缓存头）
-    const bust = Math.floor(Date.now() / 600000);
-    fetch(`js/progress.json?t=${bust}`, { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!d || !d.in_progress || !Array.isArray(d.assets) || !d.assets.length) return;
-        renderLiveProgress(d, section, tbody);
-      })
-      .catch(() => { /* 静默降级：保持隐藏，不影响任何既有功能 */ });
+  // 主回测数据末月（= 日志表格最后一个完整月），用于判断进度快照是否与之同步
+  function lastDataMonth() {
+    try {
+      const m = (typeof APP_DATA !== 'undefined' && APP_DATA.realReturns && APP_DATA.realReturns.months) || null;
+      return (m && m.length) ? m[m.length - 1] : null;
+    } catch (e) { return null; }
   }
 
-  function liveFmtMoney(v) {
-    const a = Math.abs(v);
-    return a >= 10000 ? (v / 10000).toFixed(2) + '万' : Math.round(v).toLocaleString('zh-CN');
+  function ensureLiveProgress() {
+    if (!liveProgressPromise) {
+      // 10 分钟粒度的查询参数：兼顾新鲜度与缓存友好（配合 worker.js 的短缓存头）
+      const bust = Math.floor(Date.now() / 600000);
+      liveProgressPromise = fetch(`js/progress.json?t=${bust}`, { cache: 'no-store' })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (!d || !d.in_progress || !Array.isArray(d.assets) || !d.assets.length) return null;
+          liveProgressData = d;
+          // 只在「快照基准月 == 主数据末月」时提示（此时日志里才会真的多出「进行中行」）
+          if (!d.base_month || d.base_month === lastDataMonth()) markLiveBadges(d);
+          return d;
+        })
+        .catch(() => null); // 静默降级：不影响任何既有功能
+    }
+    return liveProgressPromise;
   }
 
-  function renderLiveProgress(d, section, tbody) {
-    const [yy, mm] = String(d.in_progress_month || '').split('-');
-    const [by, bm] = String(d.base_month || '').split('-');
-    const pct = Number(d.est_change_pct_base) || 0;
-    const amt = Number(d.est_change_amount) || 0;
-    const cum = Number(d.cum_return_pct_base) || 0;
-
-    const titleEl = document.getElementById('live-title');
-    const subEl = document.getElementById('live-sub');
-    const valEl = document.getElementById('live-value');
-    const deltaEl = document.getElementById('live-delta');
-    const noteEl = document.getElementById('live-note');
-
-    if (titleEl) titleEl.textContent = `${yy}年${parseInt(mm, 10)}月 · 组合进度快照`;
-    if (subEl) {
-      subEl.textContent =
-        `数据截至 ${d.data_as_of || '—'}（本月最后交易日收盘） · ` +
-        `月初基准 ${by}年${parseInt(bm, 10)}月 ¥${liveFmtMoney(d.base_total || 0)} · ` +
-        `基准本金 ¥${liveFmtMoney(d.base_capital || 500000)} → 累计 ${cum >= 0 ? '+' : ''}${cum.toFixed(2)}%`;
-    }
-    if (valEl) valEl.textContent = '¥' + liveFmtMoney(d.est_total || 0);
-    if (deltaEl) {
-      // 涨红跌绿（A股习惯）：亏损用 down 类
-      deltaEl.className = 'live-metric-delta ' + (amt >= 0 ? 'up' : 'down');
-      deltaEl.innerHTML =
-        `本月至今 ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%` +
-        `<br><span style="font-weight:400;font-size:0.76rem;">${amt >= 0 ? '+' : '-'}¥${liveFmtMoney(Math.abs(amt))}（÷固定基准50万）</span>`;
-    }
-
-    tbody.innerHTML = d.assets.map((a) => {
-      const m = Number(a.mtd) || 0;
-      const cls = m > 0 ? 'cell-up' : (m < 0 ? 'cell-down' : '');
-      return `<tr>
-        <td>${a.name}</td>
-        <td class="${cls}">${m >= 0 ? '+' : ''}${m.toFixed(2)}%</td>
-        <td>¥${liveFmtMoney(a.base_holding || 0)}</td>
-        <td>¥${liveFmtMoney(a.est_value || 0)}</td>
-      </tr>`;
-    }).join('');
-
-    if (noteEl) {
-      const fail = d.fetch && d.fetch.fail ? Number(d.fetch.fail) : 0;
-      noteEl.innerHTML =
-        `⚠️ 本月尚未结束，以上为<strong>月至今(MTD)</strong>估算，仅供进度参考，` +
-        `<strong>不计入</strong>下方任何官方回测指标（年化 / 回撤 / 胜率等仍截至 ${by}年${parseInt(bm, 10)}月）。` +
-        `收益比例统一按<strong>固定基准 ¥50 万</strong>口径计算，与站内各收益列一致。` +
-        `快照生成于 ${d.generated_at || '—'}${d.degraded ? '（⚠️ 本次取数降级，数值不可用）' : (fail ? `（${fail} 个资产取数降级）` : '')}`;
-    }
-
-    section.style.display = '';
+  // 滚动汇总表里每个「查看操作记录」按钮打上 🟡 角标，提示日志内含进行中数据
+  // 用 body 级 class + CSS 伪元素实现（而非逐个按钮加 class），
+  // 这样"先取到进度、后渲染按钮"或"重算后重建按钮"都不会丢角标
+  function markLiveBadges(d) {
+    document.body.classList.add('has-live-progress');
+    document.querySelectorAll('.btn-detail').forEach((b) => {
+      b.title = `${d.in_progress_month} 尚在进行中（MTD 估算），已追加为日志末行`;
+    });
   }
 
   function initLogModal() {
@@ -831,6 +799,9 @@
       }
     });
   }
+
+  // 日志渲染轮次标记：异步补齐「进行中月份行」时用于防止插到过期的渲染上
+  let logRenderToken = 0;
 
   function showLogDetail(result, index) {
     const modal = document.getElementById('log-modal');
@@ -919,11 +890,129 @@
       prevMonthValue = s.totalValue;
     }
 
-    // 累计月序：按时间正序编号，计「已累计的真实收益月数」
-    //   入场月（首行，无收益）= 第 0 个月；首个有收益月 = 第 1 个月；末月 = 第 N 个月（= 真实数据条数）
+    // 累计月序：按时间正序编号，**入场月即第 1 个月**
+    //   入场月（2015-08，无收益）= 第 1 个月；末月 = 第 N 个月（N = 快照条数）
     //   按正序建立映射，因此倒序展示时编号依然正确
     const monthNoMap = {};
-    result.monthlySnapshots.forEach((s, i) => { monthNoMap[s.month] = i; });
+    result.monthlySnapshots.forEach((s, i) => { monthNoMap[s.month] = i + 1; });
+
+    const SEP_ROW = '<tr class="month-separator"><td colspan="16" style="padding:0;border:none;height:4px;background:var(--color-bg);"></td></tr>';
+
+    // ============================================================
+    //  进行中月份行（MTD 估算）—— 追加到日志末行，数据源 js/progress.json
+    //  口径：
+    //    · 各资产「估算现值」= 该次回测末月持仓 × (1 + 该资产本月至今 MTD%)
+    //      （progress.json 只提供 MTD%，持仓取本次回测自身，因此任意起点都能自洽）
+    //    · 收益比例一律 ÷ 固定基准本金 50 万（与「累计收益」「年度收益率」两列同口径）
+    //    · 无操作（恒市值法在月末才调仓，进行中不产生任何买卖）
+    //  ⚠️ 仅供进度参考，不参与任何官方回测指标（年化/回撤/胜率仍截至基准月）
+    // ============================================================
+    function buildLiveRows(d) {
+      const snaps = result.monthlySnapshots;
+      if (!snaps.length) return '';
+      const last = snaps[snaps.length - 1];
+      // 基准月必须正好是日志最后一个完整月，否则说明数据已定稿 / 不同步 → 不展示
+      if (!d.base_month || d.base_month !== last.month) return '';
+
+      const mtdMap = {};
+      d.assets.forEach((a) => { mtdMap[a.name] = Number(a.mtd) || 0; });
+
+      const est = {};
+      let estTotal = 0;
+      ASSETS.forEach((name) => {
+        const hold = last.holdings[name] || 0;
+        const m = (name in mtdMap) ? mtdMap[name] : 0;
+        est[name] = hold * (1 + m / 100);
+        estTotal += est[name];
+      });
+
+      const baseCapital = RollingBacktest.CONFIG.totalCapital || 500000;
+      const targetValMap = {};
+      const targetPctMap = {};
+      last.assetDetails.forEach((ad) => {
+        targetValMap[ad.asset] = ad.targetVal;
+        targetPctMap[ad.asset] = ad.targetPct;
+      });
+
+      const liveMonth = d.in_progress_month || '';
+      const lParts = liveMonth.split('-');
+      const ly = lParts[0] || last.month.substring(0, 4);
+      const lm = parseInt(lParts[1], 10) || 0;
+
+      const monthAmount = estTotal - last.totalValue;
+      // 口径（用户指定）：本月至今收益金额 ÷ 固定基准本金 50 万
+      //   -1.04万 / 50万 = -2.07%（不是 ÷上月末总市值 的 -0.94%，后者仅作参考对照）
+      const mtdBasePct = baseCapital > 0 ? (monthAmount / baseCapital) * 100 : 0;
+      const monthPctPrev = last.totalValue > 0 ? (estTotal / last.totalValue - 1) * 100 : 0; // 参考：÷上月末总市值
+      const yearStartValue = yearStartMap[ly] || baseCapital;
+      const annAmount = estTotal - yearStartValue;
+      const annPct = baseCapital > 0 ? (annAmount / baseCapital) * 100 : 0;
+      const cumNo = snaps.length + 1;                            // 入场月=第1个月 → 进行中月 = 条数+1
+      const cumAmount = estTotal - baseCapital;
+      const cumPct = (estTotal / baseCapital - 1) * 100;
+      const cashEst = est['现金·货币基金'] || 0;
+      const positionPct = estTotal > 0 ? ((estTotal - cashEst) / estTotal * 100) : 0;
+
+      const mCls = mtdBasePct > 0 ? 'action-buy' : (mtdBasePct < 0 ? 'action-sell' : '');
+      const cumCls = cumPct >= 0 ? 'action-buy' : 'action-sell';
+      const annCls = annAmount >= 0 ? 'action-buy' : 'action-sell';
+      const posCls = positionPct >= 75 ? 'action-buy' : (positionPct < 50 ? 'action-sell' : '');
+      const sgn = (v) => (v >= 0 ? '+' : '-');
+      const yuan = (v) => `${sgn(v)}¥${Math.round(Math.abs(v)).toLocaleString('zh-CN')}`;
+
+      let html = '';
+      ASSETS.forEach((name, ai) => {
+        const m = (name in mtdMap) ? mtdMap[name] : 0;
+        const mRowCls = m > 0 ? 'action-buy' : (m < 0 ? 'action-sell' : '');
+        const pctOfTotal = estTotal > 0 ? (est[name] / estTotal) : 0;
+        const dev = (pctOfTotal - (targetPctMap[name] || 0)) * 100;
+
+        html += '<tr class="live-month-row">';
+
+        if (ai === 0) {
+          html += `<td rowspan="6" style="font-weight:700;color:var(--color-warning,#c05600);">${liveMonth}` +
+            `<div style="font-size:0.66rem;font-weight:600;opacity:0.9;">🟡 进行中</div></td>`;
+          html += `<td rowspan="6" style="color:var(--color-warning,#c05600);font-weight:600;">进行中估算` +
+            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;">月至今 MTD</div></td>`;
+        }
+
+        html += `<td style="text-align:left;"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${ASSET_COLORS[name]};margin-right:4px;"></span>${name}</td>`;
+        html += `<td style="font-weight:600;">¥${(targetValMap[name] || 0).toFixed(0)}</td>`;
+        html += `<td>¥${(last.holdings[name] || 0).toFixed(0)}</td>`;
+        html += `<td class="${mRowCls}">${m >= 0 ? '+' : ''}${m.toFixed(2)}%</td>`;
+        html += `<td style="font-weight:600;">¥${est[name].toFixed(0)}</td>`;
+        html += `<td>${(pctOfTotal * 100).toFixed(1)}%</td>`;
+        html += `<td class="${Math.abs(dev) > 5 ? 'action-sell' : ''}">${dev >= 0 ? '+' : ''}${dev.toFixed(1)}%</td>`;
+        html += `<td style="color:var(--color-text-muted);">—</td>`;
+        html += `<td style="color:var(--color-text-muted);">—</td>`;
+
+        if (ai === 0) {
+          html += `<td rowspan="6" style="font-weight:700;">¥${estTotal.toFixed(0)}` +
+            `<div style="font-size:0.64rem;font-weight:400;opacity:0.7;">估算</div></td>`;
+          // 月收益：月份 + 比例（÷固定基准50万）+ 金额
+          html += `<td rowspan="6" class="${mCls}" style="font-weight:700;text-align:right;">` +
+            `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${ly}年${lm}月 MTD</div>` +
+            `${mtdBasePct >= 0 ? '+' : ''}${mtdBasePct.toFixed(2)}%` +
+            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;line-height:1.3;">${yuan(monthAmount)} · ÷50万</div>` +
+            `<div style="font-size:0.6rem;font-weight:400;opacity:0.55;line-height:1.3;">参考 ÷上月末 ${monthPctPrev >= 0 ? '+' : ''}${monthPctPrev.toFixed(2)}%</div></td>`;
+          // 累计收益：第 N 个月 + 比例 + 金额（均为估算）
+          html += `<td rowspan="6" class="${cumCls}" style="font-weight:600;text-align:right;">` +
+            `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">第 ${cumNo} 个月</div>` +
+            `${cumPct >= 0 ? '+' : ''}${cumPct.toFixed(2)}%` +
+            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;line-height:1.3;">${yuan(cumAmount)} · 估算</div></td>`;
+          // 年度收益率：当年至今 + 比例 + 金额
+          html += `<td rowspan="6" class="${annCls}" style="font-weight:600;text-align:right;">` +
+            `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${ly}年 至今</div>` +
+            `${annPct >= 0 ? '+' : ''}${annPct.toFixed(2)}%` +
+            `<div style="font-size:0.64rem;font-weight:400;opacity:0.85;line-height:1.3;">${yuan(annAmount)} · 估算</div></td>`;
+          html += `<td rowspan="6" class="${posCls}" style="font-weight:600;">${positionPct.toFixed(0)}%</td>`;
+        }
+
+        html += '</tr>';
+      });
+
+      return html;
+    }
 
     for (const snap of snapshots) {
       const phaseClass = snap.phase.includes('建仓') ? 'phase-build' : 'phase-rebalance';
@@ -991,8 +1080,8 @@
           // 累计收益 = 组合「累计月序 + 累计收益率 + 累计收益金额」竖向三行
           //   累计收益率 = (当前总市值 / 初始本金 50万 − 1) × 100%
           //   累计收益金额 = 当前总市值 − 初始本金 50万（首行入场月为 0，自身即基准）
-          const cumNo = (snap.month in monthNoMap) ? monthNoMap[snap.month] : 0;
-          const cumLabel = cumNo === 0 ? '入场月' : `第 ${cumNo} 个月`;
+          const cumNo = (snap.month in monthNoMap) ? monthNoMap[snap.month] : 1;
+          const cumLabel = cumNo === 1 ? '第 1 个月 · 入场' : `第 ${cumNo} 个月`;
           const cumReturn = (snap.totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100;
           const cumAmount = snap.totalValue - RollingBacktest.CONFIG.totalCapital;
           const cumClass = cumReturn >= 0 ? 'action-buy' : 'action-sell';
@@ -1025,7 +1114,7 @@
       });
 
       // 每月之间加分隔线（16 列：含新增的「年度收益率」）
-      tableHTML += '<tr class="month-separator"><td colspan="16" style="padding:0;border:none;height:4px;background:var(--color-bg);"></td></tr>';
+      tableHTML += SEP_ROW;
     }
 
     tableHTML += '</tbody></table></div>';
@@ -1035,15 +1124,39 @@
       <div style="margin-top:12px;font-size:0.75rem;color:var(--color-text-muted);display:flex;flex-wrap:wrap;gap:12px;">
         <span>📘 蓝色行 = 建仓期</span>
         <span>📋 白色行 = 再平衡期</span>
+        <span style="color:var(--color-warning,#c05600);">🟡 进行中行 = 本月尚未结束的 MTD 估算（不参与官方指标）</span>
         <span style="color:var(--color-success);">🔴 买入（涨）</span>
         <span style="color:var(--color-danger);">🟢 卖出（跌）</span>
         <span>— = 无操作</span>
         <span>偏离≥±5% → 触发调仓</span>
+        <span>收益比例口径：÷固定基准本金 ¥50 万（各段可加）</span>
       </div>
     `;
 
     body.innerHTML = summaryHTML + tableHTML;
     modal.style.display = 'flex';
+
+    // ---- 进行中月份（MTD 估算）行：追加到表格首/末（跟随排序方向）----
+    const liveToken = ++logRenderToken;
+    function insertLiveRow() {
+      if (liveToken !== logRenderToken) return;              // 已被更新的渲染取代
+      if (modal.style.display === 'none') return;            // 弹窗已关闭
+      const d = liveProgressData;
+      if (!d) return;                                        // 无进度数据 → 静默不展示
+      const tb = document.querySelector('#log-modal-body .log-table tbody');
+      if (!tb || tb.querySelector('.live-month-row')) return; // 已插入过
+      const html = buildLiveRows(d);
+      if (!html) return;
+      if (sortDesc) {
+        tb.insertAdjacentHTML('afterbegin', html + SEP_ROW);
+      } else {
+        const lastEl = tb.lastElementChild;
+        const needSep = !(lastEl && lastEl.classList.contains('month-separator'));
+        tb.insertAdjacentHTML('beforeend', (needSep ? SEP_ROW : '') + html);
+      }
+    }
+    if (liveProgressData) insertLiveRow();
+    else ensureLiveProgress().then(insertLiveRow);
 
     // 绑定排序按钮
     setTimeout(() => {

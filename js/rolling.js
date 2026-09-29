@@ -552,9 +552,9 @@ const RollingBacktest = (() => {
       prevMonthValue = s.totalValue;
     }
 
-    // 累计月序：入场月 = 0，首个有收益月 = 1（与前端「第 N 个月」口径一致）
+    // 累计月序：**入场月即第 1 个月**（与前端「第 N 个月」口径一致，1-based）
     const monthNoMap = {};
-    result.monthlySnapshots.forEach((s, i) => { monthNoMap[s.month] = i; });
+    result.monthlySnapshots.forEach((s, i) => { monthNoMap[s.month] = i + 1; });
 
     for (const snap of result.monthlySnapshots) {
       const yearStartValue = yearStartMap[snap.month.substring(0, 4)] || CONFIG.totalCapital;
@@ -585,7 +585,7 @@ const RollingBacktest = (() => {
           (mAmount >= 0 ? '+' : '') + mAmount.toFixed(2),
           (annPct >= 0 ? '+' : '') + annPct.toFixed(2),
           (annAmount >= 0 ? '+' : '') + annAmount.toFixed(2),
-          (monthNoMap[snap.month] || 0),
+          (monthNoMap[snap.month] ?? 1),
           ((snap.totalValue / CONFIG.totalCapital - 1) * 100 >= 0 ? '+' : '') + ((snap.totalValue / CONFIG.totalCapital - 1) * 100).toFixed(2),
           (snap.totalValue - CONFIG.totalCapital >= 0 ? '+' : '') + (snap.totalValue - CONFIG.totalCapital).toFixed(2),
           snap.estimatedMonth ? '⚠️估计值' : '真实数据'

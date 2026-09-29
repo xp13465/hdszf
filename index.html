@@ -110,25 +110,15 @@
     .log-table .has-action { background: rgba(184,134,11,0.04); }
     .log-table .month-separator td { pointer-events: none; }
 
-    /* === 跨皮肤通用：进行中月份进度（js/progress.json 驱动，非完整月估算，不参与官方指标） === */
-    .live-card { background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e2dfd8); border-left: 4px solid var(--color-warning, #c05600); border-radius: 12px; padding: 1.25rem 1.5rem; box-shadow: 0 4px 18px rgba(0,0,0,0.05); }
-    .live-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1rem; }
-    .live-badge { display: inline-block; font-size: 0.72rem; font-weight: 600; color: var(--color-warning, #c05600); background: rgba(192,86,0,0.10); border: 1px solid rgba(192,86,0,0.35); border-radius: 999px; padding: 0.2rem 0.6rem; margin-bottom: 0.55rem; }
-    .live-title { margin: 0 0 0.3rem; font-size: 1.1rem; color: var(--color-primary, #1a3555); }
-    .live-sub { margin: 0; font-size: 0.78rem; color: var(--color-text-secondary, #5f6368); line-height: 1.6; }
-    .live-metric { text-align: right; min-width: 200px; }
-    .live-metric-label { font-size: 0.72rem; color: var(--color-text-muted, #94989e); }
-    .live-metric-value { font-size: 1.6rem; font-weight: 700; color: var(--color-primary, #1a3555); line-height: 1.25; }
-    .live-metric-delta { font-size: 0.82rem; font-weight: 600; color: var(--color-text-secondary, #5f6368); }
-    .live-metric-delta.up { color: var(--color-rise, #c53030); }
-    .live-metric-delta.down { color: var(--color-fall, #1a7d3a); }
-    .live-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-    .live-table thead th { background: var(--color-bg, #f8f7f4); color: var(--color-text-secondary, #5f6368); padding: 0.45rem 0.5rem; text-align: center; font-weight: 600; font-size: 0.75rem; white-space: nowrap; border-bottom: 1px solid var(--color-border, #e2dfd8); }
-    .live-table tbody td { padding: 0.45rem 0.5rem; text-align: center; border-bottom: 1px solid var(--color-border-light, #f0ede8); white-space: nowrap; color: var(--color-text, #1a1a2e); }
-    .live-table tbody td:first-child, .live-table thead th:first-child { text-align: left; }
-    .live-table .cell-up { color: var(--color-rise, #c53030); font-weight: 600; }
-    .live-table .cell-down { color: var(--color-fall, #1a7d3a); font-weight: 600; }
-    .live-note { margin: 0.9rem 0 0; font-size: 0.74rem; line-height: 1.65; color: var(--color-text-muted, #94989e); }
+    /* === 跨皮肤通用：完整持仓日志中的「进行中月份」行（js/progress.json 驱动，非完整月估算，不参与官方指标） === */
+    .log-table .live-month-row td {
+      background: rgba(192,86,0,0.06);
+      border-top: 1px dashed var(--color-warning, #c05600);
+      border-bottom: 1px dashed var(--color-warning, #c05600);
+    }
+    .log-table .live-month-row:hover td { background: rgba(192,86,0,0.10); }
+    /* 滚动汇总表里每个「查看操作记录」按钮：存在进行中数据时打 🟡 角标（body 级 class，重渲染也不丢） */
+    body.has-live-progress .btn-detail::after { content: ' 🟡'; font-size: 0.72rem; }
 
     /* === 跨皮肤通用：抖音授权弹窗 === */
     .auth-modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); backdrop-filter: blur(6px); z-index: 20000; display: flex; align-items: center; justify-content: center; padding: 1rem; animation: authFadeIn 0.25s ease-out; }
@@ -284,35 +274,6 @@
           </div>
         </div>
         <p class="risk-disclaimer" style="font-size:0.68rem;color:var(--color-text-muted);opacity:0.6;text-align:center;margin-top:0.75rem;">* 历史回测不代表未来表现。投资有风险，入市需谨慎。</p>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===== 板块1.5: 进行中月份进度（数据源 js/progress.json，默认隐藏，有数据才显示）===== -->
-  <section id="live-progress" class="section" style="display:none;">
-    <div class="container">
-      <div class="live-card">
-        <div class="live-head">
-          <div>
-            <span class="live-badge">🟡 进行中 · 非完整月估算</span>
-            <h2 class="live-title" id="live-title">本月进度快照</h2>
-            <p class="live-sub" id="live-sub">—</p>
-          </div>
-          <div class="live-metric">
-            <div class="live-metric-label">组合估算市值</div>
-            <div class="live-metric-value" id="live-value">—</div>
-            <div class="live-metric-delta" id="live-delta">—</div>
-          </div>
-        </div>
-        <div style="overflow-x:auto;">
-          <table class="live-table">
-            <thead>
-              <tr><th>资产</th><th>本月至今 (MTD)</th><th>月初持仓</th><th>估算现值</th></tr>
-            </thead>
-            <tbody id="live-tbody"></tbody>
-          </table>
-        </div>
-        <p class="live-note" id="live-note">—</p>
       </div>
     </div>
   </section>
@@ -778,9 +739,9 @@
   <script src="js/engine.js?v=21"></script>
   <script src="js/sliders.js?v=9"></script>
   <script src="js/charts.js?v=17"></script>
-  <script src="js/rolling.js?v=16"></script>
+  <script src="js/rolling.js?v=17"></script>
   <script src="js/share-image.js?v=5"></script>
-  <script src="js/main.js?v=49"></script>
+  <script src="js/main.js?v=50"></script>
 
 
   <!-- ===== SEO 静态文本（爬虫可见） ===== -->
