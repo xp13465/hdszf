@@ -500,6 +500,14 @@ investment-advisor/
 1. `setCompareCard` 用 `data.maxDd` → `undefined.toFixed` 崩溃；正确字段是 `data.dd`、对照值 `data.frozen.maxDd`。
 2. `main.js` themeMap.business 仍旧 `v=18`（index.html 已 v=19）→ 切回商务风命中旧缓存；已同步。
 3. 悬浮层被日志弹窗遮挡 / 视口顶部裁切 → 改 `scrollIntoView` + `mouse.move`，并加 35% 边界收敛。
+4. **`monthly_update.js` 定稿会被自己的旧快照卡死** → 新增**阶段 9.5**：自检前自动跑 `node scripts/monthly_progress.js`（不带 `--push`）。
+   旧快照在 TARGET 写进 `data.js` 后立刻过期（月份落进 `months`、`base_month` 落后一月）→ `smoke_check` 第 7 项 FAIL → 阶段 10 不 commit / 不 push。
+   容错：取数全失败（退出码 2，降级 MTD=0）只告警不中断；其它非零码才中止。
+5. **`monthly_update.js` 两条文案口径混用** → 新增 `V.nCum = 收益条数 + 1`：
+   - 数据范围文案用 `V.n`（收益条数，当前 132）；
+   - **累计月序文案用 `V.nCum`**（当前 133）：Hero「90 / 133月」、指标卡「总收益（133个月）」，与 `main.js` 的 `m.totalMonths` 同源。
+   - Hero 副标题「翻倍/增长/亏损」由 `main.js` 按 `终值÷50万 ≥ 2` 判定，静态回退需同步为 **「11年翻倍」**。
+   - 发布前用 `node scripts/monthly_update.js --dry-run --strict` 确认「全部规则命中」。
 
 ---
 

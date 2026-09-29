@@ -3,7 +3,8 @@
  * 恒市值助手 · 月度数据一键更新
  *
  * 把 RELEASE_CHECKLIST 的全流程串成一条命令：
- *   取数 → 重算派生 → 收口月 → 版本号 bump → 静态文案 → 文档 → 差异报告 → 自检 → commit → push
+ *   取数 → 重算派生 → 收口月 → 版本号 bump → 静态文案 → 文档 → 差异报告
+ *   → 刷新进行中快照(progress.json) → 自检 → commit → push
  *
  * 用法：
  *   node scripts/monthly_update.js --dry-run            只打印将要执行的替换，不改任何文件
@@ -232,6 +233,11 @@ for (const a of Object.keys(rr.asset_returns)) {
 
 const V = {
   n: N_AFTER,
+  // 累计月序（1-based，含入场月）—— 用户 2026-09-29 拍板的口径，必须与 js/main.js
+  // 的 totalMonths（Hero「90 / N月」、指标卡「总收益（N个月）」）一致 = 收益条数 + 1。
+  // 注意与 V.n 区分：V.n 是「数据窗口 / 收益条数」（用在数据范围文案里），
+  // V.nCum 是「累计月序」（用在月胜率分母、总收益标签里）。两者相差 1，别混用。
+  nCum: N_AFTER + 1,
   endCN: `${eY}年${eM}月`,
   startCN: `${sY}年${sM}月`,
   startLabel: START_LABEL,
@@ -265,9 +271,9 @@ bumpVer('index.html', 'main.js');
 // ---------------- 8. 静态文案 ----------------
 P('\n=== 阶段 7 · index.html 静态文案 ===');
 sub('index.html', /(id="hero-final-value">)[\d.]+万(<)/, `$1${V.finalWan}万$2`, 'Hero 终值');
-sub('index.html', /(11年翻倍 · 年化)[\d.]+(%)/, `$1${V.annual1}$2`, 'Hero 年化');
+sub('index.html', /(11年(?:翻倍|增长|亏损) · 年化)[\d.]+(%)/, `$1${V.annual1}$2`, 'Hero 年化');
 sub('index.html', /(id="hero-winrate-label">[^<]*?月胜率\s*)[\d.]+(%)/, `$1${V.wr1}$2`, 'Hero 月胜率');
-sub('index.html', /(id="hero-winrate-value">)\s*\d+\s*\/\s*\d+月(<)/, `$1${V.posMonths} / ${V.n}月$2`, 'Hero 月胜率 x/y');
+sub('index.html', /(id="hero-winrate-value">)\s*\d+\s*\/\s*\d+月(<)/, `$1${V.posMonths} / ${V.nCum}月$2`, 'Hero 月胜率 x/y（累计月序=收益条数+1）');
 sub('index.html', /(id="hero-dd-value">)-?[\d.]+(%<)/, `$1${B.maxDd.toFixed(1)}$2`, 'Hero 最大回撤');
 sub('index.html', /(og:description" content="[^"]*?年化)[\d.]+(%[^"]*?最大回撤仅)[\d.]+(%)/, `$1${V.annual1}$2${V.dd1}$3`, 'og:description');
 sub('index.html', /(og:image:alt" content="[^"]*?年化)[\d.]+(%\s*回撤)[\d.]+(%)/, `$1${V.annual1}$2${V.dd1}$3`, 'og:image:alt');
@@ -275,7 +281,7 @@ sub('index.html', /\d+个月真实数据验证/, `${V.n}个月真实数据验证
 sub('index.html', /\d+个月（约11年）历史回测数据/, `${V.n}个月（约11年）历史回测数据`, 'section-subtitle 月数');
 sub('index.html', /(\d{4})年(\d{1,2})月\s*—\s*(\d{4})年(\d{1,2})月，共\s*<strong>\d+个月<\/strong>/,
   `${V.startCN} — ${V.endCN}，共 <strong>${V.n}个月</strong>`, '回测时间跨度');
-sub('index.html', /总收益（\d+个月）/, `总收益（${V.n}个月）`, '总收益标签');
+sub('index.html', /总收益（\d+个月）/, `总收益（${V.nCum}个月）`, '总收益标签（累计月序=收益条数+1）');
 sub('index.html', /(\d{4})年(\d{1,2})月\s*~\s*(\d{4})年(\d{1,2})月（\d+个月）真实市场数据回测/,
   `${V.startCN} ~ ${V.endCN}（${V.n}个月）真实市场数据回测`, 'insight-box 数据说明');
 sub('index.html', /保守型年化\s*[\d.]+%（回撤\s*-?[\d.]+%）/,
@@ -342,9 +348,44 @@ P('\n=== 阶段 9 · 生成新旧差异报告 ===');
 const reportPath = `scripts/data_update_report_${TARGET}.md`;
 must(process.execPath, ['scripts/diff_data_update.js', '--md', reportPath], `输出 ${reportPath}`);
 
-// ---------------- 11. 自检 ----------------
-P('\n=== 阶段 10 · 自检 ===');
+// ---------------- 10.5 刷新进行中快照 ----------------
+// 为什么必须在这里做（踩坑记录，改动前必读）：
+//   progress.json 的 base_month 原来指向「上一个完整月」，status 为 in_progress:true。
+//   本次定稿把 TARGET 月写进 data.js 后，progress.json 立刻变成「过期快照」——
+//   它的月份已经出现在 months 里、base_month 也不再等于主数据末月。
+//   smoke_check.js 第 7 项会因此 FAIL，而下面阶段 10 遇 FAIL 会「不 commit、不 push」，
+//   于是整个月度定稿在自检阶段被自己的旧快照卡死（2026-10-03 起必然触发）。
+//   所以定稿后必须立刻把快照滚到「新的进行中月」= nextMonthLabel(新末月)。
+// 容错：取数全失败时 monthly_progress.js 退出码为 2（降级为 MTD=0 占位），
+//       此时 JSON 结构仍合法（in_progress:true / base_month==末月 / 月份不在 months 里），
+//       故按「成功但降级」处理，只告警不中断。
+P('\n=== 阶段 9.5 · 刷新进行中月份快照 (js/progress.json) ===');
 if (DRY) {
+  P('  [dry-run] 跳过 monthly_progress.js');
+} else {
+  let snapOk = true;
+  try {
+    execFileSync(process.execPath, ['scripts/monthly_progress.js'], { cwd: ROOT, stdio: 'pipe' });
+    P('  ✓ progress.json 已滚动到新的进行中月份（实时取数成功）');
+  } catch (e) {
+    const code = typeof e.status === 'number' ? e.status : -1;
+    if (code === 2) {
+      P('  ⚠ progress.json 已刷新，但取数全部失败 → 降级为 MTD=0 占位（站点会显示 0.00% 估算）');
+    } else {
+      snapOk = false;
+      P(`  ✗ monthly_progress.js 异常退出 (code=${code})`);
+      P((e.stderr || e.stdout || '').toString().split('\n').slice(-10).join('\n'));
+    }
+  }
+  if (!snapOk) {
+    P('  → 快照刷新失败会导致 smoke_check 第 7 项 FAIL。请先修好 progress.json 再定稿：');
+    P('     node scripts/monthly_progress.js');
+    process.exit(1);
+  }
+}
+
+// ---------------- 11. 自检 ----------------
+P('\n=== 阶段 10 · 自检 ===');if (DRY) {
   P('  [dry-run] 跳过 smoke_check / recompute --check / git');
 } else {
   let ok = true;
@@ -381,6 +422,7 @@ if (DRY) {
     `稳健型：年化 ${V.annual2}% / 终值 ${V.finalWan}万 / 夏普 ${V.sharpe2} / 回撤 ${V.dd2}% / 月胜率 ${V.wr2}%（${V.posMonths}/${V.n}）`,
     `三档：保守 ${R.conservative.annual.toFixed(2)}% / 稳健 ${R.balanced.annual.toFixed(2)}% / 进取 ${R.aggressive.annual.toFixed(2)}%`,
     `差异报告：${reportPath}`,
+    `进行中快照：js/progress.json 已滚动至新进行中月（同 commit 一起上线，避免旧快照让回测口径自相矛盾）`,
     '',
     `验证：smoke_check 全 PASS；recompute_derived --check 静态≈动态`
   ].join('\n');

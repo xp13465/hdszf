@@ -142,6 +142,25 @@
   - 内容无变化时脚本不重写文件（不产生无意义 diff / 部署）。
 - **与全量更新的分工**：`monthly_update.js` = 月末定稿（写数据 + 重算 + 上线）；`monthly_progress.js` = 月中进度（只读 + 报告 + 站点日志行）。二者互补，不冲突。
 - **月末定稿后**：该月的 `progress.json` 会自然失效（其月份已进入 `months`，同时 `base_month` ≠ 新末月），`smoke_check` 第 7 项会 FAIL 提醒，重跑脚本即可切换到新月份（`in_progress_month` 自动 +1）。
+- **⚠️ 必须在定稿里自动刷新快照（2026-09-29 修复）**：`monthly_update.js` 新增 **阶段 9.5**，在自检前自动跑一次 `node scripts/monthly_progress.js`
+  （不带 `--push`，由外层统一 commit + push）。原因：定稿把 `TARGET` 月写进 `data.js` 后，旧快照立刻"过期"
+  （月份落进 `months`、`base_month` 落后一月），`smoke_check` 第 7 项必然 FAIL，而阶段 10 遇 FAIL 会 **不 commit、不 push** ——
+  整个月度定稿会被自己的旧快照卡死。
+  - 容错：取数全失败时 `monthly_progress.js` 退出码为 2（降级 MTD=0 占位），JSON 结构仍合法 → 只告警不中断；
+    其它非零退出码才中止定稿。
+  - 手工定稿时若跳过此步，先自己跑一次 `node scripts/monthly_progress.js` 再提交。
+
+### 阶段 9.5 之外：`monthly_update.js` 的两条文案口径（2026-09-29 修正）
+
+- **`V.n`（数据窗口 = 收益条数）与 `V.nCum`（累计月序 = 收益条数 + 1）必须分清**：
+  - 数据范围类文案用 `V.n`（「132个月真实数据验证」「共 132个月」「（132个月）真实市场数据回测」）；
+  - 累计月序类文案用 **`V.nCum`**（Hero「90 / 133月」、指标卡「总收益（133个月）」）—— 与 `js/main.js` 的
+    `m.totalMonths` 同源（1-based 含入场月，用户 2026-09-29 拍板）。
+  - 曾误用 `V.n` → 会把 133 写成 132，与页面动态值差 1。
+- **Hero 副标题的"翻倍/增长/亏损"**由 `js/main.js` 按 `finalValue / 50万 ≥ 2` 动态判定，静态回退文案必须同步
+  （当前终值 110.6 万 → **「11年翻倍」**）。替换规则正则为 `/(11年(?:翻倍|增长|亏损) · 年化)[\d.]+(%)/`。
+- 发布前建议加 `--strict` 干跑一次，确认「全部规则命中」（任一规则未命中都说明静态文案与动态口径脱节）：
+  `node scripts/monthly_update.js --dry-run --strict`
 
 ---
 

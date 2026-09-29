@@ -153,8 +153,10 @@ if (fs.existsSync(PROG)) {
       `main.js=[${mainAssets.join('/')}] progress=[${(p.assets || []).map(a => a.name).join('/')}]`);
 
     // 前端仅在「基准月 = 日志末月」时才追加进行中行 → 基准月漂移会导致该行整体消失
+    // （同理：live overlay 也会因月份「不晚于数据末月」被 setLiveOverlay 拒绝，全站「含当月估」标记撤下）
+    // 定稿后 base_month 必然落后一个月 → 重跑 node scripts/monthly_progress.js 即可（monthly_update.js 已自动代跑）
     check('progress.json 基准月=主数据末月', p.base_month === rr.months[rr.months.length - 1],
-      `base_month=${p.base_month} months末位=${rr.months[rr.months.length - 1]}`);
+      `base_month=${p.base_month} months末位=${rr.months[rr.months.length - 1]} → 快照已过期，重跑 node scripts/monthly_progress.js`);
 
     // 口径红线：本月至今比例的分母必须是「固定基准本金 50 万」，不是上月末总市值
     const impliedBasePct = p.base_capital ? (p.est_change_amount / p.base_capital) * 100 : 0;
