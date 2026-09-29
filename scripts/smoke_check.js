@@ -119,5 +119,27 @@ check('最早入场月≥地板2015-08', earliestStart === FLOOR,
 check('12起点全真实数据(无估计泄漏)', floorOk,
   estLeak ? estLeak : '');
 
+// ---- 7) 进行中月份进度快照（js/progress.json）不得污染主回测 ----
+// 该文件只服务站内「进行中月份」区块（只读展示），其月份必须尚未进入 data.js 主数据；
+// 一旦"进行中月"出现在 months 里，说明月度定稿已完成，快照文件应立即被重写/清理。
+const PROG = path.join(ROOT, 'js/progress.json');
+if (fs.existsSync(PROG)) {
+  let p = null;
+  try { p = JSON.parse(fs.readFileSync(PROG, 'utf8')); } catch (e) { p = null; }
+  check('progress.json 可解析', !!p, 'JSON 解析失败');
+  if (p) {
+    check('progress.json 标记为进行中', p.in_progress === true, `in_progress=${p.in_progress}`);
+    const leaked = p.in_progress_month && rr.months.includes(p.in_progress_month);
+    check('进行中月份未泄漏进 data.js', !leaked,
+      leaked ? `${p.in_progress_month} 已在 months 中 → 该月已定稿，请重跑 monthly_progress.js 或删除 progress.json` : '');
+    check('progress.json 基准本金=50万', p.base_capital === 500000, `base_capital=${p.base_capital}`);
+    check('progress.json 资产行数与 fund_map 一致',
+      Array.isArray(p.assets) && p.assets.length === Object.keys(JSON.parse(read('scripts/fund_map.json')).assets).length + 1,
+      `assets=${p.assets && p.assets.length}（应为风险资产数+现金1行）`);
+  }
+} else {
+  check('progress.json 存在（站点进行中区块数据源）', true, '未生成，站点该区块将自动隐藏（非致命）');
+}
+
 console.log(failures === 0 ? '\n全部通过 ✓' : `\n${failures} 项失败 ✗`);
 process.exit(failures === 0 ? 0 : 1);

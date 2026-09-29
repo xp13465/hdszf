@@ -342,7 +342,7 @@ investment-advisor/
   - `getStartPoints` 的 `totalMonthsNeeded` 改为 `months.length - monthIdx`（自动覆盖到 `months` 末位，含 2026-08）。每月补数后窗口自动延伸，**不再需要手改 `CONFIG.endMonth`**。
   - 效果：12 个起点的日志末月全部从 2026-07 → **2026-08**，且每行改用当月真实收益（此前每行套用次月收益）。
 - **新增「年度收益率」列**（`js/main.js` 的 `showLogDetail`）：对每条记录按日历年聚合，展示该年"至今"的**收益金额(¥)** 与**收益比例(%)**（yearStartValue=上一年末总市值，首年=初始资金 50 万）。CSV 导出同步加「年度收益率(%) / 年收益金额(元)」两列。
-- **新增 `scripts/monthly_progress.js`（进行中月份进度快照）**：取"当前未完成月"的**月至今(MTD)**收益（新浪前复权日 K 线，与 `fetch_returns.py` 同源），把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的报告。**绝不写 `data.js`/`real_returns.json`**，不污染主回测。用法 `node scripts/monthly_progress.js [--out 报告.md] [--no-fetch]`。
+- **新增 `scripts/monthly_progress.js`（进行中月份进度快照）**：取"当前未完成月"的**月至今(MTD)**收益（新浪前复权日 K 线，与 `fetch_returns.py` 同源），把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的报告。**绝不写 `data.js`/`real_returns.json`**，不污染主回测。用法 `node scripts/monthly_progress.js [--out 报告.md] [--json js/progress.json] [--no-json] [--no-fetch] [--push]`（`--push` = 内容有变化才 commit + push 该 JSON，用于自动化；详见「进行中月份区块」专节）。
 - **`scripts/smoke_check.js` 新增第 5 项守卫**：加载 `js/rolling.js` 跑 `runAll()`，断言每个起点末位快照月份 == `months` 末位标签，防止日志 off-by-one 回归。
 - 删除调试用临时脚本 `scripts/_log_check.js`（不入库）。
 - **未改 `data.js` / `engine.js`**：本次无新月份数据（2026-09 尚未走完，9/28 实时 MTD 沪深300 −5.72%，待 10 月初再定稿）。
@@ -387,6 +387,35 @@ investment-advisor/
 - 月序边界：末月月序 == `asset_returns[资产].length`（当前 132）；入场月序 == 0。
 - 父子自洽：年内月金额之和 == 年金额；各年金额之和 == 累计金额。
 - 版本号 bump（本次 `rolling.js` v15 → **v16**、`main.js` v47 → **v48**）。
+
+---
+
+### 站点「进行中月份」区块 + progress.json（2026-09-29 · 用户拍板）
+
+**需求**：用户希望"能看到（估算的）当月最新进度，只要做好标识就行"。
+
+**数据链路（三件套，职责严格分离）**：
+
+| 环节 | 文件 | 说明 |
+|---|---|---|
+| 取数 + 估算 | `scripts/monthly_progress.js` | 新浪前复权日 K 线取"当月至今 MTD"，用最新完整月的组合持仓往前推；`--push` 时自动 commit + push |
+| 数据源 | `js/progress.json` | 站点该区块**唯一**的数据来源；**只读快照，绝不进 `data.js`** |
+| 渲染 | `index.html` 的 `#live-progress` 区块 + `js/main.js` 的 `initLiveProgress()` | 运行时 `fetch('js/progress.json?t=<10分钟桶>')`；失败 / 非进行中 → 整块隐藏（静默降级） |
+
+**关键约定（改动前必读）**
+
+1. **绝不污染主回测**：`progress.json` 只服务这一个区块，`data.js` / `engine.js` / `rolling.js` 完全不认识它。
+   官方指标（年化 / 回撤 / 胜率 / 三档卡片 / 滚动日志）永远只到**最新完整月**。
+2. **百分比口径统一 ÷固定基准 50 万**：与日志表「月收益 / 年度收益率 / 累计收益」三列一致（各分段可加）。
+   `progress.json` 同时给出 `est_change_pct_base`（÷50万，页面显示此值）与 `est_change_pct_prev`（÷上月末总市值，仅参考），别把后者当主指标。
+3. **内容不变不重写**：脚本对比时把 `generated_at` 置为占位符再比较，因此"行情没动"时不会产生无意义 diff / 部署；`generated_at` 语义 = **快照数据最后一次变化的时间**。
+4. **缓存**：`worker.js` 新增 `/js/progress.json` 分支，`Cache-Control: public, max-age=60`（其它 CSS/JS 仍是 300s）。
+   前端再叠加 10 分钟粒度的 `?t=` 查询参数，兼顾新鲜度与缓存友好（**这是唯一一个不靠版本号 bump 的动态 JSON**，因为文件内容由脚本重写而非人工改）。
+5. **涨跌配色**沿用 A 股习惯（涨红跌绿），全部走 CSS 变量，三种皮肤（business / modern / tech）自动适配，已实机截图核对深浅两套主题。
+6. **`smoke_check.js` 第 7 项守卫**：`progress.json` 必须 `in_progress:true`、`base_capital==500000`、资产行数 = 风险资产数 + 现金 1 行，且**其月份不得已出现在 `months` 里**（一旦出现说明该月已定稿，快照文件该重跑或删除）。
+
+**自动化（每周/每交易日跑，不进主数据）**：`node scripts/monthly_progress.js --push`
+→ 更新 `js/progress.json` → 有变化才 commit + push → CF 自动部署 → 站点区块显示"🟡 进行中 · 非完整月估算"。
 
 ---
 

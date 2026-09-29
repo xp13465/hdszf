@@ -130,9 +130,15 @@
 - **脚本**：`scripts/monthly_progress.js`（Node，自包含，用全局 `fetch` 取新浪日 K 线）。
   - 作用：取"当前未完成月"的**月至今(MTD)**收益，把最新完整月的组合持仓往前推一步，输出带 **🟡 进行中（非完整月）** 标记的组合进度报告。
   - **绝不写 `js/data.js` / `js/real_returns.json`**，不污染主回测口径；真正的月末定稿仍由 `monthly_update.js`（每月 3 号）负责。
-  - 用法：`node scripts/monthly_progress.js [--out 报告.md] [--no-fetch]`。取数全失败时降级为 MTD=0 占位仍输出（退出码 2）。
+  - 用法：`node scripts/monthly_progress.js [--out 报告.md] [--json js/progress.json] [--no-json] [--no-fetch] [--push]`。取数全失败时降级为 MTD=0 占位仍输出（退出码 2）。
   - 实时取数需联网；若自动化环境无外网，会降级为占位并在报告里标明。
-- **与全量更新的分工**：`monthly_update.js` = 月末定稿（写数据 + 重算 + 上线）；`monthly_progress.js` = 月中进度（只读 + 报告）。二者互补，不冲突。
+- **口径（与站内一致）**：组合"本月至今"百分比 = 变更金额 ÷ **固定基准本金 50 万**（不是 ÷ 上月末总市值），与日志表「月收益 / 年度收益率 / 累计收益」三列同口径、可加。JSON 里 `est_change_pct_prev` 是 ÷ 上月末总市值的**参考值**，页面不显示。
+- **站点展示**：`--push` 会把 `js/progress.json` 提交并推送 → CF 自动部署 → 首页 Hero 下方的「🟡 进行中 · 非完整月估算」区块显示（`index.html#live-progress` + `js/main.js` 的 `initLiveProgress()`）。
+  - 该区块**只读**，`worker.js` 对 `/js/progress.json` 设 60 秒缓存；前端另加 10 分钟粒度的 `?t=` 参数。
+  - 取不到 `progress.json` 时整块自动隐藏（静默降级），不影响任何既有功能。
+  - 内容无变化时脚本不重写文件（不产生无意义 diff / 部署）。
+- **与全量更新的分工**：`monthly_update.js` = 月末定稿（写数据 + 重算 + 上线）；`monthly_progress.js` = 月中进度（只读 + 报告 + 站点进度块）。二者互补，不冲突。
+- **月末定稿后**：该月的 `progress.json` 会自然失效（其月份已进入 `months`），`smoke_check` 第 7 项会 FAIL 提醒，重跑脚本即可切换到新月份（`in_progress_month` 自动 +1）。
 
 ---
 
@@ -142,6 +148,8 @@
   若日志又退回 2026-07（或任何非最新月），smoke_check 直接 FAIL，阻断发布。
 - `scripts/smoke_check.js` 第 6 项（2026-09-29 起）：**数据起点固化 2015-08**——断言 `months[0]==="2015-08"`、最早入场月==2015-08、12 个起点快照全为真实数据（无 `estimatedMonth` 泄漏）。
   若有人手改 `months[0]` 或重抓时起点漂移，smoke_check 直接 FAIL。
+- `scripts/smoke_check.js` 第 7 项（2026-09-29 起）：**progress.json 不污染主回测**——断言 `in_progress:true`、`base_capital==500000`、资产行数 = 风险资产数 + 现金 1 行，且其月份**不得**出现在 `months` 里。
+  失败通常意味着"该月已定稿但快照没更新"，重跑 `monthly_progress.js` 即可。
 
 ---
 
@@ -158,3 +166,4 @@
 - 派生指标重算不全 → 页面出现「汇总表新、方案数字旧」的矛盾，上线前务必跑阶段 3。
 - 版本号忘 bump → 线上看不出变化（毛子云 CDN + 浏览器缓存双重缓存）。
 - **⚠️ 新浪部分代码历史深度不足**：实测新浪现在对标普500(513500)/纳斯达克100(513100)/黄金(518880) 只回约 900 根日 K（≈2023-04 / 2020-05 起），但 `data.js` 这三只均有 `2015-09` 起完整历史（当年取数通道更深）。**每月增量 append 安全**（只取最新月）；但**整文件从新浪重抓会丢 2015–2023/2020 历史**。→ `js/data.js` + `js/real_returns.json` 已被 git 管理即权威备份；取数脚本只增量 append，绝不整文件按新浪重生成。
+- **`js/progress.json` 是唯一「不靠版本号 bump」的动态资源**：内容由 `monthly_progress.js` 重写，缓存由 `worker.js`（60 秒）+ 前端 `?t=` 参数控制，改它无需动 `index.html`。其数值属"进行中估算"，**切勿抄进 `data.js` 或任何静态文案**（一旦抄入，页面会出现"未完成月混进官方指标"的矛盾）。(513500)/纳斯达克100(513100)/黄金(518880) 只回约 900 根日 K（≈2023-04 / 2020-05 起），但 `data.js` 这三只均有 `2015-09` 起完整历史（当年取数通道更深）。**每月增量 append 安全**（只取最新月）；但**整文件从新浪重抓会丢 2015–2023/2020 历史**。→ `js/data.js` + `js/real_returns.json` 已被 git 管理即权威备份；取数脚本只增量 append，绝不整文件按新浪重生成。

@@ -1,0 +1,64 @@
+{
+  "generated_at": "2026-09-29 11:12",
+  "in_progress": true,
+  "in_progress_month": "2026-09",
+  "base_month": "2026-08",
+  "data_as_of": "2026-09-28",
+  "base_capital": 500000,
+  "base_total": 1105811.22,
+  "est_total": 1095437.21,
+  "est_change_amount": -10374.01,
+  "est_change_pct_base": -2.07,
+  "est_change_pct_prev": -0.94,
+  "cum_return_pct_base": 119.09,
+  "fetch": {
+    "ok": 5,
+    "fail": 0
+  },
+  "degraded": false,
+  "assets": [
+    {
+      "name": "沪深300",
+      "mtd": -5.72,
+      "base_holding": 75515.8,
+      "est_value": 71196,
+      "last_day": "2026-09-28"
+    },
+    {
+      "name": "中证500",
+      "mtd": -6.66,
+      "base_holding": 25000,
+      "est_value": 23335.92,
+      "last_day": "2026-09-28"
+    },
+    {
+      "name": "标普500",
+      "mtd": -2.45,
+      "base_holding": 75000,
+      "est_value": 73164.46,
+      "last_day": "2026-09-28"
+    },
+    {
+      "name": "纳斯达克100",
+      "mtd": 2.86,
+      "base_holding": 104921.7,
+      "est_value": 107919.46,
+      "last_day": "2026-09-28"
+    },
+    {
+      "name": "黄金",
+      "mtd": -6.13,
+      "base_holding": 100000,
+      "est_value": 93865.97,
+      "last_day": "2026-09-28"
+    },
+    {
+      "name": "现金·货币基金",
+      "mtd": 0.08,
+      "base_holding": 725373.72,
+      "est_value": 725955.39,
+      "last_day": null
+    }
+  ],
+  "note": "非完整月（月至今 MTD）估算，不计入官方回测；月末收盘后由月度定稿流程写入正式数据。收益比例统一按固定基准 50 万口径。"
+}

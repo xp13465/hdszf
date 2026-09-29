@@ -346,6 +346,9 @@
     // 滚动回测
     initRollingBacktest();
 
+    // 进行中月份进度快照（只读展示，非完整月估算，不参与官方指标）
+    initLiveProgress();
+
     // 分享图生成按钮
     if (typeof ShareImage !== 'undefined') {
       ShareImage.init();
@@ -699,6 +702,85 @@
     window.addEventListener('resize', () => {
       if (rollingCharts.equity) rollingCharts.equity.resize();
     });
+  }
+
+  // ============================================================
+  //  进行中月份进度快照（数据源 js/progress.json）
+  //  ⚠️ 只读展示：绝不写入 APP_DATA、绝不参与任何回测指标计算。
+  //     取不到数据或非"进行中"状态 → 整块隐藏，静默降级。
+  //     正式月末定稿仍由 scripts/monthly_update.js 写入 data.js 主回测。
+  // ============================================================
+  function initLiveProgress() {
+    const section = document.getElementById('live-progress');
+    const tbody = document.getElementById('live-tbody');
+    if (!section || !tbody) return;
+
+    // 10 分钟粒度的查询参数：兼顾新鲜度与缓存友好（配合 worker.js 的短缓存头）
+    const bust = Math.floor(Date.now() / 600000);
+    fetch(`js/progress.json?t=${bust}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (!d || !d.in_progress || !Array.isArray(d.assets) || !d.assets.length) return;
+        renderLiveProgress(d, section, tbody);
+      })
+      .catch(() => { /* 静默降级：保持隐藏，不影响任何既有功能 */ });
+  }
+
+  function liveFmtMoney(v) {
+    const a = Math.abs(v);
+    return a >= 10000 ? (v / 10000).toFixed(2) + '万' : Math.round(v).toLocaleString('zh-CN');
+  }
+
+  function renderLiveProgress(d, section, tbody) {
+    const [yy, mm] = String(d.in_progress_month || '').split('-');
+    const [by, bm] = String(d.base_month || '').split('-');
+    const pct = Number(d.est_change_pct_base) || 0;
+    const amt = Number(d.est_change_amount) || 0;
+    const cum = Number(d.cum_return_pct_base) || 0;
+
+    const titleEl = document.getElementById('live-title');
+    const subEl = document.getElementById('live-sub');
+    const valEl = document.getElementById('live-value');
+    const deltaEl = document.getElementById('live-delta');
+    const noteEl = document.getElementById('live-note');
+
+    if (titleEl) titleEl.textContent = `${yy}年${parseInt(mm, 10)}月 · 组合进度快照`;
+    if (subEl) {
+      subEl.textContent =
+        `数据截至 ${d.data_as_of || '—'}（本月最后交易日收盘） · ` +
+        `月初基准 ${by}年${parseInt(bm, 10)}月 ¥${liveFmtMoney(d.base_total || 0)} · ` +
+        `基准本金 ¥${liveFmtMoney(d.base_capital || 500000)} → 累计 ${cum >= 0 ? '+' : ''}${cum.toFixed(2)}%`;
+    }
+    if (valEl) valEl.textContent = '¥' + liveFmtMoney(d.est_total || 0);
+    if (deltaEl) {
+      // 涨红跌绿（A股习惯）：亏损用 down 类
+      deltaEl.className = 'live-metric-delta ' + (amt >= 0 ? 'up' : 'down');
+      deltaEl.innerHTML =
+        `本月至今 ${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%` +
+        `<br><span style="font-weight:400;font-size:0.76rem;">${amt >= 0 ? '+' : '-'}¥${liveFmtMoney(Math.abs(amt))}（÷固定基准50万）</span>`;
+    }
+
+    tbody.innerHTML = d.assets.map((a) => {
+      const m = Number(a.mtd) || 0;
+      const cls = m > 0 ? 'cell-up' : (m < 0 ? 'cell-down' : '');
+      return `<tr>
+        <td>${a.name}</td>
+        <td class="${cls}">${m >= 0 ? '+' : ''}${m.toFixed(2)}%</td>
+        <td>¥${liveFmtMoney(a.base_holding || 0)}</td>
+        <td>¥${liveFmtMoney(a.est_value || 0)}</td>
+      </tr>`;
+    }).join('');
+
+    if (noteEl) {
+      const fail = d.fetch && d.fetch.fail ? Number(d.fetch.fail) : 0;
+      noteEl.innerHTML =
+        `⚠️ 本月尚未结束，以上为<strong>月至今(MTD)</strong>估算，仅供进度参考，` +
+        `<strong>不计入</strong>下方任何官方回测指标（年化 / 回撤 / 胜率等仍截至 ${by}年${parseInt(bm, 10)}月）。` +
+        `收益比例统一按<strong>固定基准 ¥50 万</strong>口径计算，与站内各收益列一致。` +
+        `快照生成于 ${d.generated_at || '—'}${d.degraded ? '（⚠️ 本次取数降级，数值不可用）' : (fail ? `（${fail} 个资产取数降级）` : '')}`;
+    }
+
+    section.style.display = '';
   }
 
   function initLogModal() {
