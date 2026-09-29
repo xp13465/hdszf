@@ -829,6 +829,14 @@
       prevSnap = s;
     }
 
+    // 月收益金额：每月「该月末总市值 − 上月末总市值」（首月基准 = 初始本金 50万）
+    const monthPrevMap = {};
+    let prevMonthValue = null;
+    for (const s of result.monthlySnapshots) {
+      monthPrevMap[s.month] = (prevMonthValue === null) ? RollingBacktest.CONFIG.totalCapital : prevMonthValue;
+      prevMonthValue = s.totalValue;
+    }
+
     for (const snap of snapshots) {
       const phaseClass = snap.phase.includes('建仓') ? 'phase-build' : 'phase-rebalance';
       const rowSpan = 6; // 6个资产
@@ -882,9 +890,16 @@
         // 总市值（第一行时显示）
         if (isFirstAsset) {
           tableHTML += `<td rowspan="${rowSpan}" style="font-weight:700;">¥${snap.totalValue.toFixed(0)}</td>`;
+          // 月收益 = 组合当月「月份 + 月收益率 + 实际收益金额」竖向排列（免视线跳回第一列）
           const mrSnap = snap.monthReturn * 100;
           const mrSnapClass = mrSnap > 0 ? 'action-buy' : (mrSnap < 0 ? 'action-sell' : '');
-          tableHTML += `<td rowspan="${rowSpan}" class="${mrSnapClass}" style="font-weight:700;">${mrSnap >= 0 ? '+' : ''}${mrSnap.toFixed(2)}%</td>`;
+          const mPrevValue = (snap.month in monthPrevMap) ? monthPrevMap[snap.month] : RollingBacktest.CONFIG.totalCapital;
+          const mAmount = snap.totalValue - mPrevValue;
+          const mLabel = snap.month.substring(0, 4) + '年' + parseInt(snap.month.substring(5, 7), 10) + '月';
+          tableHTML += `<td rowspan="${rowSpan}" class="${mrSnapClass}" style="font-weight:700;text-align:right;">` +
+            `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${mLabel}</div>` +
+            `${mrSnap >= 0 ? '+' : ''}${mrSnap.toFixed(2)}%` +
+            `<div style="font-size:0.7rem;font-weight:400;opacity:0.85;">¥${mAmount >= 0 ? '+' : ''}${Math.round(mAmount).toLocaleString()}</div></td>`;
           // 累计收益 = (当前总市值 / 初始资金 - 1) × 100%
           const cumReturn = (snap.totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100;
           const cumClass = cumReturn >= 0 ? 'action-buy' : 'action-sell';
