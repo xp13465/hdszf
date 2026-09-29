@@ -153,7 +153,7 @@ function cashMTD() {
         (fetchFail > 0 ? `（${fetchFail} 个失败/降级）` : '') + `\n\n`;
 
   md += `## 各资产月至今(MTD)收益\n\n`;
-  md += `| 资产 | MTD | 基准持仓(2026-08) | 估算现值 |\n`;
+  md += `| 资产 | MTD | 基准持仓(${lastCompleteMonth}) | 估算现值 |\n`;
   md += `| --- | --- | --- | --- |\n`;
   for (const r of rows) {
     md += `| ${r.asset} | ${sign(r.mtd * 100)}${(r.mtd * 100).toFixed(2)}% | ¥${fmtMoney(r.baseH)} | ¥${fmtMoney(r.est)} |\n`;
