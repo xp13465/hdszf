@@ -711,7 +711,10 @@ const RollingBacktest = (() => {
           ad.amount > 0 ? ad.amount.toFixed(2) : '-',
           ad.fee > 0 ? ad.fee.toFixed(2) : '-',
           snap.totalValue.toFixed(2),
-          (snap.monthReturn * 100).toFixed(2) + '%',
+          // 组合层「月收益率」口径铁律：本月收益金额 ÷ 固定基准本金 50 万（= mAmount / totalCapital），
+          // 与弹窗日志表、滚动汇总表、折线图提示环比同源；各段可加（Σ月 = 年，Σ年 = 累计）。
+          // ⚠️ 不要改回 snap.monthReturn（÷上月末总市值的复合口径，数值只有约一半）。
+          (CONFIG.totalCapital > 0 ? (mAmount / CONFIG.totalCapital) * 100 : 0).toFixed(2) + '%',
           (mAmount >= 0 ? '+' : '') + mAmount.toFixed(2),
           (annPct >= 0 ? '+' : '') + annPct.toFixed(2),
           (annAmount >= 0 ? '+' : '') + annAmount.toFixed(2),

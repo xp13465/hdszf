@@ -392,5 +392,104 @@ if (typeof PROG !== 'undefined' && fs.existsSync(PROG)) {
     mainSrc.includes('含估计值') && read('js/rolling.js').includes('hasEstimatedData'));
 }
 
+// ---- 13) 组合层收益比例口径守卫：恒 ÷ 固定基准本金 50 万 ----
+//  用户 2026-09-30 拍板：「收益率永远统一于本金来对比」。
+//  历史问题：弹窗日志表「月收益」与 CSV「月收益率」用的是 snap.monthReturn（÷上月末总市值），
+//  与滚动汇总表 / 折线图提示（÷50万）分叉 → 同一个月在页面上出现两个数字（-2.07% vs -0.94%）。
+//  本组守住统一后的口径，三道：行为（直接跑生产代码 exportLogCSV）/ 可加性 / 源码防回潮。
+{
+  const CAP = 500000;
+
+  // 用**新跑一次**的结果，避免被前面第 10 组的叠加态污染
+  const sp13 = RB.getStartPoints().find((s) => s.isEarliest) || RB.getStartPoints()[0];
+  const r13 = RB.runSingleBacktest(sp13);
+  const snaps13 = r13.monthlySnapshots;
+
+  const lines = RB.exportLogCSV(r13).split('\n').filter((l) => l.length);
+  const head13 = lines[0].split(',');
+  check('CSV 表头「月收益率」在第 14 列（组合层）',
+    head13[13] === '月收益率', `实际=${head13[13]}`);
+  check('CSV 表头「本月收益率」在第 6 列（资产自身行情，口径不同故保留两个名字）',
+    head13[5] === '本月收益率', `实际=${head13[5]}`);
+
+  // 每月 6 个资产行重复同一组组合层列 → 取每月首行即可
+  const perMonth = [];
+  let lastMonth = null;
+  for (const row of lines.slice(1)) {
+    const c = row.split(',');
+    if (c[0] !== lastMonth) { perMonth.push(c); lastMonth = c[0]; }
+  }
+  check('CSV 月数 == 快照数', perMonth.length === snaps13.length,
+    `${perMonth.length} vs ${snaps13.length}`);
+
+  // (1) 行为：第 14 列 == Δ总市值 ÷ 50万（首月基准 = 初始本金）
+  const badBase = [], badPrev = [], matchedPrev = [];
+  for (let i = 0; i < perMonth.length; i++) {
+    const snap = snaps13[i];
+    const prev = i === 0 ? CAP : snaps13[i - 1].totalValue;
+    const expect = ((snap.totalValue - prev) / CAP) * 100;
+    const got = parseFloat(perMonth[i][13]);
+    const amountCol = parseFloat(perMonth[i][14]);
+    if (Math.abs(got - expect) > 0.006) badBase.push(`${snap.month}: ${got}% ≠ ${expect.toFixed(2)}%`);
+    if (Math.abs(amountCol - (snap.totalValue - prev)) > 0.02) badPrev.push(snap.month);
+    // 反向守卫：不得退化成 ÷上月末总市值 口径
+    const legacy = snap.monthReturn * 100;
+    if (Math.abs(got - legacy) < 0.006 && Math.abs(expect - legacy) > 0.05) matchedPrev.push(snap.month);
+  }
+  check('CSV「月收益率」== Δ总市值 ÷ 50万（逐月）', badBase.length === 0,
+    badBase.slice(0, 3).join(' | '));
+  check('CSV「月收益金额」== 相邻两月总市值之差', badPrev.length === 0, badPrev.join(','));
+  check('CSV「月收益率」未退化回 snap.monthReturn（÷上月末总市值）', matchedPrev.length === 0,
+    matchedPrev.slice(0, 5).join(','));
+  check('两种口径确实不同（证明上式非空转）',
+    snaps13.filter((s, i) => {
+      const prev = i === 0 ? CAP : snaps13[i - 1].totalValue;
+      return Math.abs(s.monthReturn * 100 - ((s.totalValue - prev) / CAP) * 100) > 0.05;
+    }).length > 0);
+
+  // (2) 可加性：Σ月份比例 == 当年比例；Σ年份比例 == 累计比例
+  const byYear = {};
+  perMonth.forEach((c) => {
+    const y = c[0].substring(0, 4);
+    (byYear[y] = byYear[y] || []).push(c);
+  });
+  const badYear = [];
+  for (const y of Object.keys(byYear)) {
+    const rows = byYear[y];
+    const sumMonth = rows.reduce((a, c) => a + parseFloat(c[13]), 0);
+    const gotYear = parseFloat(rows[rows.length - 1][15]);
+    // 容差 = 各月 toFixed(2) 的舍入累积（12 个月 × 0.005 ≈ 0.06）
+    if (Math.abs(sumMonth - gotYear) > 0.005 * rows.length + 0.02) {
+      badYear.push(`${y}: Σ月 ${sumMonth.toFixed(2)} ≠ 年 ${gotYear}`);
+    }
+  }
+  check('可加性 · Σ各月比例 == 当年比例（逐年）', badYear.length === 0, badYear.join(' | '));
+
+  const sumYear = Object.keys(byYear)
+    .reduce((a, y) => a + parseFloat(byYear[y][byYear[y].length - 1][15]), 0);
+  const lastRow = perMonth[perMonth.length - 1];
+  const gotCum = parseFloat(lastRow[18]);
+  check('可加性 · Σ各年比例 == 累计比例',
+    Math.abs(sumYear - gotCum) < 0.005 * Object.keys(byYear).length + 0.02,
+    `Σ年 ${sumYear.toFixed(2)} vs 累计 ${gotCum}`);
+
+  // (3) 源码防回潮：展示路径不得再出现 snap.monthReturn * 100
+  const mainSrc13 = read('js/main.js');
+  const rollSrc13 = read('js/rolling.js');
+  check('main.js 展示路径已无 snap.monthReturn * 100（旧口径）',
+    !/snap\.monthReturn\s*\*\s*100/.test(mainSrc13));
+  check('rolling.js 展示路径已无 snap.monthReturn * 100（旧口径）',
+    !/snap\.monthReturn\s*\*\s*100/.test(rollSrc13));
+  check('两处均已改走 ÷50万 公式',
+    /mAmount\s*\/\s*mBase/.test(mainSrc13) && /mAmount\s*\/\s*CONFIG\.totalCapital/.test(rollSrc13));
+
+  // 刻意不动的两类：资产自身月收益率 + computeMetrics 统计量
+  check('资产自身月收益率列未被改动（仍用 ad.monthReturn）',
+    /ad\.monthReturn/.test(mainSrc13) && /ad\.monthReturn/.test(rollSrc13));
+  check('computeMetrics 统计量未被改动（monthReturn 产品链仍在，供胜率/Sharpe 使用）',
+    /yearReturns\[y\] \*= \(1 \+ snap\.monthReturn\)/.test(rollSrc13) &&
+    /snaps\.filter\(s => s\.monthReturn > 0\)/.test(rollSrc13));
+}
+
 console.log(failures === 0 ? '\n全部通过 ✓' : `\n${failures} 项失败 ✗`);
 process.exit(failures === 0 ? 0 : 1);

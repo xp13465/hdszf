@@ -1624,11 +1624,17 @@
         // 总市值（第一行时显示）
         if (isFirstAsset) {
           tableHTML += `<td rowspan="${rowSpan}" style="font-weight:700;">¥${snap.totalValue.toFixed(0)}</td>`;
-          // 月收益 = 组合当月「月份 + 月收益率 + 实际收益金额」竖向排列（免视线跳回第一列）
-          const mrSnap = snap.monthReturn * 100;
-          const mrSnapClass = mrSnap > 0 ? 'action-buy' : (mrSnap < 0 ? 'action-sell' : '');
+          // 月收益 = 组合当月「月份 + 月收益比例 + 实际收益金额」竖向排列（免视线跳回第一列）
+          // ⚠️ 口径铁律（用户指定）：月收益比例 = 本月收益金额 ÷ **固定基准本金 50 万**。
+          //    **不是** snap.monthReturn —— 那是 ÷上月末总市值 的复合口径，只有约一半大小。
+          //    同一张表的下半部分「进行中行」(mtdBasePct)、表末图例、年度/累计列、
+          //    折线图提示的「环比上月」全部同此口径，故各段比例可加：
+          //    Σ月份比例 = 当年比例，Σ年份比例 = 累计比例。
           const mPrevValue = (snap.month in monthPrevMap) ? monthPrevMap[snap.month] : RollingBacktest.CONFIG.totalCapital;
           const mAmount = snap.totalValue - mPrevValue;
+          const mBase = RollingBacktest.CONFIG.totalCapital || 500000;
+          const mrSnap = mBase > 0 ? (mAmount / mBase) * 100 : 0;
+          const mrSnapClass = mrSnap > 0 ? 'action-buy' : (mrSnap < 0 ? 'action-sell' : '');
           const mLabel = snap.month.substring(0, 4) + '年' + parseInt(snap.month.substring(5, 7), 10) + '月';
           tableHTML += `<td rowspan="${rowSpan}" class="${mrSnapClass}" style="font-weight:700;text-align:right;">` +
             `<div style="font-size:0.7rem;font-weight:500;opacity:0.7;line-height:1.3;">${mLabel}</div>` +
@@ -1687,6 +1693,7 @@
         <span>— = 无操作</span>
         <span>偏离≥±5% → 触发调仓</span>
         <span>收益比例口径：÷固定基准本金 ¥50 万（进行中行亦然，故与各段收益可加）</span>
+        <span>「月收益率」列 = 该资产<b>自身</b>当月行情涨跌（市场口径，非组合口径）；组合层只看「月收益 / 累计收益 / 年度收益率」三列</span>
       </div>
     `;
 
