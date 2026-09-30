@@ -281,7 +281,7 @@ investment-advisor/
 | charts.js | v=17 | index.html |
 | rolling.js | v=20 | index.html |
 | share-image.js | v=6 | index.html |
-| main.js | v=60 | index.html |
+| main.js | v=61 | index.html |
 
 > 查当前值：`grep -o "js/[a-z_-]*\.js?v=[0-9]*\|css/[a-z_-]*\.css?v=[0-9]*" index.html`
 
@@ -714,11 +714,12 @@ const isTenure = equityXMode === 'tenure';
 - `tenure`：起点 x **全为 0**；末点 x = `[133,133,121,...,13]`；`x=0` 处 12 条都有值；`x=132` 处只有最早 2 条（**符合该口径语义**，不是 bug）；刻度 `0 → 入场`、`12 → 第1年`。
 - 来回切换后 `date` 必须**完全复现**（不得残留 tenure 的坐标）。
 
-验证脚本（不进仓库）：`node workspace/_verify_equity_axis.js`（jsdom + 抓 ECharts option + 模拟点击切换，**60 项断言 / 两模式 + MoM 专项**）、
-`workspace/_shot_xmode.py`（实机点击切换 + 两模式截图 + 读悬停提示）、`workspace/_check_tip_clip.py`（量提示框是否被裁）。
+验证脚本（不进仓库）：`node workspace/_verify_equity_axis.js`（jsdom + 抓 ECharts option + 模拟点击切换，**72 项断言 / 两模式 + MoM 专项 + 行序守卫**）、
+`workspace/_shot_xmode.py`（实机点击切换 + 两模式截图 + 读悬停提示）、`workspace/_shot_order.py`（行序证据图）、`workspace/_check_tip_clip.py`（量提示框是否被裁）。
 
-> `.chart-note` 说明行走 `index.html` 内联样式 + `.chart-mode-switch` / `.xmode-btn`，**不涉及 `css/*.css`**
-> （三套皮肤只用到 `--color-text-secondary` / `--color-border-light`，实测三份 css 都有定义）。
+> `.chart-note` 说明行走 `index.html` 内联样式 + `.chart-mode-switch` / `.xmode-btn`，**不涉及 `css/*.css`**。
+> 用到的 token 只有 `--color-text-secondary`（三份 css 都有定义）；按钮**边框用 `1px solid currentColor`**，
+> 不用 `--color-border-light` —— 该 token 在 tech（深色）皮肤里是 `#1e2433`，在深底上等于隐形（已踩过）。
 
 #### I. 折线图悬停提示新增「环比上月（MoM）」列（2026-09-30）
 
@@ -806,6 +807,44 @@ CSV 的「月收益率」列**口径分叉**（后两者用 `snap.monthReturn` =
 3. `workspace/_shot_unify.py`：证据图 `_shot_unify_bottom.png` / `_shot_unify_detail.png`。
 
 **版本**：`rolling.js` v19 → **v20**、`main.js` v59 → **v60**。
+
+---
+
+#### K. 折线图悬停提示的**行序 = 起点日期升序**（2026-09-30 · 用户报「并列值顺序不对」）
+
+**用户报告**：「按日期看 的走势图 hover 里 比如最新的 2026-09 里 排序好像是按值排序的 我希望是按日期排序
+比如 2021 和 2022 年 8 月 都是 54.2 但是现在排序不对」。
+
+**规则（新增，与 §H 的横轴口径并列）**：`tooltip.formatter` 内**必须显式排序**，键为
+`a.seriesIndex - b.seriesIndex` —— 即**起点日期升序**（`getStartPoints()` 本身按时间升序生成
+2015-08 → 2016-08 → … → 2025-08，故 series 下标 ≡ 日期序；重复起点 2015-08「一次/分批」按 series 顺序稳定并列）。
+**不接受按数值排序**：`params.sort((a,b) => b.value[1] - a.value[1])` 已下线。
+
+**为什么不能按数值排（两条，第二条是本次的核心发现）**
+1. 行序会随鼠标横移不停跳位 —— 同一屏两次悬停的行序都不同，无法逐行对照；图例顺序也失去参考价值。
+2. **并列值不稳定**：实测（临时把排序改回按值排，实机读 2026-09 那屏的真实 DOM 行序）得到
+   `… 7. 2020年8月 +56.9% / 8. 2022年8月 +54.2% / 9. 2021年8月 +54.2% …`
+   —— **2022 跑到了 2021 前面**，正是用户看到的现象。
+   根因：**ECharts 在 `trigger:'axis'` 下传入的 `params` 并非按 series 顺序，而与该点距鼠标的距离相关**
+   （此前以为"值相等时 JS 稳定排序会保住原序"，实测被推翻）。因此**并列时的先后完全由鼠标位置决定**，
+   只靠 `sort` 的稳定性救不了 → 必须给一个与鼠标无关的确定性键。
+
+**不变量（两种模式都成立）**
+- 行序 == series 顺序（== 图例顺序），且起点年份单调不减。
+- 行序与「按数值降序」是否一致**不重要**；在数值非单调的位置（实测 date 模式 `x=85`，两排序差 3 项）也必须仍是日期序。
+- 并列值（实测 2026-09 的 `2021年8月` / `2022年8月` 同为 **+54.2%**）必须按日期先后：2021 在前。
+
+**回归断言**
+- `workspace/_verify_equity_axis.js`（**72 项**，原 60 + 新增 12）：`auditOrder()` 从**渲染出的行 HTML 里反解 seriesName**
+  映射回 series 下标（不依赖 formatter 的排序逻辑），核对日期单调 + 与图例一致；
+  并构造**反例输入**（把 `params` 反序传入且把所有曲线值改成同一个数）—— 按日期排则行序逐位不变，按值排必然改变。
+  变异测试证实：把排序改回按值排 → 断言立刻报 **15 项失败**（含 `行序 [2,0,1]` 这类错位）。
+- `workspace/_pagecheck.py`（实机 **47 项**，含 §4b）：读**真实 DOM 的 innerText 行序**，
+  ① 用 `convertToPixel` 精确落在末点像素；② 自动扫描出「按值降序 ≠ 日期序」的**分歧位**并在此处验证（试金石）；
+  ③ 直接复现用户案例：断言并列 +54.2% 时 `2021年8月` 排在 `2022年8月` 之前。
+- 证据图：`workspace/_shot_order_mtd.png` / `_shot_order_discord.png`（脚本 `_shot_order.py`）。
+
+**版本**：`main.js` v60 → **v61**。
 
 ---
 
