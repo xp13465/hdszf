@@ -12,7 +12,8 @@
  *   node crontab/run_job.js mtd --no-status         # 诊断用：不写 status.json（不污染真实状态）
  *   node crontab/run_job.js mtd -- --no-fetch       # 「--」后的参数原样透传给子脚本
  *
- * 退出码：0 = 成功或按设计跳过；2 = 取数降级（无数据可发布，属正常告警）；其它 = 真失败
+ * 退出码：0 = 成功或按设计跳过；2 = 取数降级（无数据可发布，属正常告警）；
+ *        3 = 数据已生成但推送/发布失败（需重跑，见下方设计要点第 5 条）；其它 = 真失败
  *
  * 设计要点（与项目铁律一一对应）：
  *   1. 绝不自造数据 —— 所有数值都由 scripts/ 下的既有脚本产出，本运行器只负责「何时跑、跑了记什么」。
@@ -20,8 +21,12 @@
  *   3. 日志写在**仓库外**（<工作区>/_hdszf_logs/），否则会被 wrangler 当成 Assets 公开上传、还会污染 git。
  *   4. finalize 失败即自动回滚 tracked 改动（git checkout -- .），把「半成品」变回「什么都没发生」，
  *      避免下一天的运行在脏工作区上继续替换（这是无人值守最危险的场景）。
- *   5. 每次运行前做一次「自愈推送」；但若发现**远程有本地没有的提交**（另一台机器推过）就只警告不硬推 ——
- *      硬推必然被拒，而且盲目处理可能覆盖别人（自动化只应该有一台机器在跑，见 README）。
+ *   5. 每次运行前与远程做一次**双向同步**：先把远程的新提交拉下来（快进，分叉则变基），
+ *      再把本地领先的提交补推上去。只做「本地领先才推」是不够的 —— 本地 clone 一旦落后于远程
+ *      （本机 / 另一次会话推过新提交），子脚本的 push 必然被「非快进」拒绝；此时若 push 失败
+ *      只打警告而不影响退出码，就会演成「运行器记成功 → 当天不再重试 → 数据永远上不了线」
+ *      的完全静默卡死。**代价要知道**：服务器会自动跟随远程代码，推了新提交它下次运行就会用新的
+ *      （自动化只应有一台机器在跑，见 README）。
  *   6. **全局单实例锁**（两个任务共用一把锁）：Windows 计划任务默认「任务已在运行则不再启动新实例」，
  *      而 Linux cron **没有**这层保护，上一轮还没跑完（定稿全流程可能几分钟）下一小时就又起一个；
  *      且 mtd 与 finalize 的时段本来就有重叠。两个进程同时 git add/commit/push 会互相踩，必须自己串行化。
@@ -207,29 +212,59 @@ function treeClean() {
   return r.ok && r.out === '';
 }
 
-/** 自愈推送：本地领先远程就先推上去，防止「上次 push 失败 → 此后一直静默卡住」。
- *  但**只在本地确实是领先时**才推：远程领先/分叉时硬推必然被拒，还会掩盖「另一台机器也在跑自动化」这个真问题。 */
-function selfHealPush() {
-  if (!treeClean()) { log('  · 工作区有未提交改动，跳过自愈推送'); return; }
-  const head = gitTry(['rev-parse', 'HEAD']);
-  if (!head.ok) { log('  · 读不到本地 HEAD，跳过自愈推送'); return; }
+/** 与远程双向同步（每次任务执行**前**调用）。两步，顺序不能颠倒：
+ *    ① 拉：远程领先 → 快进拉取；已分叉 → 变基拉取（把本地提交重放到最新代码之上）。
+ *    ② 推：本地领先远程 → 补推。含「上一轮 push 被拒而留在本地的进度快照提交」。
+ *
+ *  为什么必须做①：本地 clone 一旦落后于远程，子脚本的 `git push` 必然被「非快进」拒绝。
+ *  2026-09-30 实测踩到：cron 上午装好、下午本机推了 6 个提交，当晚 18:07 的 mtd 取数成功、
+ *  本地 commit 成功、push 被拒，而 monthly_progress.js 当时只打 `[warn]` 不影响退出码 →
+ *  运行器记「成功」→ oncePer:'day' 闸门关闭 → 当天不再重试 → 数据永远上不了线，全程静默。
+ *
+ *  ⚠️ 只在工作区干净（tracked 无改动）时动手：脏工作区一律不 pull / rebase，避免冲掉人工改动。
+ *  ⚠️ 拉取后可执行的是**远程的最新代码**——推了坏改动时应当 revert 远程，而不是指望这里回滚。 */
+function syncWithRemote() {
+  if (!treeClean()) { log('  · 工作区有未提交改动，跳过远程同步（不 pull，避免冲掉改动）'); return; }
+  const head0 = gitTry(['rev-parse', 'HEAD']);
+  if (!head0.ok) { log('  · 读不到本地 HEAD，跳过远程同步'); return; }
   const fetched = gitTry(['fetch', '--quiet', 'origin', 'main']);
-  if (!fetched.ok) { log('  · fetch 失败（网络或凭据问题），跳过自愈推送'); return; }
+  if (!fetched.ok) { log('  · fetch 失败（网络或凭据问题），跳过远程同步'); return; }
   const remote = gitTry(['rev-parse', 'FETCH_HEAD']);
-  if (!remote.ok) { log('  · 读不到远程 tip，跳过自愈推送'); return; }
-  if (remote.out === head.out) { log('  · 本地与远程一致，无需自愈推送'); return; }
+  if (!remote.ok) { log('  · 读不到远程 tip，跳过远程同步'); return; }
 
-  const localAhead = gitTry(['merge-base', '--is-ancestor', remote.out, head.out]).ok;
-  if (!localAhead) {
-    log(`  ⚠ 远程(${remote.out.slice(0, 7)}) 上有本地没有的提交 → 不自动推送`);
-    log('    · 原因：另一台机器（或另一次会话）已经推过了');
-    log('    · 处置：本地 git pull --rebase 后重跑；自动化只应有一台机器在跑，见 crontab/README.md');
+  const isAncestor = (a, b) => gitTry(['merge-base', '--is-ancestor', a, b]).ok;
+
+  // ---- ① 拉：远程领先 或 已分叉（即远程有本地没有的提交）----
+  if (remote.out !== head0.out && !isAncestor(remote.out, head0.out)) {
+    const remoteAhead = isAncestor(head0.out, remote.out);
+    log(remoteAhead
+      ? `  ! 远程(${remote.out.slice(0, 7)}) 领先本地(${head0.out.slice(0, 7)}) → 快进拉取`
+      : `  ! 本地(${head0.out.slice(0, 7)}) 与远程(${remote.out.slice(0, 7)}) 已分叉 → 变基拉取`);
+    let pull = gitTry(['pull', '--ff-only', 'origin', 'main']);
+    if (!pull.ok) {
+      // 分叉的典型成因：上一轮进度快照已在本地 commit 但 push 被拒 —— 变基正好把那个提交重放上来。
+      pull = gitTry(['pull', '--rebase', 'origin', 'main']);
+    }
+    if (!pull.ok) {
+      gitTry(['rebase', '--abort']);
+      log(`  ✗ 拉取失败：${pull.out.split('\n')[0]}`);
+      log('    · 处置：cd 到仓库手动 git status / git pull --rebase 排查');
+      return;                                  // 跟不上就不要再跑：跑了也推不上去
+    }
+    log('    · 注意：随后执行的是拉取后的新代码');
+  }
+
+  // ---- ② 推：本地领先远程（含①里 rebase 保住的本地提交）----
+  const head = gitTry(['rev-parse', 'HEAD']);
+  if (!head.ok) { log('  · 读不到本地 HEAD，跳过补推'); return; }
+  if (remote.out === head.out) { log('  · 本地与远程一致，无需补推'); return; }
+  if (!isAncestor(remote.out, head.out)) {
+    log(`  ⚠ 本地(${head.out.slice(0, 7)}) 与远程(${remote.out.slice(0, 7)}) 不一致且非领先关系，跳过补推`);
     return;
   }
-  log(`  ! 本地(${head.out.slice(0, 7)}) 领先远程(${remote.out.slice(0, 7)}) → 尝试补推`);
+  log(`  ! 本地(${head.out.slice(0, 7)}) 领先远程(${remote.out.slice(0, 7)}) → 补推`);
   const p = gitTry(['push', 'origin', 'main']);
-  if (!p.ok) log(`  ✗ 补推失败：${p.out.split('\n')[0]}`);
-  else log('  ✓ 补推成功（上次失败的推送已恢复）');
+  log(p.ok ? '  ✓ 补推成功（上次被拒的推送已恢复）' : `  ✗ 补推失败：${p.out.split('\n')[0]}`);
 }
 
 // ---------------------------------------------------------------- 闸门
@@ -295,7 +330,7 @@ function runOnce(cfg, st, s) {
   writeStatus(st);
 
   log(`[${stamp()}] 尝试 ${s.attempts_today}/${cfg.attemptsPerDay}${FORCE ? '（--force）' : ''}`);
-  selfHealPush();
+  syncWithRemote();
 
   const beforeClean = cfg.revertOnFailure ? treeClean() : true;
   const childArgs = [path.join(ROOT, cfg.script)].concat(cfg.args, PASSTHROUGH);
@@ -322,9 +357,11 @@ function runOnce(cfg, st, s) {
 
   const raw = out + '\n' + err;
   // 把子脚本的「按设计不更新」翻译成人话，避免状态报表里出现看似失败的 ✗ 行
-  const msg = /尚未走完/.test(raw)
-    ? '按设计不更新：目标月尚未走完（下月初自动重试）'
-    : summarize(raw);
+  const msg = code === 3
+    ? '快照已生成但未推送上线（push 被拒：远程有本地没有的提交）→ 下次运行前会自动同步重推'
+    : /尚未走完/.test(raw)
+      ? '按设计不更新：目标月尚未走完（下月初自动重试）'
+      : summarize(raw);
   s.last_exit = code;
   s.last_msg = msg;
   s.last_duration_s = Number(secs);

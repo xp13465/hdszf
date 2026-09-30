@@ -51,6 +51,11 @@ const NO_JSON = has('--no-json');
 const JSON_OUT = arg('json') || 'js/progress.json';
 const PUSH = has('--push');
 
+// 推送（发布）是否失败：push 被拒时置位，让退出码带上「数据已生成但未上线」的语义。
+// 为什么必须置位：push 失败若只打警告、不影响退出码，运行器会把本次记成「成功」并关掉当天的
+// 重试闸门 —— 数据永远上不了线却毫无告警，是完全静默的卡死（2026-09-30 实测踩到）。
+let PUBLISH_FAILED = false;
+
 // Node 18+ 才有全局 fetch（实时取数用它直连新浪）。Ubuntu 22.04 用 apt 装到的 nodejs 只有 12.x，
 // 届时报错会是「fetch is not defined」这种看不出所以然的形式 —— 这里提前拦住并给出装法。
 if (!NO_FETCH && typeof fetch !== 'function') {
@@ -301,21 +306,25 @@ function existingIdentityValid() {
     }
     // 推送闸门：只为「含真实 MTD 的快照」或「明确标记 degraded、估算字段全为 null 的占位」推送。
     // 绝不允许把用 0 填补出来的估算推上线（keepExisting 时文件根本没动，也无需推送）。
-    if (PUSH && !keepExisting) gitPushJson(JSON_OUT);
+    if (PUSH && !keepExisting) PUBLISH_FAILED = !gitPushJson(JSON_OUT);
   }
 
-  // 退出码：2 = 降级（本次未发布任何本月至今数据）→ 自动化应如实上报并安排重跑。
+  // 退出码：2 = 降级（本次未发布任何本月至今数据）；3 = 数据已生成但推送失败（未上线，需重跑）。
+  // 3 的意义：push 被拒（远程有新提交）时不能让运行器误判为「成功」—— 那会关掉当天闸门，
+  // 数据永远上不了线却毫无告警。运行器把 3 当「真失败」→ 记 fail_streak 并在当天继续重试。
+  if (PUBLISH_FAILED) process.exit(3);
   process.exit(DEGRADED && !NO_FETCH ? 2 : 0);
 })();
 
-// 仅提交并推送进度 JSON（有变化才提交），推后核对远程 tip
+// 仅提交并推送进度 JSON（有变化才提交），推后核对远程 tip。
+// 返回值：true = 已上线（或无需提交）；false = 本次未上线 —— 调用处据此设置退出码 3。
 function gitPushJson(relPath) {
   const { execSync } = require('child_process');
   const run = (cmd) => execSync(cmd, { cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe'] }).toString().trim();
   try {
     if (!run(`git status --porcelain -- ${relPath}`)) {
       console.error('[skip] git 无变更，跳过提交');
-      return;
+      return true;
     }
     run(`git add -- ${relPath}`);
     const msg = `chore(progress): 更新进行中月份进度快照 ${relPath}\n\n由 scripts/monthly_progress.js --push 自动生成（只读快照，不修改 data.js / real_returns.json）`;
@@ -324,9 +333,20 @@ function gitPushJson(relPath) {
     run(`git push origin ${branch}`);
     const tip = execSync(`git ls-remote origin ${branch}`, { cwd: ROOT }).toString().trim().split(/\s+/)[0];
     const local = run('git rev-parse HEAD');
-    console.error(tip === local ? `[ok] 已推送，远程 tip=${tip.slice(0, 7)}` : `[warn] 远程 tip=${tip.slice(0, 7)} 与本地 ${local.slice(0, 7)} 不一致，请人工核对`);
+    if (tip === local) {
+      console.error(`[ok] 已推送，远程 tip=${tip.slice(0, 7)}`);
+      return true;
+    }
+    // push 命令没抛错、但远程 tip 没跟上 → 同样是「没上线」，必须按失败处理
+    console.error(`[error] 推送后远程 tip=${tip.slice(0, 7)} ≠ 本地 HEAD=${local.slice(0, 7)} → 本次未上线（退出码 3）`);
+    return false;
   } catch (e) {
-    console.error('[warn] commit/push 失败：' + String(e.message || e).split('\n')[0]);
+    // 最常见：push 被「非快进」拒绝（远程有本地没有的提交）。
+    // 运行器下次运行前会先与远程同步（crontab/run_job.js#syncWithRemote），届时自动恢复。
+    console.error('[error] commit/push 失败：' + String(e.message || e).split('\n')[0]);
+    console.error('   · 若为「非快进」拒绝：远程有本地没有的提交 → 运行器下次运行前会自动 pull --rebase 后重推');
+    console.error('   · 手工处置：cd 到仓库 && git pull --rebase && node scripts/monthly_progress.js --push');
+    return false;
   }
 }
 
