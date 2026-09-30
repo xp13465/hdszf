@@ -219,6 +219,8 @@
     /* 板块级「本月至今」说明行 */
     .live-note-line { display: none; margin-top: 0.85rem; font-size: 0.75rem; line-height: 1.6; color: var(--color-text-secondary, #5f6368); background: rgba(192,86,0,0.07); border: 1px solid rgba(192,86,0,0.25); border-radius: 8px; padding: 0.55rem 0.8rem; }
     body.has-live-estimate .live-note-line { display: block; }
+    /* 图表下方口径说明（横轴为日历时间，同一月份各起点都有数值） */
+    .chart-note { margin-top: 0.6rem; font-size: 0.72rem; line-height: 1.65; color: var(--color-text-muted, #94989e); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <script src="js/vendor/qrcode.min.js"></script>
@@ -429,6 +431,7 @@
         <div class="chart-card">
           <div class="chart-title">📈 不同起点的累计收益曲线对比</div>
           <div id="chart-rolling-equity" class="chart-container chart-wide"></div>
+          <div class="chart-note">横轴为<b>日历时间</b>（自 2015 年 8 月起），因此同一个月份上各个起点都有数值——曲线右端聚拢是正常的：越晚入场的起点，覆盖的时间越短。纵轴为相对固定基准 50 万本金的累计收益率。悬停可看该月各起点的收益与已持有的月数。</div>
         </div>
       </div>
 
@@ -829,7 +832,7 @@
   <script src="js/charts.js?v=17"></script>
   <script src="js/rolling.js?v=19"></script>
   <script src="js/share-image.js?v=6"></script>
-  <script src="js/main.js?v=56"></script>
+  <script src="js/main.js?v=57"></script>
 
 
   <!-- ===== SEO 静态文本（爬虫可见） ===== -->

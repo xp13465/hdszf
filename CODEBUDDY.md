@@ -281,7 +281,7 @@ investment-advisor/
 | charts.js | v=17 | index.html |
 | rolling.js | v=19 | index.html |
 | share-image.js | v=6 | index.html |
-| main.js | v=55 | index.html |
+| main.js | v=57 | index.html |
 
 > 查当前值：`grep -o "js/[a-z_-]*\.js?v=[0-9]*\|css/[a-z_-]*\.css?v=[0-9]*" index.html`
 
@@ -670,6 +670,38 @@ investment-advisor/
 **为什么前端看标志而不是看数值**：已验证「`degraded: true` 但数值被填成 0」（模拟修复前的伪数据）时前端**仍不展示估算** —— 闸门挂在标志上，即使将来有人写错数值也不会漏出去。
 
 验证脚本（不进仓库）：`C:\Users\23405\.workbuddy\binaries\node\workspace\_check_degraded.js`（jsdom 四场景：正常 / 降级全 null / 降级含伪 0 / 老快照无 degraded 字段）。
+
+#### H. 滚动板块折线图横轴 = **全局日历月序**（2026-09-30 修 —— 用户报「最新月份只有 1 个数值」）
+
+**现象**：悬停到最右侧（如 2026-09）时提示里只有 1~2 条曲线，而同一时刻本该 12 个起点都有值。
+
+**根因**：`renderRollingEquityChart` 用**曲线内局部下标** `j` 当横轴（`data.push([j, ...])`），
+12 条曲线因此全部左对齐到 `x=0`（视觉上像"同一起点出发"）；而刻度年份又按**最早起点**换算
+（`baseYear/baseMonth = results[0].startPoint`）。两套语义打架：看着是一条日历时间轴，
+实际每条的 x 是「入场后第几个月」→ 只有最早起点那条能延伸到最右端。
+
+**修法**：横轴统一为**全局日历月序**（最早起点月 = 0），`x` 由日历月换算：
+
+```js
+const basePoint = results[0].startPoint;                  // 2015-08 → x = 0
+const toGlobalX = (ym) => { const [y,m] = String(ym).split('-').map(Number);
+  return (y - basePoint.year) * 12 + (m - basePoint.month); };
+// 每条曲线：offset = toGlobalX(snapshots[0].month)；点 = [offset + j, 收益率]
+// 本月至今点 = [toGlobalX(r.live.month), ...]（所有曲线共用同一 x）
+```
+
+**连带必须同步的三处**（漏一处就自相矛盾）：
+1. `markPoint` 的 `coord` 用 `data[data.length-1][0]` 取实际 x（**不能**再用 `data.length - 1`）；
+2. 刻度 `axisLabel.formatter` 复用同一个 `xToYm()`；旧代码里的硬编码 `v === 131` 已删（`v % 12 === 0` 足够）；
+3. 悬停提示：首行给**日历年月**，每行附「入场后第 N 个月」（`x - offsets[seriesIndex] + 1`）—— 同一日历月上各起点持有期不同，旧文案「第 N 个月」会被误读成持有期。
+
+**改动后的不变量（改动前必测）**：所有曲线末点 x 相同（= 进行中月）；该 x 处 **12 条曲线都有值**；
+各曲线起点 x = `[0,0,12,24,...,120]`（两个 2015-08 起点 + 每年一个）；`x=0 → 2015年`、`x=132 → 2026年`。
+验证脚本（不进仓库）：`node workspace/_verify_equity_axis.js`（jsdom + 抓 ECharts option，27 项断言）、
+`workspace/_shot_equity_axis.py`（实机截图 + 读悬停提示，最新月份应含 12 个起点）。
+
+> 图表下方新增 `.chart-note` 说明行（`index.html` 内联样式，不涉及 `css/*.css`）：
+> 「横轴为日历时间…曲线右端聚拢是正常的」。曲线右端聚拢是**正确**形态，不是数据缺失。
 
 ---
 

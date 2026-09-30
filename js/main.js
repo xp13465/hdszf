@@ -817,19 +817,36 @@
     const chart = echarts.init(dom);
     rollingCharts.equity = chart;
 
+    // 横轴口径 = **全局日历月序**（最早起点月 = 0），不是「各曲线自己的局部下标」。
+    // ⚠️ 旧实现用局部下标 j：12 条曲线视觉上全部左对齐到 x=0，而刻度年份却按最早起点换算，
+    //    两种语义打架 → 悬停最右侧（最新月份）只有最早起点那 1~2 条曲线有值（用户报的 bug）。
+    //    正确形态：同一日历月上，各曲线从各自入场月延伸过来，都该有点。
+    const basePoint = results[0].startPoint;   // 最早起点（2015-08）→ 全局月序 0
+    const toGlobalX = (ym) => {
+      const [y, m] = String(ym).split('-').map(Number);
+      return (y - basePoint.year) * 12 + (m - basePoint.month);
+    };
+    const xToYm = (x) => {
+      const totalM = basePoint.month - 1 + x;
+      return { y: basePoint.year + Math.floor(totalM / 12), m: (totalM % 12) + 1 };
+    };
+
     // 调色板：一次建仓=红色系，分批建仓=蓝绿渐深
+    const offsets = [];                        // 各曲线在全局月序中的起点（tooltip 算「入场后第几个月」用）
     const series = results.map((r, i) => {
       const snapshots = r.monthlySnapshots;
+      const offset = snapshots.length ? toGlobalX(snapshots[0].month) : toGlobalX(r.startPoint.key);
+      offsets.push(offset);
       const data = [];
       for (let j = 0; j < snapshots.length; j++) {
-        data.push([j, (snapshots[j].totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100]);
+        data.push([offset + j, (snapshots[j].totalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100]);
       }
 
       // 本月至今（MTD）（live overlay）：把进行中月作为末点接上。
       // 该点是 本月至今 MTD，末端用空心圆标出，与固化月区分（表头说明行 + 悬停提示同步解释）。
       let liveCoord = null;
       if (r.live) {
-        liveCoord = [snapshots.length, (r.live.finalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100];
+        liveCoord = [toGlobalX(r.live.month), (r.live.finalValue / RollingBacktest.CONFIG.totalCapital - 1) * 100];
         data.push(liveCoord);
       }
 
@@ -857,7 +874,7 @@
         markPoint: isEarliest ? {
           data: [{
             name: '终点',
-            coord: [data.length - 1, data[data.length - 1][1]],
+            coord: [data[data.length - 1][0], data[data.length - 1][1]],
             symbol: 'pin',
             symbolSize: 38,
             itemStyle: { color: '#c53030' },
@@ -878,9 +895,9 @@
       };
     });
 
-    // 找出最近和最早起点的数据，用于标注
-    const latestResult = results[results.length - 1]; // 2025-07
-    const earliestResult = results[0]; // 2015-08
+    // 进行中月（本月至今）落在全局月序的哪个位置：所有曲线的末点共用同一个 x
+    const liveRes = results.find((r) => r.live);
+    const liveX = liveRes ? toGlobalX(liveRes.live.month) : null;
 
     const option = {
       backgroundColor: 'transparent',
@@ -892,18 +909,18 @@
         padding: [10, 14],
         textStyle: { fontSize: 12, color: '#333' },
         formatter: function(params) {
-          const monthIdx = params[0].axisValue;
-          // 推算年份月份
-          const baseYear = results[0].startPoint.year;
-          const baseMonth = results[0].startPoint.month;
-          const totalM = baseMonth - 1 + monthIdx;
-          const y = baseYear + Math.floor(totalM / 12);
-          const m = (totalM % 12) + 1;
-          let html = `<strong>${y}年${m}月 · 第${monthIdx + 1}个月</strong><br/>`;
+          const x = params[0].axisValue;
+          const { y, m } = xToYm(x);
+          const isLive = liveX !== null && x === liveX;
+          let html = `<strong>${y}年${m}月</strong>`;
+          html += `<span style="color:#999;">　${params.length} 个起点${isLive ? ' · 本月至今（MTD）' : ''}</span><br/>`;
           params.sort((a, b) => b.value[1] - a.value[1]);
           for (const p of params) {
+            // 「入场后第 N 个月」按各自起点换算 —— 同一日历月上各曲线的持有期长度不同
+            const held = x - offsets[p.seriesIndex] + 1;
             html += `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:4px;"></span>`;
-            html += `${p.seriesName}: <strong>${p.value[1] >= 0 ? '+' : ''}${p.value[1].toFixed(1)}%</strong><br/>`;
+            html += `${p.seriesName}: <strong>${p.value[1] >= 0 ? '+' : ''}${p.value[1].toFixed(1)}%</strong>`;
+            html += `<span style="color:#999;">　入场后第${held}个月</span><br/>`;
           }
           return html;
         }
@@ -920,20 +937,13 @@
       grid: { left: 55, right: 35, top: 25, bottom: 45 },
       xAxis: {
         type: 'value',
-        name: '回测月数',
+        name: '日历时间',
         nameTextStyle: { fontSize: 11, color: '#aaa' },
         axisLabel: {
           fontSize: 10, color: '#999',
           formatter: function(v) {
-            // 每隔12个月标年份
-            if (v % 12 === 0 || v === 131) {
-              const baseYear = results[0].startPoint.year;
-              const baseMonth = results[0].startPoint.month;
-              const totalM = baseMonth - 1 + v;
-              const y = baseYear + Math.floor(totalM / 12);
-              return y + '年';
-            }
-            return '';
+            // 每 12 个月标一个年份；v 已是全局月序 → 换算出的年份对**所有**曲线都成立
+            return v % 12 === 0 ? xToYm(v).y + '年' : '';
           }
         },
         min: 0,
