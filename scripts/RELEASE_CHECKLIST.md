@@ -136,13 +136,21 @@
     `null` = 本次无数据（可发布）；`0` = 伪造的「当月持平」（绝不可发布，会被 live overlay
     当成真的本月数据发到全站 Hero / 三档卡 / 指标卡 / 滚动板块）。前端识别 `degraded` 后自动回退已定稿口径。
   - 实时取数需联网；若自动化环境无外网，会降级并在报告里标明。
-  - **调度方式（2026-09-29 变更：改为纯脚本，零 AI 依赖）**：由本机 **Windows 计划任务**在每交易日 18:00 之后唤醒
+  - **调度方式（2026-09-29 变更：改为纯脚本，零 AI 依赖；2026-09-30 支持 Linux）**：
+    由 **Windows 计划任务**或 **Linux cron** 在每交易日 18:00（北京时间）之后唤醒
     `crontab/run_job.js mtd`（自带「当天成功一次即停」闸门，因此可高频唤醒补跑而不会重复提交/部署）。
-    月度定稿同理，走 `hdszf-finalize` 任务（每月 3 日起、当月成功一次即停）。
-    **安装命令 / 手动跑法与频率 / 查看清单 / 维护方法 / 故障处置** 全部见 **`crontab/README.md`**。
-    不装计划任务时手动跑：每交易日 `node crontab/run_job.js mtd --force`、每月 `node crontab/run_job.js finalize --force`。
-    ⚠️ 运行器日志与状态写在**仓库之外**（`<工作区>\_hdszf_logs\`）：仓库根是 Assets 发布目录，放进去会被公开上传并污染 git。
+    月度定稿同理，走 `finalize` 任务（每月 3 日起、当月成功一次即停）。
+    **安装命令 / 手动跑法与频率 / 查看清单 / 维护方法 / 故障处置** 全部见 **`crontab/README.md`**
+    （Ubuntu 云服务器部署见 README 第 10 节：`bash crontab/install.sh`）。
+    不装调度器时手动跑：每交易日 `node crontab/run_job.js mtd --force`、每月 `node crontab/run_job.js finalize --force`。
+    ⚠️ 运行器日志与状态写在**仓库之外**（Windows `<工作区>\_hdszf_logs\`；Linux `<仓库上级>/_hdszf_logs/`）：
+    仓库根是 Assets 发布目录，放进去会被公开上传并污染 git。
     ⚠️ 运行器只决定「何时跑」，不产出任何数值；「月未走完不更新」仍由 `monthly_update.js` 自己把住（未走完 → exit 0）。
+    ⚠️ 跨平台三处硬约束（改动前必读，详见 `crontab/README.md` 第 10 节）：
+    ① **时区归一**（4 个脚本里的 `TZ-GUARD`）—— 云服务器多为 UTC，不归一「18:00 后」会整体错 8 小时；
+    ② **单实例锁**（`_hdszf_logs/automation.lock`）—— cron 没有 Windows 计划任务那层「已在运行就不启动新实例」保护；
+    ③ **`.gitattributes` 锁 `*.sh` 为 LF** —— 否则 Linux 报 `bad interpreter: ...^M`。
+    ⚠️ **自动化只应有一台机器在跑**（推荐云服务器，本机作替补手动补跑），否则两处 push 互相撞。
 - **口径（与站内一致）**：组合"本月至今"百分比 = 变更金额 ÷ **固定基准本金 50 万**（不是 ÷ 上月末总市值），与日志表「月收益 / 年度收益率 / 累计收益」三列同口径、可加。JSON 里 `est_change_pct_prev` 是 ÷ 上月末总市值的**参考值**，页面仅在日志行里以极小字标注。
 - **站点展示**：`--push` 会把 `js/progress.json` 提交并推送 → CF 自动部署 → 打开**「完整持仓日志」**即可看到表格**末行**（倒序时为首行）的「🟡 进行中」行（`js/main.js` 的 `ensureLiveProgress()` + `buildLiveRows()`）。
   - 2026-09-29 用户否掉了"首页独立区块"形态，改为**日志表格内一行**；旧的 `index.html#live-progress` 区块与 `.live-*` 样式、`initLiveProgress()`/`renderLiveProgress()` 已删除。

@@ -2,13 +2,14 @@
 /**
  * 恒市值助手 · 自动化健康检查（查看清单）
  *
- * 一条命令看清「计划任务有没有在跑、数据有没有跟上、线上有没有更新」。
+ * 一条命令看清「计划任务/cron 有没有在跑、数据有没有跟上、线上有没有更新」。
+ * Windows 与 Linux 通用：平台不同时第 2 段的取数方式自动切换（schtasks / crontab -l）。
  *
  * 用法：
  *   node crontab/status.js                # 完整报告
  *   node crontab/status.js --online       # additionally 核对线上版本号与数据截止月
  *   node crontab/status.js --tail=30      # 每个任务多打几行日志
- *   node crontab/status.js --no-tasks     # 不调用 schtasks（沙箱/无权限时用）
+ *   node crontab/status.js --no-tasks     # 不查调度器（沙箱/无权限/手动模式时用）
  *
  * 只读脚本：不修改任何文件、不执行任何写操作、不产生提交。
  */
@@ -19,6 +20,12 @@ const path = require('path');
 const vm = require('vm');
 const { execFileSync, spawnSync } = require('child_process');
 
+// ---------------------------------------------------------------- TZ-GUARD（时区归一）
+// 与 run_job.js 同源：本报表里的时间、星期、日期必须和运行器闸门的判断口径一致（北京时间）。
+// 否则云服务器是 UTC 时，你会看到「时间显示没到 18:00，但日志说已经跑了」这种自相矛盾的报表。
+process.env.TZ = process.env.HDSZF_TZ || 'Asia/Shanghai';
+
+const IS_WIN = process.platform === 'win32';
 const ROOT = path.resolve(__dirname, '..');
 // 日志与状态一律放在**仓库之外**：仓库目录是 Cloudflare Assets 的发布根，
 // 放进去会被公开上传、还会污染 git。可用 HDSZF_LOG_DIR 覆盖（测试/迁移用）。
@@ -26,6 +33,7 @@ const LOG_DIR = process.env.HDSZF_LOG_DIR
   ? path.resolve(process.env.HDSZF_LOG_DIR)
   : path.resolve(ROOT, '..', '_hdszf_logs');
 const STATUS_FILE = path.join(LOG_DIR, 'status.json');
+const LOCK_FILE = path.join(LOG_DIR, 'automation.lock');
 
 const argv = process.argv.slice(2);
 const has = (f) => argv.includes(f);
@@ -74,7 +82,13 @@ function readDataWindow() {
   } catch (e) { return { err: String(e.message || e) }; }
 }
 
+// ---------------------------------------------------------------- 调度器查询
+// Windows → schtasks；Linux/macOS → 当前用户的 crontab（crontab/install.sh 写入的条目）
 function taskInfo(name) {
+  return IS_WIN ? schtasksInfo(name) : crontabInfo(name);
+}
+
+function schtasksInfo(name) {
   // schtasks 的中文输出在 GBK 控制台下会乱码 → 用 cmd 先切 UTF-8 再取
   const r = spawnSync('cmd.exe', ['/c', `chcp 65001>nul && schtasks /query /tn "${name}" /fo LIST /v`], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
   if (r.error || r.status !== 0) return { err: '任务未注册或无法查询' };
@@ -90,6 +104,66 @@ function taskInfo(name) {
   };
 }
 
+function crontabRead() {
+  const r = spawnSync('crontab', ['-l'], { encoding: 'utf8' });
+  if (r.error) return { err: `无法执行 crontab -l：${String(r.error.message || r.error)}` };
+  if (r.status !== 0) return { err: '当前用户没有 crontab（未注册，或 crontab 命令不可用）' };
+  return { lines: String(r.stdout || '').split(/\r?\n/) };
+}
+
+/** Ubuntu/Debian 的 cron 守护进程是否在跑；不是 systemd 的环境返回 null（不算错误） */
+function cronServiceState() {
+  const r = spawnSync('systemctl', ['is-active', 'cron'], { encoding: 'utf8' });
+  if (r.error) return null;
+  return String(r.stdout || '').trim() || null;
+}
+
+function crontabInfo(name) {
+  const ce = crontabRead();
+  if (ce.err) return { err: ce.err };
+  const jobs = ce.lines.filter((l) => !l.trim().startsWith('#') && /run_job\.js\s+(mtd|finalize)(\s|$)/.test(l));
+  const mine = jobs.filter((l) => new RegExp(`run_job\\.js\\s+${name}(\\s|$)`).test(l));
+  if (!mine.length) {
+    return { err: jobs.length ? `crontab 里有 hdszf 条目，但没有 ${name}` : 'crontab 里没有 hdszf 条目（未注册）' };
+  }
+  return { name, state: '已注册', next: `${nextCronRun(mine[0])}（估算）`, raw: mine.join('\n') };
+}
+
+/** 只解析我们自己写的表达式（`*` / `a-b` / `a,b` / 数字），够用且不会误判 */
+function nextCronRun(line) {
+  const f = line.trim().split(/\s+/);
+  if (f.length < 5) return '—';
+  const parse = (s, max) => {
+    if (s === '*') return null;                     // null = 通配
+    const out = [];
+    for (const part of s.split(',')) {
+      const m = part.match(/^(\d+)(?:-(\d+))?$/);
+      if (!m) return undefined;                     // undefined = 解析不了
+      const a = Number(m[1]); const b = m[2] ? Number(m[2]) : a;
+      for (let i = a; i <= b; i++) if (i >= 0 && i <= max) out.push(i);
+    }
+    return out.sort((x, y) => x - y);
+  };
+  const mins = parse(f[0], 59); const hrs = parse(f[1], 23);
+  if (mins === undefined || hrs === undefined) return '—';
+  const now = new Date();
+  const p2 = (x) => String(x).padStart(2, '0');
+  for (let d = 0; d < 2; d++) {
+    for (let h = (d === 0 ? now.getHours() : 0); h < 24; h++) {
+      if (hrs && !hrs.includes(h)) continue;
+      for (const m of mins) {
+        const t = new Date(now);
+        t.setDate(now.getDate() + d);
+        t.setHours(h, m, 0, 0);
+        if (t.getTime() > now.getTime()) {
+          return `${t.getFullYear()}-${p2(t.getMonth() + 1)}-${p2(t.getDate())} ${p2(t.getHours())}:${p2(t.getMinutes())}`;
+        }
+      }
+    }
+  }
+  return '—';
+}
+
 function tailLog(job, n) {
   const d = new Date();
   const f = path.join(LOG_DIR, `${job}_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}.log`);
@@ -100,7 +174,7 @@ function tailLog(job, n) {
 
 (async () => {
   console.log(`${C.b}恒市值助手 · 自动化健康检查${C.x}   ${C.d}${nowStamp()}${C.x}`);
-  console.log(`${C.d}仓库 ${ROOT}${C.x}`);
+  console.log(`${C.d}仓库 ${ROOT}   ${process.platform} · node ${process.version} · TZ=${process.env.TZ}${C.x}`);
 
   // ---------------------------------------------------------------- 1. 运行器状态
   h('1. 计划任务运行状态（本运行器自己的记录）');
@@ -133,22 +207,42 @@ function tailLog(job, n) {
     }
   }
 
-  // ---------------------------------------------------------------- 2. 系统计划任务
-  h('2. Windows 计划任务注册情况');
+  // 单实例锁：存在且持有进程仍活着 = 当前真有一个任务在跑（另一个任务本次会按设计跳过）
+  if (fs.existsSync(LOCK_FILE)) {
+    let info = {};
+    try { info = JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8')); } catch (_) {}
+    const ageS = Math.round((Date.now() - fs.statSync(LOCK_FILE).mtimeMs) / 1000);
+    let alive = false;
+    if (info.pid) { try { process.kill(info.pid, 0); alive = true; } catch (e) { alive = e.code === 'EPERM'; } }
+    if (alive) console.log(`\n${OK} 正在运行：${info.job}（pid=${info.pid}，已 ${ageS}s）`);
+    else console.log(`\n${WARN}发现僵尸锁：${info.job || '?'} pid=${info.pid} 已 ${Math.round(ageS / 60)} 分钟 → 下次唤醒会自动接管；也可直接删 ${LOCK_FILE}`);
+  }
+
+  // ---------------------------------------------------------------- 2. 调度器注册情况
+  h(IS_WIN ? '2. Windows 计划任务注册情况' : '2. Linux cron 注册情况');
   if (NO_TASKS) {
     console.log(`${C.d}（--no-tasks：已跳过）${C.x}`);
   } else {
+    if (!IS_WIN) {
+      const cs = cronServiceState();
+      if (!cs) console.log(`${C.d}cron 服务状态未知（没有 systemctl，或不适用）${C.x}`);
+      else if (cs === 'active') console.log(`${OK} cron 服务：active`);
+      else console.log(`${WARN}cron 服务状态 = ${cs} → 修：sudo systemctl enable --now cron`);
+    }
     for (const name of ['hdszf-mtd', 'hdszf-finalize']) {
       const t = taskInfo(name);
       if (t.err) {
         console.log(`${BAD} ${padEnd(name, 16)} ${t.err}`);
-        console.log(`   ${C.d}注册命令见 crontab/install.cmd${C.x}`);
-      } else {
+        console.log(`   ${C.d}注册命令见 crontab/${IS_WIN ? 'install.cmd' : 'install.sh'}${C.x}`);
+      } else if (IS_WIN) {
         console.log(`${OK} ${padEnd(name, 16)} 状态=${t.state}  上次=${t.last}  结果=${t.lastResult}  下次=${t.next}`);
         if (t.state === 'Disabled' || t.state === '已禁用') console.log(`   ${WARN}任务被禁用 → 用 schtasks /change /tn ${name} /enable 重新启用`);
+      } else {
+        console.log(`${OK} ${padEnd(name, 16)} ${t.state}  下次≈${t.next}`);
+        t.raw.split('\n').forEach((l) => console.log(`   ${C.d}${l}${C.x}`));
       }
     }
-    console.log(`${C.d}  提示：上次运行结果 0=成功；2=降级（无数据可发布，正常）；其它=失败${C.x}`);
+    console.log(`${C.d}  提示：上次运行结果 0=成功或按设计跳过；2=降级（无数据可发布，正常）；其它=失败${C.x}`);
   }
 
   // ---------------------------------------------------------------- 3. 数据与仓库
@@ -230,7 +324,7 @@ function tailLog(job, n) {
   // ---------------------------------------------------------------- 结论
   h('结论');
   const problems = [];
-  if (!st) problems.push('运行器从未执行 → 检查计划任务是否注册（crontab/install.cmd）');
+  if (!st) problems.push(`运行器从未执行 → 检查调度器是否注册（crontab/${IS_WIN ? 'install.cmd' : 'install.sh'}）`);
   else {
     for (const job of ['mtd', 'finalize']) {
       const s = st[job] || {};

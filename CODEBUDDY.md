@@ -1,6 +1,6 @@
 # 恒市值助手 — 项目记忆文件
 
-> 最后更新: 2026-09-02（数据刷新至日历 2026-08，131 → 132 个月） | 维护者: CodeBuddy AI + @sugas
+> 最后更新: 2026-09-30（新增 Ubuntu/Linux 云服务器 cron 部署，运行器跨平台化） | 维护者: CodeBuddy AI + @sugas
 
 ---
 
@@ -47,7 +47,12 @@ investment-advisor/
 │   ├── monthly_progress.js  # 本月至今（MTD）快照 → js/progress.json
 │   ├── smoke_check.js       # 72 项断言自检（发布闸门）
 │   └── generate_og_image.py # OG 预览图生成脚本（Python+Pillow）
-├── crontab/                 # 纯脚本自动化（Windows 计划任务 + 手动模式，零 AI 依赖）→ 见 §七
+├── crontab/                 # 纯脚本自动化（Windows 计划任务 / Linux cron + 手动，零 AI 依赖）→ 见 §七
+│   ├── run_job.js           #   运行器（跨平台）：闸门 + 单实例锁 + 时区归一 + 日志 + 回滚 + 自愈推送
+│   ├── status.js            #   健康检查（跨平台：Windows 查 schtasks / Linux 查 crontab）
+│   ├── install.cmd / uninstall.cmd / status.cmd   #   Windows 计划任务
+│   ├── install.sh / uninstall.sh / status.sh      #   Linux cron
+│   └── README.md            #   完整用法（含 Ubuntu 云服务器部署章节）
 ├── sitemap.xml             # 站点地图（提交到 Google/Bing）
 ├── robots.txt              # 爬虫规则
 ├── .gitignore              # 含 .playwright-cli/ 排除
@@ -146,30 +151,46 @@ investment-advisor/
 3. `wrangler.jsonc` 声明 Worker 名称 `hdszf` + `main: worker.js` + `assets.binding: ASSETS` + `run_worker_first: true`
 4. 毛子云 CDN 缓存 20 分钟 → 部署后最多 20 分钟用户才能看到新样式（待后台调整为 5 分钟）
 
-### 数据自动更新（纯脚本 · Windows 计划任务，零 AI 依赖）
+### 数据自动更新（纯脚本 · Windows 计划任务 / Linux cron，零 AI 依赖）
 
-> **2026-09-29 起**：数据更新与月度固化**不再依赖 AI / WorkBuddy 会话**，改由本机 Windows 计划任务驱动。
+> **2026-09-29 起**：数据更新与月度固化**不再依赖 AI / WorkBuddy 会话**，改由系统调度器驱动。
 > 完整文档（安装命令 / **手动跑法与频率** / 查看清单 / 维护方法 / 故障处置）见 **`crontab/README.md`**。
-> 不装计划任务也能用：手动每交易日跑 `node crontab/run_job.js mtd --force`、每月跑 `node crontab/run_job.js finalize --force`
+> 不装调度器也能用：手动每交易日跑 `node crontab/run_job.js mtd --force`、每月跑 `node crontab/run_job.js finalize --force`
 > （`--force` = 手动补跑模式：忽略时间窗口等**软闸门**并逐条打印警告，可在任意时间点执行）。详见 README 第 3 节。
 
-| 计划任务 | 触发 | 执行 | 频率 |
-|---|---|---|---|
-| `hdszf-mtd` | 每天 18:00–23:59 每小时唤醒 | `node crontab/run_job.js mtd` → `monthly_progress.js --push` | 每交易日 1 次 |
-| `hdszf-finalize` | 每天 09:00–23:59 每小时唤醒 | `node crontab/run_job.js finalize` → `monthly_update.js --strict` | 每月 1 次（3 日起） |
+| 平台 | 注册 | 触发 | 执行 | 频率 |
+|---|---|---|---|---|
+| Windows（本机） | `crontab\install.cmd` | 每天 18:00–23:59（mtd）/ 09:00–23:59（finalize）每小时唤醒 | `node crontab/run_job.js <job>` | mtd 每交易日 1 次；finalize 每月 1 次（3 日起） |
+| **Linux/Ubuntu（云服务器，推荐）** | **`bash crontab/install.sh`** | 全天每小时第 7 / 37 分钟唤醒 | 同上 | 同上 |
 
 **关键设计（改动前必读）**
 - 运行器 `crontab/run_job.js` 自带闸门：**当天/当月成功一次后立即跳过**，因此可以高频唤醒（错过就补跑）而不会重复提交、重复部署。
 - 时段选择有业务含义：MTD 排在 **18:00 之后**（A 股 15:00 收盘、新浪日 K 傍晚更新，早跑会取到昨日收盘）；定稿排在 **每月 3 日之后**（给上月末最后一个交易日留发布余量）。**不要随意把时间提前。**
 - 运行器只决定「何时跑、跑了记什么」，**不产出任何数值**；「月未走完不更新」仍由 `monthly_update.js` 自己把住（未走完 → exit 0）。
-- **日志与状态写在仓库之外**（`<工作区>\_hdszf_logs\`）：仓库根是 Cloudflare Assets 发布目录，放进去会被公开上传并污染 git。可用 `HDSZF_LOG_DIR` 覆盖。
+- **日志与状态写在仓库之外**（`<工作区>\_hdszf_logs\` / Linux 为 `<仓库上级>/_hdszf_logs/`）：仓库根是 Cloudflare Assets 发布目录，放进去会被公开上传并污染 git。可用 `HDSZF_LOG_DIR` 覆盖。
 - **定稿前置：工作区必须干净（硬闸门，`--force` 也不绕过）**：定稿内部是 `git add -A` + commit，脏工作区会把人工改动
   一起裹进「数据更新」提交并 push 上线 → 运行器检测到不干净就**跳过并提示先 commit/stash**。
   ⚠️ 绕过运行器直跑 `scripts/monthly_update.js` 时**没有这道保护**，务必自己先确认 `git status` 为空
   （`monthly_progress.js` 无此风险：只 `git add -- js/progress.json` 单文件）。
 - **失败自动回滚**：定稿失败若留下未提交改动，自动 `git checkout -- .` 还原成「什么都没发生」，避免半成品被下次运行继续加工。
-- **自愈推送**：每次运行前比对本地 HEAD 与远程 tip，本地领先就先补推，防止上次 push 失败后静默卡住。
+- **自愈推送**：每次运行前 `fetch` 并比对本地 HEAD 与远程 tip：本地领先就先补推；**远程领先/分叉时只告警不硬推**
+  （那说明另一台机器也在跑自动化）。⚠️ **自动化只应有一台机器在跑**（推荐云服务器；本机作替补手动补跑）。
 - 退出码语义：`0` 成功或按设计跳过；`2` 降级（按铁律不写入不推送，站点回退已定稿口径）；其它为真失败。
+
+**跨平台演化（2026-09-30，为 Ubuntu 云服务器而做）**
+- **时区归一（TZ-GUARD）**：`run_job.js` / `status.js` / `monthly_progress.js` / `monthly_update.js` 启动即
+  `process.env.TZ = process.env.HDSZF_TZ || 'Asia/Shanghai'`（必须在任何 `new Date()` 之前；Node 16+ 赋值即时生效，已实测）。
+  原因：闸门的「18:00 后 / 周末 / 每月 3 日后」按北京时间判断，而云服务器默认多为 **UTC**，不归一会整体错 8 小时
+  （表面成功、数据日期却错）。全仓搜 `TZ-GUARD` 可定位这 4 处，改要一起改。
+- **单实例锁（Linux 必需）**：两个任务共用一把 `_hdszf_logs/automation.lock`。Windows 计划任务默认「已在运行就不再启动新实例」，
+  而 **cron 没有**这层保护，且 mtd 与 finalize 的时段本来重叠 —— 没有锁时两个进程会同时 `git commit/push` 互相踩。
+  判定：`wx` 原子写入抢锁 → 已有锁则看 pid 是否存活 + 锁龄（>60 分钟视为僵尸自动接管）。`--force` 不绕过。
+- **cron 写「全天每小时唤醒」而非固定小时**：写死 `18-23` 会在 UTC 服务器上错 8 小时；时段判断交给运行器闸门最安全
+  （多几次空转，每次几百毫秒）。`install.sh --hours 18-23` 会自动补 `CRON_TZ=Asia/Shanghai` 并告警。
+- **Linux 上再无 Windows 假设**：`PATH` 按平台构建（`/usr/local/bin:/usr/bin:/bin` 等）、`HOME` 用 `os.homedir()` 兜底、
+  业务脚本找 Python 按平台换候选（Linux 用 `python3`）并给出「怎么装」的明确报错。`install.sh` 还会预检
+  **SSH 推送凭据**（deploy key + `ssh-keyscan` + 勾 write access）——无头服务器最易翻车的一步。
+- ⚠️ 新增 **`.gitattributes`**：`*.sh text eol=lf`（否则 `.sh` 落盘成 CRLF，Linux 报 `bad interpreter: ...^M`）、`*.cmd/*.bat eol=crlf`。
 - ⚠️ WorkBuddy 里的两条旧自动化（每月 3 日 / 每周一）与本方案**功能重叠**，启用本方案后应停用，避免同一天两处同时 push。
 
 ---

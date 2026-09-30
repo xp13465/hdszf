@@ -22,6 +22,12 @@
  *           替换值全部来自引擎实时计算，因此下个月再跑依然有效。
  */
 
+// ---------------------------------------------------------------- TZ-GUARD（时区归一）
+// 「今天 / 目标月是否走完 / 文案里的日期戳」一律按**北京时间**算（A 股月历就是北京时间）。
+// 若部署在 UTC 的云服务器上又没归一，月初清晨跑会把 todayYM 算成上一个月，
+// 定稿被误判为「目标月未走完」而整月空转。与 crontab/run_job.js 同源（全仓搜 TZ-GUARD）。
+process.env.TZ = process.env.HDSZF_TZ || 'Asia/Shanghai';
+
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
@@ -132,14 +138,23 @@ P(`  目标日历月   : ${TARGET}${TARGET_ARG ? '（命令行指定）' : '（�
 // ---------------- 2. 数据源完整性校验 ----------------
 P('\n=== 阶段 2 · 校验目标月是否已结束 ===');
 const PY = findPython();
+/**
+ * 找 Python 解释器（取数探针用）。
+ * Windows：python / py launcher 优先，最后兜底本机已知的绝对路径。
+ * Linux  ：通常只有 python3（Ubuntu 20.04+ 默认不提供 python 命令）。
+ * 一个都找不到时返回 null，由调用处给出「怎么装」的明确提示 —— 而不是抛 ENOENT 让人猜。
+ */
 function findPython() {
-  for (const c of ['python', 'py', 'python3']) {
+  const candidates = process.platform === 'win32'
+    ? ['python', 'py', 'python3', 'C:/Users/23405/.workbuddy/binaries/python/versions/3.13.12/python.exe']
+    : ['python3', 'python'];
+  for (const c of candidates) {
     try {
       execFileSync(c, ['--version'], { stdio: 'ignore' });
       return c;
-    } catch (e) { /* try next */ }
+    } catch (e) { /* 试下一个 */ }
   }
-  return 'C:/Users/23405/.workbuddy/binaries/python/versions/3.13.12/python.exe';
+  return null;
 }
 
 const probe = `
@@ -151,10 +166,24 @@ d=json.load(urllib.request.urlopen(req, timeout=40))
 print(d[-1]['day'])
 `;
 let lastTradeDay;
+if (!PY) {
+  P(`  ✗ 找不到 Python 解释器（已尝试：${process.platform === 'win32' ? 'python / py / python3' : 'python3 / python'}）`);
+  P('     Ubuntu/Debian : sudo apt install -y python3');
+  P('     Windows       : 装 Python，或把 python.exe 绝对路径加进 crontab/run_job.js 的 EXTRA_PATH');
+  process.exit(1);
+}
 try {
   lastTradeDay = execFileSync(PY, ['-c', probe], { encoding: 'utf8', stdio: 'pipe' }).trim();
 } catch (e) {
-  P('  ✗ 无法访问数据源，中止。');
+  const msg = String((e && e.stderr) || '') + String((e && e.stdout) || '') + String((e && e.message) || '');
+  if (/ENOENT|not found/i.test(msg)) {
+    P(`  ✗ 调不起 Python（${PY}）：${msg.split('\n')[0]}`);
+    P('     Ubuntu/Debian : sudo apt install -y python3');
+  } else {
+    P('  ✗ 无法访问数据源（新浪接口不通 / 超时 / 返回异常），中止。');
+    P(`     原始报错：${msg.split('\n').filter(Boolean).slice(-1)[0] || '(无)'}`);
+    P('     排查：curl -sI https://money.finance.sina.com.cn 是否通；公司网络/代理可能需要额外配置。');
+  }
   process.exit(1);
 }
 const today = new Date();

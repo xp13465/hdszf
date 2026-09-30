@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * 恒市值助手 · 无人值守运行器（零 AI 依赖，纯 Node）
+ * 恒市值助手 · 无人值守运行器（零 AI 依赖，纯 Node；Windows / Linux / macOS 通用）
  *
- * 由 Windows 计划任务按小时唤醒，内部自带「每日/每月只成功一次」的闸门，
- * 因此计划任务可以放心地高频触发（错过就补跑），不会重复提交、不会重复部署。
+ * 由 Windows 计划任务或 Linux cron 按小时唤醒，内部自带「每日/每月只成功一次」的闸门，
+ * 因此调度器可以放心地高频触发（错过就补跑），不会重复提交、不会重复部署。
  *
  * 用法：
  *   node crontab/run_job.js mtd                     # 本月至今（MTD）快照 → progress.json
@@ -20,14 +20,31 @@
  *   3. 日志写在**仓库外**（<工作区>/_hdszf_logs/），否则会被 wrangler 当成 Assets 公开上传、还会污染 git。
  *   4. finalize 失败即自动回滚 tracked 改动（git checkout -- .），把「半成品」变回「什么都没发生」，
  *      避免下一天的运行在脏工作区上继续替换（这是无人值守最危险的场景）。
- *   5. 每次运行前做一次「自愈推送」：本地领先远程就先推掉，防止上次 push 失败后静默卡住。
+ *   5. 每次运行前做一次「自愈推送」；但若发现**远程有本地没有的提交**（另一台机器推过）就只警告不硬推 ——
+ *      硬推必然被拒，而且盲目处理可能覆盖别人（自动化只应该有一台机器在跑，见 README）。
+ *   6. **全局单实例锁**（两个任务共用一把锁）：Windows 计划任务默认「任务已在运行则不再启动新实例」，
+ *      而 Linux cron **没有**这层保护，上一轮还没跑完（定稿全流程可能几分钟）下一小时就又起一个；
+ *      且 mtd 与 finalize 的时段本来就有重叠。两个进程同时 git add/commit/push 会互相踩，必须自己串行化。
+ *   7. **时区归一**：闸门判断的「小时 / 星期 / 日期」一律按北京时间（见下方 TZ-GUARD）。
  */
 
 'use strict';
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 const { execFileSync, spawnSync } = require('child_process');
 
+// ---------------------------------------------------------------- TZ-GUARD（时区归一）
+// 【云服务器部署必读】A 股的交易时段与月历都是**北京时间**，所以闸门的「18:00 之后才跑」
+// 「周末不跑」「3 号之后才定稿」必须按北京时间判断。云服务器默认多为 UTC，若不归一：
+//   北京 18:00 = UTC 10:00 → cron 若按服务器本地时间写 18:00，实际是北京次日 02:00，
+//   结果是「看着跑成功了，取到的却是上一个交易日的收盘」——比报错更难发现。
+// 归一后无论服务器在哪个时区，行为都与本机（Asia/Shanghai）完全一致。
+// ⚠️ 必须在**任何 new Date() 之前**赋值：Node 16+ 改 process.env.TZ 会立即重置时区缓存（已实测）。
+// 需要按别的时区跑时用环境变量覆盖：HDSZF_TZ=Asia/Shanghai
+process.env.TZ = process.env.HDSZF_TZ || 'Asia/Shanghai';
+
+const IS_WIN = process.platform === 'win32';
 const ROOT = path.resolve(__dirname, '..');
 // 日志与状态一律放在**仓库之外**：仓库目录是 Cloudflare Assets 的发布根，
 // 放进去会被公开上传、还会污染 git。可用 HDSZF_LOG_DIR 覆盖（测试/迁移用）。
@@ -35,6 +52,9 @@ const LOG_DIR = process.env.HDSZF_LOG_DIR
   ? path.resolve(process.env.HDSZF_LOG_DIR)
   : path.resolve(ROOT, '..', '_hdszf_logs');
 const STATUS_FILE = path.join(LOG_DIR, 'status.json');
+// 单实例锁：**两个任务共用一把**（原因见文件头第 6 点）。锁内容是 JSON，便于排障时人眼查看。
+const LOCK_FILE = path.join(LOG_DIR, 'automation.lock');
+const LOCK_STALE_MS = 60 * 60 * 1000; // 超过 1 小时视为僵尸锁（正常一轮跑不到这么久）
 const NODE = process.execPath;
 
 // ---------------------------------------------------------------- 任务定义
@@ -66,14 +86,25 @@ const JOBS = {
 };
 
 // ---------------------------------------------------------------- 环境补全
-// 计划任务的 PATH 极干净：必须自己补 git / python，否则脚本内的 execFileSync('git'|'python') 会 ENOENT。
-const EXTRA_PATH = [
-  'C:\\Program Files\\Git\\cmd',
-  'C:\\Users\\23405\\.workbuddy\\binaries\\python\\versions\\3.13.12',
-];
-process.env.PATH = EXTRA_PATH.concat(process.env.PATH ? [process.env.PATH] : []).join(';');
-// Git for Windows 的 ssh 靠 HOME/USERPROFILE 找 ~/.ssh；计划任务下显式兜底，避免推不上去。
-if (!process.env.HOME) process.env.HOME = process.env.USERPROFILE || 'C:\\Users\\23405';
+// 计划任务 / cron 的 PATH 极干净：必须自己补 git / python（node 本身用 process.execPath，不受影响），
+// 否则脚本内的 execFileSync('git' | 'python') 会 ENOENT。
+const EXTRA_PATH = IS_WIN
+  ? [
+      'C:\\Program Files\\Git\\cmd',                                   // Git for Windows
+      'C:\\Users\\23405\\.workbuddy\\binaries\\python\\versions\\3.13.12',
+    ]
+  : [
+      path.dirname(process.execPath),                                  // node 所在目录（官方包 / nvm / fnm 都可能）
+      '/usr/local/bin', '/usr/local/sbin',
+      '/usr/bin', '/usr/sbin', '/bin', '/sbin',
+      '/snap/bin',
+    ];
+process.env.PATH = EXTRA_PATH.concat(process.env.PATH ? [process.env.PATH] : []).join(path.delimiter);
+// git 的 ssh 靠 HOME 找 ~/.ssh（id_ed25519 / known_hosts）：计划任务与 cron 的环境里可能缺失，
+// 显式兜底，否则 push 会静默失败在上传阶段。
+if (!process.env.HOME) {
+  process.env.HOME = process.env.USERPROFILE || os.homedir();
+}
 
 // ---------------------------------------------------------------- 小工具
 const argv = process.argv.slice(2);
@@ -91,6 +122,11 @@ function stamp(d = new Date()) {
 }
 function dayKey(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
 function monthKey(d = new Date()) { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}`; }
+function tzOffset(d = new Date()) {
+  const m = -d.getTimezoneOffset();
+  return `${m >= 0 ? '+' : '-'}${pad(Math.floor(Math.abs(m) / 60))}:${pad(Math.abs(m) % 60)}`;
+}
+function repoLabel() { return path.basename(ROOT); }
 
 function ensureLogDir() { fs.mkdirSync(LOG_DIR, { recursive: true }); }
 function logFile(job) { return path.join(LOG_DIR, `${job}_${monthKey()}.log`); }
@@ -118,6 +154,45 @@ function writeStatus(obj) {
   fs.writeFileSync(STATUS_FILE, JSON.stringify(obj, null, 2) + '\n', 'utf8');
 }
 
+// ---------------------------------------------------------------- 单实例锁
+// 抢锁失败 = 上一个任务还在跑 → 本次「按设计跳过」（exit 0），下一小时唤醒还会再来。
+// 判定真死还是假死：① 锁里的 pid 是否还活着；② 锁文件年龄是否超过 LOCK_STALE_MS。
+function acquireLock(job) {
+  ensureLogDir();
+  const write = () => fs.writeFileSync(
+    LOCK_FILE,
+    JSON.stringify({ job, pid: process.pid, started_at: stamp(), repo: ROOT }, null, 2) + '\n',
+    { flag: 'wx' } // wx = 文件已存在就报错 → 天然的原子抢锁
+  );
+  try {
+    write();
+    return true;
+  } catch (e) {
+    if (e.code !== 'EEXIST') throw e;
+  }
+
+  let info = {};
+  let ageMs = LOCK_STALE_MS + 1;
+  try { info = JSON.parse(fs.readFileSync(LOCK_FILE, 'utf8')); } catch (_) {}
+  try { ageMs = Date.now() - fs.statSync(LOCK_FILE).mtimeMs; } catch (_) { return true; }
+
+  let alive = false;
+  if (info.pid) {
+    try { process.kill(info.pid, 0); alive = true; }
+    catch (e) { alive = e.code === 'EPERM'; } // EPERM = 存在但没权限动它 → 仍视为存活
+  }
+  if (alive && ageMs < LOCK_STALE_MS) {
+    log(`[${stamp()}] 按设计跳过：${info.job || '另一个任务'} 仍在运行中（pid=${info.pid}，开始于 ${info.started_at || '?'}）`);
+    return false;
+  }
+  log(`  ! 发现僵尸锁（持有者 ${info.job || '?'} pid=${info.pid} 存活=${alive} 年龄=${(ageMs / 60000).toFixed(1)} 分钟）→ 接管`);
+  try { fs.unlinkSync(LOCK_FILE); } catch (_) {}
+  try { write(); return true; } catch (_) { return false; }
+}
+function releaseLock() {
+  try { fs.unlinkSync(LOCK_FILE); } catch (_) {}
+}
+
 // ---------------------------------------------------------------- git 助手
 function git(args) {
   return execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', stdio: 'pipe' }).trim();
@@ -125,7 +200,6 @@ function git(args) {
 function gitTry(args) {
   try { return { ok: true, out: git(args) }; } catch (e) { return { ok: false, out: String((e.stdout || '') + (e.stderr || '') || e.message).trim() }; }
 }
-function headShort() { try { return git(['rev-parse', '--short', 'HEAD']); } catch (_) { return '(未知)'; } }
 
 /** 工作区是否干净（只看 tracked 文件的改动；未跟踪的产物不算脏） */
 function treeClean() {
@@ -133,16 +207,26 @@ function treeClean() {
   return r.ok && r.out === '';
 }
 
-/** 自愈推送：本地领先远程就先推上去，防止「上次 push 失败 → 此后一直静默卡住」 */
+/** 自愈推送：本地领先远程就先推上去，防止「上次 push 失败 → 此后一直静默卡住」。
+ *  但**只在本地确实是领先时**才推：远程领先/分叉时硬推必然被拒，还会掩盖「另一台机器也在跑自动化」这个真问题。 */
 function selfHealPush() {
-  const clean = treeClean();
-  if (!clean) { log('  · 工作区有未提交改动，跳过自愈推送'); return; }
+  if (!treeClean()) { log('  · 工作区有未提交改动，跳过自愈推送'); return; }
   const head = gitTry(['rev-parse', 'HEAD']);
-  const tip = gitTry(['ls-remote', 'origin', 'main']);
-  if (!head.ok || !tip.ok) { log('  · 无法比对远程 tip，跳过自愈推送'); return; }
-  const remoteSha = tip.out.split(/\s+/)[0];
-  if (remoteSha === head.out) { log('  · 本地与远程一致，无需自愈推送'); return; }
-  log(`  ! 本地(${head.out.slice(0, 7)}) ≠ 远程(${remoteSha.slice(0, 7)}) → 尝试补推`);
+  if (!head.ok) { log('  · 读不到本地 HEAD，跳过自愈推送'); return; }
+  const fetched = gitTry(['fetch', '--quiet', 'origin', 'main']);
+  if (!fetched.ok) { log('  · fetch 失败（网络或凭据问题），跳过自愈推送'); return; }
+  const remote = gitTry(['rev-parse', 'FETCH_HEAD']);
+  if (!remote.ok) { log('  · 读不到远程 tip，跳过自愈推送'); return; }
+  if (remote.out === head.out) { log('  · 本地与远程一致，无需自愈推送'); return; }
+
+  const localAhead = gitTry(['merge-base', '--is-ancestor', remote.out, head.out]).ok;
+  if (!localAhead) {
+    log(`  ⚠ 远程(${remote.out.slice(0, 7)}) 上有本地没有的提交 → 不自动推送`);
+    log('    · 原因：另一台机器（或另一次会话）已经推过了');
+    log('    · 处置：本地 git pull --rebase 后重跑；自动化只应有一台机器在跑，见 crontab/README.md');
+    return;
+  }
+  log(`  ! 本地(${head.out.slice(0, 7)}) 领先远程(${remote.out.slice(0, 7)}) → 尝试补推`);
   const p = gitTry(['push', 'origin', 'main']);
   if (!p.ok) log(`  ✗ 补推失败：${p.out.split('\n')[0]}`);
   else log('  ✓ 补推成功（上次失败的推送已恢复）');
@@ -152,7 +236,7 @@ function selfHealPush() {
 // 软闸门 = 可被人为忽略的「时机约束」（时间窗口 / 月初余量 / 周末 / 已成功 / 次数上限）。
 // --force 会忽略**全部**软闸门（供手动补跑），但会逐条打印警告 —— 因为忽略时间窗意味着
 // 可能取到上一交易日的收盘，读者必须知道自己在看什么。
-// 计划任务注册的命令**不带 --force**，所以无人值守时的保护完全不受影响。
+// 计划任务 / crontab 注册的命令**不带 --force**，所以无人值守时的保护完全不受影响。
 const SOFT_WARNINGS = [];
 function gateReason(job, cfg, st) {
   const now = new Date();
@@ -166,7 +250,7 @@ function gateReason(job, cfg, st) {
     hit.push('周末休市，不跑');
   }
   if (cfg.windowFromHour && now.getHours() < cfg.windowFromHour) {
-    const hh = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    const hh = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
     hit.push(
       `未到时间窗口（${cfg.windowFromHour}:00 之后才跑；当前 ${hh}，` +
       `新浪日 K 尚未更新，取到的可能是上一交易日收盘）`
@@ -199,61 +283,9 @@ function summarize(out) {
   ).replace(/^\[[^\]]*\]\s*/, '').slice(0, 160);
 }
 
-// ---------------------------------------------------------------- 主流程
-function main() {
-  if (has('--help') || has('-h') || !JOB_NAME) {
-    console.log(`
-恒市值助手 · 无人值守运行器
-
-  node crontab/run_job.js mtd                 本月至今（MTD）快照（每交易日 18:00 后）
-  node crontab/run_job.js finalize            月度定稿固化（每月 3 日起，成功一次即停）
-  node crontab/run_job.js <job> --force       手动补跑：忽略**全部**软闸门（时间窗口 / 已成功 / 次数上限），并逐条打印警告
-  node crontab/run_job.js <job> --no-status   诊断用：不改动 status.json
-  node crontab/run_job.js <job> -- <args...>  透传参数给子脚本（如 -- --no-fetch）
-
-  手动模式：不装计划任务时，自己按频率跑这两条命令即可（--force 会连时间窗口一起忽略，
-  所以可以在任何时间点手动补跑；但早于 18:00 跑 mtd 取到的可能是上一交易日收盘）。
-  手动模式下没有「已成功即跳过」之外的兜底，失败也不会有人通知你 —— 跑完请看上面的 exit。
-
-  健康检查：node crontab/status.js
-  日志目录：${LOG_DIR}
-`);
-    return 0;
-  }
-  const cfg = JOBS[JOB_NAME];
-  if (!cfg) {
-    console.error(`未知任务：${JOB_NAME}（可选：${Object.keys(JOBS).join(' | ')}）`);
-    return 1;
-  }
-
+// ---------------------------------------------------------------- 执行（已持锁）
+function runOnce(cfg, st, s) {
   const now = new Date();
-  let st = readStatus();
-  st[JOB_NAME] = st[JOB_NAME] || {};
-  const s = st[JOB_NAME];
-
-  log('');
-  log(`[${stamp(now)}] ==== ${JOB_NAME} · ${cfg.label} ====`);
-
-  const reason = gateReason(JOB_NAME, cfg, st);
-  if (reason) {
-    log(`[${stamp()}] 按设计跳过：${reason}`);
-    flush(JOB_NAME);
-    return 0; // 跳过不是失败：计划任务每小时都会唤醒，静默跳过即可
-  }
-  if (SOFT_WARNINGS.length) {
-    log(`[${stamp()}] ⚠ --force 手动补跑：已忽略以下软闸门（自动化的默认保护本次不生效）`);
-    SOFT_WARNINGS.forEach((h) => log(`    ⚠ ${h}`));
-  }
-
-  // 硬闸门（--force 也不绕过）：定稿用 git add -A 提交，脏工作区会把人工改动裹进「数据更新」一起上线。
-  // 这是安全性约束，不是时机约束 —— 手动补跑同样必须先 commit / stash。
-  if (cfg.requireCleanTree && !treeClean()) {
-    log(`[${stamp()}] 按设计跳过：工作区有未提交改动`);
-    log('    · 原因：定稿内部用 git add -A 提交，脏工作区会把你的改动一起裹进「数据更新」提交并上线');
-    log('    · 处置：先 git commit 或 git stash 你的改动，再重跑本任务');
-    flush(JOB_NAME);
-    return 0;
-  }
 
   // 记录尝试次数（先写盘，防止运行中途被强制结束导致计数丢失）
   const today = dayKey(now);
@@ -304,7 +336,6 @@ function main() {
     s.last_ok_at = stamp();
     log(`[${stamp()}] exit=0 → 成功（${secs}s）${msg ? '：' + msg : ''}`);
     writeStatus(st);
-    flush(JOB_NAME);
     return 0;
   }
 
@@ -314,7 +345,6 @@ function main() {
     log(`[${stamp()}] exit=2 → 降级（取数不完整，未写入/未推送任何本月至今数据；站点已回退已定稿口径）`);
     log(`  · 这是设计内的安全行为：宁可不显示，也不用 0 拼出假的「当月持平」`);
     writeStatus(st);
-    flush(JOB_NAME);
     return 2;
   }
 
@@ -334,8 +364,81 @@ function main() {
   }
 
   writeStatus(st);
-  flush(JOB_NAME);
   return code;
+}
+
+// ---------------------------------------------------------------- 主流程
+function main() {
+  if (has('--help') || has('-h') || !JOB_NAME) {
+    console.log(`
+恒市值助手 · 无人值守运行器（Windows 计划任务 / Linux cron 通用）
+
+  node crontab/run_job.js mtd                 本月至今（MTD）快照（每交易日 18:00 后）
+  node crontab/run_job.js finalize            月度定稿固化（每月 3 日起，成功一次即停）
+  node crontab/run_job.js <job> --force       手动补跑：忽略**全部**软闸门（时间窗口 / 已成功 / 次数上限），并逐条打印警告
+  node crontab/run_job.js <job> --no-status   诊断用：不改动 status.json
+  node crontab/run_job.js <job> -- <args...>  透传参数给子脚本（如 -- --no-fetch）
+
+  手动模式：不装计划任务/cron 时，自己按频率跑这两条命令即可（--force 会连时间窗口一起忽略，
+  所以可以在任何时间点手动补跑；但早于 18:00 跑 mtd 取到的可能是上一交易日收盘）。
+  手动模式下没有「已成功即跳过」之外的兜底，失败也不会有人通知你 —— 跑完请看上面的 exit。
+
+  健康检查：node crontab/status.js
+  日志目录：${LOG_DIR}
+  单实例锁：${LOCK_FILE}（存在且进程仍活着 = 有任务在跑；卡死超过 1 小时会被下次唤醒自动接管）
+  当前时区：${process.env.TZ} (UTC${tzOffset()})   ${process.platform} · node ${process.version}
+`);
+    return 0;
+  }
+  const cfg = JOBS[JOB_NAME];
+  if (!cfg) {
+    console.error(`未知任务：${JOB_NAME}（可选：${Object.keys(JOBS).join(' | ')}）`);
+    return 1;
+  }
+
+  const now = new Date();
+  let st = readStatus();
+  st[JOB_NAME] = st[JOB_NAME] || {};
+  const s = st[JOB_NAME];
+
+  log('');
+  log(`[${stamp(now)}] ==== ${JOB_NAME} · ${cfg.label} ====`);
+  log(`[${stamp()}] 环境：${process.platform} · node ${process.version} · TZ=${process.env.TZ} (UTC${tzOffset()}) · ${repoLabel()}`);
+
+  const reason = gateReason(JOB_NAME, cfg, st);
+  if (reason) {
+    log(`[${stamp()}] 按设计跳过：${reason}`);
+    flush(JOB_NAME);
+    return 0; // 跳过不是失败：调度器每小时都会唤醒，静默跳过即可
+  }
+  if (SOFT_WARNINGS.length) {
+    log(`[${stamp()}] ⚠ --force 手动补跑：已忽略以下软闸门（自动化的默认保护本次不生效）`);
+    SOFT_WARNINGS.forEach((h) => log(`    ⚠ ${h}`));
+  }
+
+  // 硬闸门（--force 也不绕过）：定稿用 git add -A 提交，脏工作区会把人工改动裹进「数据更新」一起上线。
+  // 这是安全性约束，不是时机约束 —— 手动补跑同样必须先 commit / stash。
+  if (cfg.requireCleanTree && !treeClean()) {
+    log(`[${stamp()}] 按设计跳过：工作区有未提交改动`);
+    log('    · 原因：定稿内部用 git add -A 提交，脏工作区会把你的改动一起裹进「数据更新」提交并上线');
+    log('    · 处置：先 git commit 或 git stash 你的改动，再重跑本任务');
+    flush(JOB_NAME);
+    return 0;
+  }
+
+  // 单实例锁：必须在「已决定要真跑」之后、写任何状态之前抢。
+  // 抢不到 = 另一个任务正在跑 → 跳过（不计入尝试次数，下一小时还会来）。
+  if (!acquireLock(JOB_NAME)) {
+    flush(JOB_NAME);
+    return 0;
+  }
+  try {
+    const code = runOnce(cfg, st, s);
+    flush(JOB_NAME);
+    return code;
+  } finally {
+    releaseLock();
+  }
 }
 
 let exitCode = 1;
@@ -343,6 +446,8 @@ try {
   exitCode = main();
 } catch (e) {
   log(`[${stamp()}] 运行器自身异常：${e && e.stack ? e.stack : e}`);
+  try { flush(JOB_NAME || 'runner'); } catch (_) {}   // 异常也要落盘，否则排障时日志里什么都没有
+  releaseLock();
   exitCode = 1;
 }
 process.exit(exitCode);

@@ -29,6 +29,12 @@
  */
 'use strict';
 
+// ---------------------------------------------------------------- TZ-GUARD（时区归一）
+// 本脚本里的「今天 / 当前月」必须按**北京时间**算（A 股月历就是北京时间）。
+// 若部署在 UTC 的云服务器上又没归一，「今天」会在凌晨算成前一天 → MTD 日期与所属月份错位。
+// 与 crontab/run_job.js 同源：改这里请一并改（全仓搜 TZ-GUARD）。
+process.env.TZ = process.env.HDSZF_TZ || 'Asia/Shanghai';
+
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');

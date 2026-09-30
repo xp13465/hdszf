@@ -1,10 +1,15 @@
-# 恒市值助手 · 定时任务（Windows 计划任务 / 手动）
+# 恒市值助手 · 定时任务（Windows 计划任务 / Linux cron / 手动）
 
-> **一句话**：数据更新与月度定稿固化**完全不依赖 AI / WorkBuddy**——由本机 Windows 计划任务唤醒
-> `crontab/run_job.js`，运行器再去调 `scripts/` 下既有的两个脚本。
+> **一句话**：数据更新与月度定稿固化**完全不依赖 AI / WorkBuddy**——由 Windows 计划任务
+> 或 Linux cron 唤醒 `crontab/run_job.js`，运行器再去调 `scripts/` 下既有的两个脚本。
 > 全程只需要 **Node + git + Python**（月度定稿取数用），零额度、零对话、零人工。
 >
-> **不想装计划任务？** 直接看第 3 节「方式 B：手动跑」——两条命令，按频率自己跑就行。
+> - **Ubuntu / Linux 云服务器** → **第 10 节**（`bash crontab/install.sh`）。
+>   推荐把自动化放在 24 小时在线的服务器上，本机只作替补手动跑。
+> - **Windows 本机** → 第 2 节（双击 `install.cmd`）。
+> - **不想装计划任务** → 第 3 节「方式 B：手动跑」——两条命令，按频率自己跑就行。
+>
+> `run_job.js` / `status.js` 是**跨平台**的：Linux 上只是换一个调度器，脚本本身不用改。
 
 ---
 
@@ -68,19 +73,25 @@ crontab\status.cmd
 
 ---
 
-## 3. 方式 B：手动跑（**不安装 `install.cmd`**）
+## 3. 方式 B：手动跑（**不安装计划任务 / cron**）
 
-不注册计划任务，就自己按频率敲命令。**两条命令，两个频率**：
+不注册调度器，就自己按频率敲命令。**两条命令，两个频率**：
 
-```
+```bash
+# Windows
 cd /d C:\Users\23405\WorkBuddy\2026-08-20-17-46-50\hdszf
-
 node crontab\run_job.js mtd --force          ← 每交易日 18:00 后，1 次
 node crontab\run_job.js finalize --force     ← 每月 1 次（次月 3 日后）
+
+# Linux / Ubuntu（云服务器）
+cd /home/ubuntu/code/hdszf
+node crontab/run_job.js mtd --force
+node crontab/run_job.js finalize --force
 ```
 
-> 命令都从**仓库根目录**执行；`crontab\` 是相对路径，跟着仓库走，换机器不用改。
-> 想省事可以把这两条各写成一个 `.cmd` 双击跑，或在 PowerShell 里用 `;` 串起来。
+> 命令都从**仓库根目录**执行；`crontab/` 是相对路径，跟着仓库走，换机器不用改。
+> （下面表格里为省事写的是 Windows 的 `\`，Linux 上把反斜杠换成 `/` 即可。）
+> 想省事可以把这两条各写成一个 `.cmd` / `.sh` 双击跑，或在 shell 里用 `;` / `&&` 串起来。
 
 ### 3.1 `--force` 是什么（手动模式的关键）
 
@@ -203,7 +214,9 @@ node crontab\status.js --online
 |---|---|
 | **幂等闸门** | 当天（MTD）/ 当月（定稿）成功过一次后，后续唤醒立即退出，绝不重复提交、重复部署 |
 | **尝试次数上限** | MTD 每晚最多 3 次、定稿每天最多 1 次 —— 失败也不会刷屏，次日自动重试 |
-| **自愈推送** | 每次运行前比对本地 HEAD 与远程 tip；若本地领先（上次 push 失败）就先补推，避免静默卡住 |
+| **单实例锁**（跨平台必需） | 两个任务共用一把锁（`_hdszf_logs/automation.lock`）。Windows 计划任务默认「已在运行就不启动新实例」，Linux cron **没有**这层保护，而且 mtd 与 finalize 的时段本来就有重叠 —— 没有锁时两个进程会同时 `git commit/push` 互相踩。持有进程崩溃留下的僵尸锁会在超 1 小时后被下次唤醒自动接管 |
+| **时区归一** | 脚本启动即把 `TZ` 定为 `Asia/Shanghai`（可用 `HDSZF_TZ` 覆盖），保证「18:00 后」「周末」「每月 3 日后」在任何时区的服务器上都按北京时间判断 —— 云服务器多是 UTC，不归一就会整体错 8 小时 |
+| **自愈推送** | 每次运行前 `fetch` 并比对本地 HEAD 与远程 tip：本地领先（上次 push 失败）就补推；**远程领先/分叉时只告警不硬推**（那说明另一台机器也在跑自动化，硬推必然被拒） |
 | **定稿前置：工作区必须干净**（硬闸门） | 定稿内部是 `git add -A`，脏工作区会把人工改动裹进「数据更新」一起上线 → 不干净则**跳过并提示**。`--force` 也不绕过（这是安全约束，不是时机约束） |
 | **失败自动回滚** | 定稿失败时若留下未提交改动，自动 `git checkout -- .` 还原成「什么都没发生」——避免半成品被下次运行继续加工 |
 | **不造数据** | 所有数值都由既有脚本产出；运行器只决定「何时跑、跑了记什么」。铁律「月未走完不更新」由 `monthly_update.js` 自己把住（未走完 → `exit 0`） |
@@ -232,11 +245,15 @@ node crontab\status.js --online
 
 ### 7.1 Node 升级 / 换机器后
 
-有两处**需要跟着改**的绝对路径（文件内都有注释标记）：
+**Windows**：有两处需要跟着改的绝对路径（文件内都有注释标记）：
 
 1. `crontab/install.cmd`（以及 `uninstall.cmd`、`status.cmd`）顶部的 `set "NODE=..."` —— 计划任务里存的就是这个路径；
    改完**重新运行 `install.cmd`** 覆盖注册。
 2. `crontab/run_job.js` 里的 `EXTRA_PATH`（git / python 的目录）—— 计划任务的 PATH 很干净，脚本靠它找到 `git` 与 `python`。
+
+**Linux**：不需要手改 —— `bash crontab/install.sh` 会自动探测 node 的绝对路径并写进 crontab；
+换了 node 之后重跑一次即可（或 `bash crontab/install.sh --node /新路径/node`）。
+`EXTRA_PATH` 在 Linux 侧会自动换成 `/usr/local/bin:/usr/bin:/bin` 等常见目录。
 
 > `run_job.js` 与 `status.js` 里的仓库根是用 `__dirname\..` 现推的，
 > 所以**整个 `crontab/` 目录可以随意改名或搬家**，只要它还在仓库根下一级，路径就自动正确。
@@ -313,10 +330,190 @@ crontab\uninstall.cmd
 
 | 文件 | 作用 |
 |---|---|
-| `run_job.js` | 运行器：闸门 + 日志 + 状态账本 + 自愈推送 + 失败回滚（`mtd` / `finalize` 两个任务） |
-| `status.js` | 健康检查（查看清单），只读 |
-| `install.cmd` / `uninstall.cmd` | 注册 / 删除计划任务 |
-| `status.cmd` | 双击即可看健康报告 |
+| `run_job.js` | 运行器：闸门 + 日志 + 状态账本 + 单实例锁 + 时区归一 + 自愈推送 + 失败回滚（`mtd` / `finalize` 两个任务）。**跨平台** |
+| `status.js` | 健康检查（查看清单），只读。**跨平台**（Windows 查 schtasks，Linux 查 crontab） |
+| `install.cmd` / `uninstall.cmd` | **Windows**：注册 / 删除计划任务 |
+| `status.cmd` | **Windows**：双击即可看健康报告 |
+| `install.sh` / `uninstall.sh` | **Linux**：写入 / 移除 crontab 条目（幂等，保留你其它条目） |
+| `status.sh` | **Linux**：健康检查入口（等价于 `node crontab/status.js`） |
 | `README.md` | 本文档 |
 
 依赖的两个业务脚本在上级目录：`../scripts/monthly_progress.js`（MTD 快照）、`../scripts/monthly_update.js`（月度定稿）。
+
+---
+
+## 10. Ubuntu / Linux 云服务器部署（cron）
+
+> **推荐场景**：把自动化放在 24 小时在线的云服务器上，本机只作替补（手动 `--force` 补跑）。
+> 脚本**不需要改**：`run_job.js` / `status.js` 已经是跨平台的，Linux 上只是换一个调度器。
+
+### 10.1 与 Windows 版的差异（先看这张表）
+
+| | Windows（本机） | Linux（云服务器） |
+|---|---|---|
+| 调度器 | 任务计划程序（`schtasks`） | `cron` |
+| 注册 / 卸载 | `install.cmd` / `uninstall.cmd` | `bash crontab/install.sh` / `bash crontab/uninstall.sh` |
+| 查看 | `status.cmd` | `bash crontab/status.sh --online` |
+| 单实例保护 | 计划任务自带（「已在运行就不再启动新实例」复选框） | **cron 没有 → 靠 `run_job.js` 的文件锁兜住**（见 5. 单实例锁） |
+| 唤醒策略 | 18:00–23:59 每小时 | **全天每小时**（时区安全，见 10.4） |
+| 日志 | `<工作区>\_hdszf_logs\` | `<仓库上级>/_hdszf_logs/`（同一套逻辑，可用 `HDSZF_LOG_DIR` 覆盖） |
+| 假数据/降级闸门、幂等闸门、回滚、自愈推送 | 完全相同 | 完全相同 |
+
+### 10.2 前置条件（在服务器上各做一次）
+
+| 项 | 检查 / 命令 | 说明 |
+|---|---|---|
+| Node ≥ 16 | `node -v` | 缺则 `sudo apt update && sudo apt install -y nodejs`，或用 nvm 装 LTS。**必须 ≥ 16**：时区归一依赖 Node 16+ 的 `process.env.TZ` 运行时生效能力 |
+| git | `git -v` | `sudo apt install -y git` |
+| Python3 | `python3 -V` | 只有**月度定稿（finalize）**需要它取数：`sudo apt install -y python3`（标准库够用，无需 pip） |
+| git 身份 | `git config --global user.name/user.email` | 不配的话 commit 会被拒。⚠️ 建议用全局配置：`git config --global user.email "sugas13465@gmail.com"` |
+| **推送凭据** | `cd <仓库> && git ls-remote origin main` | **最容易翻车的一步**。仓库 remote 是 SSH（`git@github.com:...`），无头服务器上必须配好 key，详见 10.3 |
+| cron 服务 | `systemctl is-active cron` | 应为 `active`；否则 `sudo systemctl enable --now cron` |
+
+### 10.3 SSH 推送凭据（服务器上没有浏览器、也没有密码交互）
+
+cron 环境里**没有 SSH agent、也没有终端可以输密码**，所以必须用**无口令的 deploy key**：
+
+```bash
+# 1) 在服务器上生成专用 key（一路回车，不要设 passphrase —— cron 里没法输）
+ssh-keygen -t ed25519 -C "hdszf-cron@$(hostname)" -f ~/.ssh/id_ed25519 -N ""
+
+# 2) 把公钥内容复制出来
+cat ~/.ssh/id_ed25519.pub
+
+# 3) 打开 GitHub → 仓库 xp13465/hdszf → Settings → Deploy keys → Add deploy key
+#    粘贴公钥，并**勾选 Allow write access**（不勾就只能读，push 会失败）
+
+# 4) 首次连接要接受 github.com 主机指纹（cron 里无法交互确认，必须提前写进 known_hosts）
+ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+# 5) 自测（应看到 "Hi ...! You've successfully authenticated"）
+ssh -T git@github.com
+```
+
+> `install.sh` 会自动帮你跑一次 `git ls-remote origin main` 验证凭据，失败会明确提示 —— 不用等到
+> 「每月 3 号定稿失败」才发现。
+>
+> 如果不想用 deploy key，也可以把 remote 换成 token 形式的 HTTPS：
+> `git remote set-url origin https://<user>:<token>@github.com/xp13465/hdszf.git`（token 要 `repo` 权限）。
+> ⚠️ 这样 token 会明文存在 `.git/config` 里，注意服务器权限。
+
+### 10.4 安装
+
+```bash
+cd /home/ubuntu/code/hdszf
+
+bash crontab/install.sh --dry-run     # 先看看会写入什么（推荐）
+bash crontab/install.sh               # 正式安装
+```
+
+它会做：探测 `node` 绝对路径 → 检查 git/python3/git 身份/**推送凭据** → 创建日志目录 →
+把下面这段写进**当前用户**的 crontab（用 BEGIN/END 标记界定，**不动你 crontab 里的其它条目**，重复执行幂等）：
+
+```cron
+PATH=/usr/local/bin:/usr/local/sbin:/usr/bin:/bin
+MAILTO=""
+### hdszf automation (managed by crontab/install.sh) >>>
+7  * * * * /usr/bin/node /home/ubuntu/code/hdszf/crontab/run_job.js mtd      >> /home/ubuntu/code/_hdszf_logs/cron.log 2>&1
+37 * * * * /usr/bin/node /home/ubuntu/code/hdszf/crontab/run_job.js finalize >> /home/ubuntu/code/_hdszf_logs/cron.log 2>&1
+### <<< hdszf automation <<<
+```
+
+常用参数：`--node /path/to/node`、`--hours 18-23`（见下）、`--show`（只看当前 crontab）、`--dry-run`。
+
+### 10.5 时区（**最容易踩的坑，务必读完**）
+
+两个事实放在一起看：
+
+1. 云服务器默认时区**多为 UTC**；
+2. A 股的交易时段与月历都是**北京时间**。
+
+于是「每天 18:00 之后才跑」这句话，在 UTC 服务器上会被解释成 **UTC 18:00 = 北京次日 02:00** ——
+表面看任务成功了，取到的却是上一个交易日的收盘。
+
+本方案用**两层保护**解决：
+
+| 层 | 做法 |
+|---|---|
+| 调度层 | cron 写**全天每小时唤醒**（`7 * * * *`），不写死小时数 —— 时区再怎么不同都不会错位，只是多几次空转（每次几百毫秒） |
+| 判断层 | `run_job.js` 启动即把 `TZ` 归一为 `Asia/Shanghai`（`scripts/` 下两个业务脚本同样处理），所以「18:00 后 / 周末 / 每月 3 日后」一律按北京时间判断 |
+
+想看服务器现在是什么时区：
+
+```bash
+date; node -e "console.log(Intl.DateTimeFormat().resolvedOptions().timeZone)"
+```
+
+如果你想省掉空转、只在自己指定的钟点唤醒（`--hours 18-23`），`install.sh` 会自动往 crontab 里补一行
+`CRON_TZ=Asia/Shanghai` 让 cron 也按北京时间解释，并打印警告 —— 若你的 cron 不支持该指令，请改回默认的全天唤醒。
+`node crontab/status.js` 的报表头会显示当前生效的 `TZ`，可与 `date` 对照。
+
+### 10.6 验证（安装后按顺序做一遍）
+
+```bash
+# 1) 零副作用试跑：真实联网取数、打印完整报告，但不写文件、不推送
+node crontab/run_job.js mtd --no-status -- --no-json
+#    看到「取数状态：5/5 个风险资产实时成功」与 exit=0 即链路通
+
+# 2) 让今天的数据真实上线（会 commit + push，触发 Cloudflare 部署）
+node crontab/run_job.js mtd --force
+
+# 3) 健康报告（第 2 段会列出 crontab 条目与下次触发时间）
+bash crontab/status.sh --online
+```
+
+### 10.7 查看清单（Linux 版）
+
+| 看什么 | 命令 | 正常表现 |
+|---|---|---|
+| 一键体检 | `bash crontab/status.sh --online` | 五段报告 + 结论；第 2 段显示 `cron 服务：active` 与两条条目 |
+| 条目是否在 | `crontab -l` | 能看到 `run_job.js mtd` / `run_job.js finalize` 两行 |
+| **下次何时跑** | `bash crontab/status.sh` | 第 2 段会算出下次触发时间（估算） |
+| cron 服务在跑 | `systemctl is-active cron` | `active` |
+| 运行器的账本 | `cat <仓库上级>/_hdszf_logs/status.json` | 两个 job 的 `last_ok_*` / `fail_streak` |
+| 详细日志 | `tail -n 40 <仓库上级>/_hdszf_logs/mtd_2026-09.log` | 每行带时间戳，含子脚本完整输出 |
+| cron 层输出 | `tail -n 40 <仓库上级>/_hdszf_logs/cron.log` | 只有异常（如 node 路径失效）时才有内容值得看 |
+| 有没有任务在跑 | `ls -l <仓库上级>/_hdszf_logs/automation.lock` | 不存在 = 当前空闲；存在且 pid 活着 = 正在跑 |
+| **cron 日志** | `journalctl -u cron -n 50 --no-pager` | Ubuntu 上 cron 执行记录（含 `CRON ... CMD`） |
+| 数据是否跟上 | `node crontab/status.js --no-tasks --tail=0` | 「数据截至」≈ 最近交易日；快照未过期 |
+| 推送是否成功 | `cd <仓库> && git log --oneline -3 && git ls-remote origin main` | 两者 HEAD 一致 |
+
+退出码语义与 Windows 完全相同：`0` 成功或按设计跳过｜`2` 降级（无数据可发布，正常）｜其它才是失败。
+
+### 10.8 维护
+
+| 我要… | Linux 做法 |
+|---|---|
+| 改执行钟点 | 重跑 `bash crontab/install.sh --hours 18-23`，或 `crontab -e` 手改（⚠️ 手改会脱离 install.sh 的管理，下次重装会被整段覆盖，记得同步） |
+| Node 升级 / 换了 node 路径 | 重跑 `bash crontab/install.sh --node /新路径/node` |
+| 换日志目录 | `export HDSZF_LOG_DIR=/var/log/hdszf && bash crontab/install.sh`（会写进 crontab） |
+| 迁移仓库位置 | `git clone` 到新路径后重跑 `install.sh` 即可（脚本里的路径都是现推的，`crontab/` 目录本身可随意改名/搬家，只要它还在仓库根下一级） |
+| 强制补跑 | `node crontab/run_job.js mtd --force` / `node crontab/run_job.js finalize --force` |
+| 卸载 | `bash crontab/uninstall.sh` |
+| 清理日志 | 日志按月分文件、体积极小；删旧月份文件即可。**`status.json` 别删**（它记着闸门状态），`cron.log` 可随时清空 |
+
+### 10.9 Linux 专属故障处置
+
+| 现象 | 原因 | 处置 |
+|---|---|---|
+| `status.sh` 说「crontab 里没有 hdszf 条目」 | 没装 / 被 `uninstall.sh` 删了 | `bash crontab/install.sh` |
+| `status.sh` 说 `cron 服务状态 = inactive` | 服务器没开 cron | `sudo systemctl enable --now cron` |
+| crontab 有条目但从不执行 | ① node 路径变了 ② `~/.ssh` 权限不对 ③ 服务器时区导致闸门全跳过 | 看 `cron.log`；`node crontab/run_job.js mtd --no-status -- --no-json` 手工跑一次；核对报表头 `TZ=Asia/Shanghai` |
+| `Permission denied (publickey)` | deploy key 没配 / 没勾 write access / known_hosts 缺 | 见 10.3 |
+| `error: failed to push some refs` / 日志出现「远程上有本地没有的提交」 | **两台机器同时跑自动化**（本机 + 服务器），或远端有人手推 | 只保留一台跑自动任务（见 10.10）；本地 `git pull --rebase` 后重跑 |
+| 定稿被跳过，日志写「工作区有未提交改动」 | 服务器上有人改过文件没提交（含 git pull 产生的 merge 冲突残留） | `git status` 看清后 `git commit` / `git stash` / 还原 |
+| 日志出现「发现僵尸锁」 | 上次运行被 OOM / 强杀 | 无需处理，下次唤醒自动接管；急可 `rm <仓库上级>/_hdszf_logs/automation.lock` |
+| 手动跑报 `bad interpreter: /usr/bin/env bash^M` | `.sh` 被 Windows 编辑器存成了 CRLF | 仓库已有 `.gitattributes` 锁定 `*.sh eol=lf`；本地用 `sed -i 's/\r$//' crontab/*.sh` 修一次即可 |
+
+### 10.10 ⚠️ 只让一台机器跑自动化
+
+`mtd` / `finalize` 都会在结束时 `git push`。**两台机器同时跑同一个任务**（本机 + 服务器）会出现
+「一个推成功、另一个被拒」，虽然脚本幂等、不会损坏数据，但会造成重复部署与日志噪音。
+
+约定：
+
+- **首选**：自动化放服务器（24h 在线、不受睡眠影响），本机只做替补。
+- 本机继续保留计划任务时，**务必把 `mtd` 的频率降下来**（例如改成每周一跑），或干脆停用，只手动 `--force` 补跑。
+- 运行器的自愈推送已能识别这种情况：远程领先时它**不硬推**，只在日志里明确告警。
+- WorkBuddy 里那两条旧自动化（每周一 / 每月 3 日）同样应停用，理由见 7.6。
+
