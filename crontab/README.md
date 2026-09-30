@@ -200,6 +200,7 @@ node crontab\status.js --online
 | `--tail=30` | 每个任务多打几行日志（默认 12 行） |
 | `--no-tasks` | 跳过 `schtasks` 查询（沙箱/受限环境、或手动模式没注册任务时用） |
 | `--no-color` | 纯文本输出（重定向到文件时用） |
+| `--self-test` | **只跑内置回归自检后退出**（当前 9 项，`9/9 通过` + 退出码 0 = 正常）：不查任何真实状态。改过 `status.js`、或看到「任务未注册」怀疑是误报时用它定性 |
 
 > 手动模式下（没注册任务）建议加 `--no-tasks`，否则第 2 段会提示任务未注册——那是预期的。
 
@@ -250,6 +251,7 @@ node crontab\status.js --online
 |---|---|---|
 | `status.js` 说「运行器从未执行」 | 计划任务没注册，或 task 被禁用 | 跑 `install.cmd`；`schtasks /change /tn hdszf-mtd /enable`；手动模式请加 `--no-tasks` |
 | `status.js` 说「工作区有未提交改动」 | 有手改没提交 | 定稿前先 `git commit` / `git stash`（运行器会跳过定稿，属正常保护） |
+| `status.js` 报「调度未注册 / 没有 hdszf-mtd」，但任务确实在跑 | **旧版 `status.js` 的 bug**（Linux 分支拿 Windows 计划任务名 `hdszf-mtd` 去匹配 crontab 行，永远匹配不上） | 升级到含 2026-10-01 修复的版本；`node crontab\status.js --self-test` 应 `9/9 通过` |
 | 连续几次 `exit=2` | 新浪接口取数失败 / 网络不通 | 手工 `node scripts\monthly_progress.js --no-json` 看具体哪个资产失败；恢复后下次唤醒自动补上 |
 | `exit=1` 且日志出现「自检失败」「替换规则未命中」 | 展示层或静态文案与替换规则脱节（真问题，不会自动修） | 日志里有具体文件与规则；修好后当天/次日自动重跑即可 |
 | 定稿后页面数字没变 | push 成功但 Cloudflare 还在部署，或 push 失败 | `node crontab\status.js --online` 看线上版本号是否落后 |
@@ -540,6 +542,7 @@ bash crontab/status.sh --online
 | 现象 | 原因 | 处置 |
 |---|---|---|
 | `status.sh` 说「crontab 里没有 hdszf 条目」 | 没装 / 被 `uninstall.sh` 删了 | `bash crontab/install.sh` |
+| `status.sh` 说「crontab 里有 hdszf 条目，但没有 **hdszf-mtd**」 | **旧版 `status.js` 的 bug**（2026-10-01 修）：Linux 分支误用 Windows 的计划任务名去匹配 crontab 行——crontab 里写的是 `run_job.js mtd`，永远匹配不上。真故障会被这两条假 ❌ 淹没 | `git pull` 拿到修复后重跑；`node crontab/status.js --self-test` 应 `9/9 通过` |
 | `status.sh` 说 `cron 服务状态 = inactive` | 服务器没开 cron | `sudo systemctl enable --now cron` |
 | crontab 有条目但从不执行 | ① node 路径变了 ② `~/.ssh` 权限不对 ③ 服务器时区导致闸门全跳过 | 看 `cron.log`；`node crontab/run_job.js mtd --no-status -- --no-json` 手工跑一次；核对报表头 `TZ=Asia/Shanghai` |
 | `Permission denied (publickey)` | deploy key 没配 / 没勾 write access / known_hosts 缺 | 见 10.3 |

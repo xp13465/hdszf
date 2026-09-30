@@ -45,6 +45,17 @@ const TAIL = num('tail', 12);
 const ONLINE = has('--online');
 const NO_TASKS = has('--no-tasks');
 
+// 两条调度任务的「显示标签」与「run_job.js 子命令」。
+// ⚠️ 两个平台的标识**不是同一个东西**，绝不能混用：
+//   Windows → 计划任务名就是 `hdszf-mtd` / `hdszf-finalize`（`schtasks /tn` 用它）
+//   Linux   → crontab 行里只有 `run_job.js mtd` / `run_job.js finalize`，**不含 hdszf-* 字样**
+// 历史 bug（2026-10-01 修）：Linux 分支沿用 schtasks 的命名去匹配 crontab 行，永远匹配不到 →
+// 恒报「crontab 里有 hdszf 条目，但没有 hdszf-mtd」，把真实故障淹没在假告警里。
+const TASKS = [
+  { label: 'hdszf-mtd', cmd: 'mtd' },
+  { label: 'hdszf-finalize', cmd: 'finalize' },
+];
+
 const C = process.env.NO_COLOR
   ? { r: '', g: '', y: '', b: '', d: '', x: '' }
   : { r: '\x1b[31m', g: '\x1b[32m', y: '\x1b[33m', b: '\x1b[36m', d: '\x1b[90m', x: '\x1b[0m' };
@@ -91,7 +102,9 @@ function taskInfo(name) {
 function schtasksInfo(name) {
   // schtasks 的中文输出在 GBK 控制台下会乱码 → 用 cmd 先切 UTF-8 再取
   const r = spawnSync('cmd.exe', ['/c', `chcp 65001>nul && schtasks /query /tn "${name}" /fo LIST /v`], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
-  if (r.error || r.status !== 0) return { err: '任务未注册或无法查询' };
+  // 区分「查不了」和「没注册」：前者是环境限制（如安全策略禁用 cmd.exe），不该计成故障
+  if (r.error) return { soft: `无法执行 schtasks（${String(r.error.code || r.error.message).slice(0, 40)}）→ 跳过此项校验` };
+  if (r.status !== 0) return { err: '任务未注册' };
   const txt = String(r.stdout || '');
   const pick = (re) => { const m = txt.match(re); return m ? m[1].trim() : '—'; };
   return {
@@ -106,8 +119,8 @@ function schtasksInfo(name) {
 
 function crontabRead() {
   const r = spawnSync('crontab', ['-l'], { encoding: 'utf8' });
-  if (r.error) return { err: `无法执行 crontab -l：${String(r.error.message || r.error)}` };
-  if (r.status !== 0) return { err: '当前用户没有 crontab（未注册，或 crontab 命令不可用）' };
+  if (r.error) return { soft: `无法执行 crontab -l（${String(r.error.code || r.error.message).slice(0, 40)}）→ 跳过此项校验` };
+  if (r.status !== 0) return { err: '当前用户没有 crontab（未注册该任务）' };
   return { lines: String(r.stdout || '').split(/\r?\n/) };
 }
 
@@ -118,15 +131,24 @@ function cronServiceState() {
   return String(r.stdout || '').trim() || null;
 }
 
-function crontabInfo(name) {
+/** 从 crontab 行里挑出 hdszf 的任务行（纯函数，便于 --self-test 断言）
+ *  cmd = run_job.js 的子命令（'mtd' / 'finalize'）；切记**不是** `hdszf-mtd` 那种计划任务名。 */
+function pickCronJobs(lines, cmd) {
+  const all = lines.filter((l) => !l.trim().startsWith('#') && /run_job\.js\s+(mtd|finalize)(\s|$)/.test(l));
+  const mine = all.filter((l) => new RegExp(`run_job\\.js\\s+${cmd}(\\s|$)`).test(l));
+  return { all, mine };
+}
+
+/** ⚠️ 入参是 run_job.js 的**子命令**（'mtd' / 'finalize'），不是 Windows 的计划任务名 */
+function crontabInfo(cmd) {
   const ce = crontabRead();
+  if (ce.soft) return { soft: ce.soft };
   if (ce.err) return { err: ce.err };
-  const jobs = ce.lines.filter((l) => !l.trim().startsWith('#') && /run_job\.js\s+(mtd|finalize)(\s|$)/.test(l));
-  const mine = jobs.filter((l) => new RegExp(`run_job\\.js\\s+${name}(\\s|$)`).test(l));
+  const { all: jobs, mine } = pickCronJobs(ce.lines, cmd);
   if (!mine.length) {
-    return { err: jobs.length ? `crontab 里有 hdszf 条目，但没有 ${name}` : 'crontab 里没有 hdszf 条目（未注册）' };
+    return { err: jobs.length ? `crontab 里有 hdszf 条目，但没有 ${cmd} 任务` : 'crontab 里没有 hdszf 条目（未注册）' };
   }
-  return { name, state: '已注册', next: `${nextCronRun(mine[0])}（估算）`, raw: mine.join('\n') };
+  return { name: cmd, state: '已注册', next: `${nextCronRun(mine[0])}（估算）`, raw: mine.join('\n') };
 }
 
 /** 只解析我们自己写的表达式（`*` / `a-b` / `a,b` / 数字），够用且不会误判 */
@@ -170,6 +192,47 @@ function tailLog(job, n) {
   if (!fs.existsSync(f)) return { file: f, lines: [], exists: false };
   const all = fs.readFileSync(f, 'utf8').split(/\r?\n/).filter(Boolean);
   return { file: f, lines: all.slice(-n), exists: true, total: all.length };
+}
+
+// ---------------------------------------------------------------- --self-test（回归守卫）
+// 2026-10-01 的真实 bug：Linux 分支沿用 Windows 的计划任务名（`hdszf-mtd`）去匹配 crontab 行 →
+// 永远匹配不到 → 恒报「crontab 里有 hdszf 条目，但没有 hdszf-mtd」，把真故障淹没在假告警里。
+// 下面用 install.sh 真实写出的 crontab 片段把行为钉死，防止回归。
+if (has('--self-test')) {
+  const SAMPLE = [
+    'PATH=/usr/local/bin:/usr/bin:/bin',
+    'MAILTO=""',
+    '### hdszf automation (managed by crontab/install.sh) >>>',
+    '# mtd      → 本月至今（MTD）快照：每交易日 18:00 后',
+    '7 * * * * /usr/bin/node /home/ubuntu/code/hdszf/crontab/run_job.js mtd >> /home/ubuntu/code/_hdszf_logs/cron.log 2>&1',
+    '37 * * * * /usr/bin/node /home/ubuntu/code/hdszf/crontab/run_job.js finalize >> /home/ubuntu/code/_hdszf_logs/cron.log 2>&1',
+    '### <<< hdszf automation <<<',
+  ];
+  const cases = [];
+  const eq = (name, got, want) => cases.push({ name, ok: JSON.stringify(got) === JSON.stringify(want), got, want });
+
+  eq('TASKS 的子命令名', TASKS.map((t) => t.cmd), ['mtd', 'finalize']);
+  eq('TASKS 的计划任务名', TASKS.map((t) => t.label), ['hdszf-mtd', 'hdszf-finalize']);
+
+  const m = pickCronJobs(SAMPLE, 'mtd');
+  const f = pickCronJobs(SAMPLE, 'finalize');
+  eq('两条任务都被识别', m.all.length, 2);
+  eq('mtd 命中 1 条', m.mine.length, 1);
+  eq('mtd 命中的确实是 mtd 那行', /run_job\.js\s+mtd\b/.test(m.mine[0]), true);
+  eq('finalize 命中 1 条', f.mine.length, 1);
+  eq('mtd 不会误吃 finalize 那行', /finalize/.test(m.mine.join('\n')), false);
+
+  // 回归钉子：拿计划任务名当子命令匹配 → 必然 0 命中。这正是旧 bug 的成因。
+  eq('旧 bug 复现：hdszf-mtd 匹配不到', pickCronJobs(SAMPLE, 'hdszf-mtd').mine.length, 0);
+  // 注释行必须被忽略（否则文档里的示例行会被当成"已注册"）
+  eq('注释行被忽略', pickCronJobs(['# 7 * * * * node run_job.js mtd'], 'mtd').all.length, 0);
+
+  const bad = cases.filter((c) => !c.ok);
+  console.log(`status.js --self-test：${cases.length - bad.length}/${cases.length} 通过`);
+  cases.forEach((c) => console.log(`  ${c.ok ? '✅' : '❌'} ${c.name}` +
+    (c.ok ? '' : `  得到 ${JSON.stringify(c.got)}，期望 ${JSON.stringify(c.want)}`)));
+  if (bad.length) console.log(`${BAD}自检未通过 → 检查 TASKS 与 pickCronJobs 的两平台标识是否被混用`);
+  process.exit(bad.length ? 1 : 0);
 }
 
 (async () => {
@@ -219,6 +282,7 @@ function tailLog(job, n) {
   }
 
   // ---------------------------------------------------------------- 2. 调度器注册情况
+  const regIssues = []; // 确认为「未注册」的任务标签 → 结论区汇总
   h(IS_WIN ? '2. Windows 计划任务注册情况' : '2. Linux cron 注册情况');
   if (NO_TASKS) {
     console.log(`${C.d}（--no-tasks：已跳过）${C.x}`);
@@ -229,16 +293,20 @@ function tailLog(job, n) {
       else if (cs === 'active') console.log(`${OK} cron 服务：active`);
       else console.log(`${WARN}cron 服务状态 = ${cs} → 修：sudo systemctl enable --now cron`);
     }
-    for (const name of ['hdszf-mtd', 'hdszf-finalize']) {
-      const t = taskInfo(name);
-      if (t.err) {
-        console.log(`${BAD} ${padEnd(name, 16)} ${t.err}`);
+    for (const { label, cmd } of TASKS) {
+      // 两平台标识不同，见文件顶部 TASKS 注释：Windows 用计划任务名，Linux 用子命令名
+      const t = taskInfo(IS_WIN ? label : cmd);
+      if (t.soft) {
+        console.log(`${WARN}${padEnd(label, 16)} ${t.soft}`);
+      } else if (t.err) {
+        regIssues.push(label);
+        console.log(`${BAD} ${padEnd(label, 16)} ${t.err}`);
         console.log(`   ${C.d}注册命令见 crontab/${IS_WIN ? 'install.cmd' : 'install.sh'}${C.x}`);
       } else if (IS_WIN) {
-        console.log(`${OK} ${padEnd(name, 16)} 状态=${t.state}  上次=${t.last}  结果=${t.lastResult}  下次=${t.next}`);
-        if (t.state === 'Disabled' || t.state === '已禁用') console.log(`   ${WARN}任务被禁用 → 用 schtasks /change /tn ${name} /enable 重新启用`);
+        console.log(`${OK} ${padEnd(label, 16)} 状态=${t.state}  上次=${t.last}  结果=${t.lastResult}  下次=${t.next}`);
+        if (t.state === 'Disabled' || t.state === '已禁用') console.log(`   ${WARN}任务被禁用 → 用 schtasks /change /tn ${label} /enable 重新启用`);
       } else {
-        console.log(`${OK} ${padEnd(name, 16)} ${t.state}  下次≈${t.next}`);
+        console.log(`${OK} ${padEnd(label, 16)} ${t.state}  下次≈${t.next}`);
         t.raw.split('\n').forEach((l) => console.log(`   ${C.d}${l}${C.x}`));
       }
     }
@@ -337,6 +405,8 @@ function tailLog(job, n) {
     }
   }
   if (remoteSha && head.ok && remoteSha !== head.out) problems.push('本地提交未推送到远程');
+  // 第 2 段查出的「未注册」必须进结论 —— 否则会出现「上半屏 ❌、结论 ✅ 一切正常」的自相矛盾
+  if (regIssues.length) problems.push(`调度未注册：${regIssues.join('、')} → 跑 crontab/${IS_WIN ? 'install.cmd' : 'install.sh'}`);
   if (problems.length === 0) {
     console.log(`${OK} 一切正常：任务在跑、数据不过期、仓库与远程一致`);
     console.log(`${C.d}提示：加 --online 可一并核对线上是否已部署最新版本${C.x}`);

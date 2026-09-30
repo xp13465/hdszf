@@ -222,6 +222,22 @@ investment-advisor/
 - ⚠️ 新增 **`.gitattributes`**：`*.sh text eol=lf`（否则 `.sh` 落盘成 CRLF，Linux 报 `bad interpreter: ...^M`）、`*.cmd/*.bat eol=crlf`。
 - ⚠️ WorkBuddy 里的两条旧自动化（每月 3 日 / 每周一）与本方案**功能重叠**，启用本方案后应停用，避免同一天两处同时 push。
 
+### 服务器值守与健康检查（2026-10-01）
+
+- **登服务器**：本机 `~/.ssh/config` 已配 `Host hdszf` → 直接 `ssh hdszf`（= `ubuntu@122.51.111.173:22`，私钥 `~/.ssh/tdsignal`）。
+  一条命令看全站：`ssh hdszf 'cd ~/code/hdszf && node crontab/status.js --online'`。
+  ⚠️ **服务器地址与密钥只写在本地记忆/技能里，绝不入仓库**（仓库公开）。
+- **新增 `--self-test`**：`node crontab/status.js --self-test` 只跑 9 项内置回归自检后退出（`9/9 通过` + exit 0），
+  不查任何真实状态 —— 改过 `status.js`、或怀疑「任务未注册」是误报时用它定性。
+- ⚠️ **已修 bug（2026-10-01，检测器误报）**：`status.js` 的 Linux 分支曾拿 **Windows 计划任务名**（`hdszf-mtd`）
+  去匹配 crontab 行，而 crontab 里实际写的是 `run_job.js mtd` → **永远匹配不上** →
+  恒报「crontab 里有 hdszf 条目，但没有 hdszf-mtd」。危害：两条**常驻假 ❌** 会把真故障淹没（告警疲劳）。
+  修法：抽出纯函数 `pickCronJobs(lines, cmd)`，并引入 `TASKS = [{label:'hdszf-mtd', cmd:'mtd'}, {label:'hdszf-finalize', cmd:'finalize'}]`
+  —— **Windows 用 `label`（schtasks 任务名），Linux 用 `cmd`（run_job.js 子命令）**，两平台标识绝不可混用。
+  连带修两处一致性问题：① 第 2 段的「未注册」现在**汇入结论区**（修复前会出现「上半屏 ❌、结论 ✅ 一切正常」的自相矛盾）；
+  ② 新增 `soft` 分支区分「查不了」（环境限制如沙箱禁用 `cmd.exe`，只 ⚠️ 不计故障）与「没注册」（真故障 ❌）。
+  回归守卫：`--self-test` 里含**旧 bug 复现钉子** —— `pickCronJobs(SAMPLE, 'hdszf-mtd').mine.length === 0`。
+
 ---
 
 ## 八、SEO 基础设施
