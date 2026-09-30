@@ -363,12 +363,15 @@ crontab\uninstall.cmd
 
 | 项 | 检查 / 命令 | 说明 |
 |---|---|---|
-| Node ≥ 16 | `node -v` | 缺则 `sudo apt update && sudo apt install -y nodejs`，或用 nvm 装 LTS。**必须 ≥ 16**：时区归一依赖 Node 16+ 的 `process.env.TZ` 运行时生效能力 |
+| **Node ≥ 18** | `node -v` | **⚠️ 最容易踩的一条**：Ubuntu 22.04 用 `sudo apt install nodejs` 装到的是 **12.x**，直接不可用。请用 NodeSource 或 nvm：<br>`curl -fsSL https://deb.nodesource.com/setup_22.x \| sudo -E bash - && sudo apt install -y nodejs`<br>`curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh \| bash && nvm install --lts`<br>版本要求来自两处：时区归一要 **16+**、实时取数用全局 `fetch` 要 **18+**。 |
 | git | `git -v` | `sudo apt install -y git` |
 | Python3 | `python3 -V` | 只有**月度定稿（finalize）**需要它取数：`sudo apt install -y python3`（标准库够用，无需 pip） |
 | git 身份 | `git config --global user.name/user.email` | 不配的话 commit 会被拒。⚠️ 建议用全局配置：`git config --global user.email "sugas13465@gmail.com"` |
 | **推送凭据** | `cd <仓库> && git ls-remote origin main` | **最容易翻车的一步**。仓库 remote 是 SSH（`git@github.com:...`），无头服务器上必须配好 key，详见 10.3 |
 | cron 服务 | `systemctl is-active cron` | 应为 `active`；否则 `sudo systemctl enable --now cron` |
+
+> 先做这一步：**把仓库更新到最新**（`cd /home/ubuntu/code/hdszf && git pull`）——
+> `install.sh` / `status.sh` / `.gitattributes` 与运行器的跨平台改造是 2026-09-30 才加的，旧 clone 里没有。
 
 ### 10.3 SSH 推送凭据（服务器上没有浏览器、也没有密码交互）
 

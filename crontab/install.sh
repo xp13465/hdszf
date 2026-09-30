@@ -76,7 +76,13 @@ NODE_VER="$("$NODE_BIN" -v 2>/dev/null || echo '?')"
 NODE_MAJOR="$(printf '%s' "$NODE_VER" | sed 's/^v//' | cut -d. -f1)"
 case "$NODE_MAJOR" in
   ''|*[!0-9]*) ;;
-  *) [ "$NODE_MAJOR" -ge 16 ] || die "node 版本过低（$NODE_VER）。运行器靠 Node 16+ 的时区归一能力，请升级到 18/20/22 LTS。" ;;
+  *) [ "$NODE_MAJOR" -ge 18 ] || die "node 版本过低（$NODE_VER），需要 18+：
+     · 时区归一（TZ-GUARD）要 Node 16+；实时取数用全局 fetch，要 Node 18+。
+     · ⚠️ Ubuntu 22.04 用 apt 装到的 nodejs 是 12.x，必须换装：
+         curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+         sudo apt install -y nodejs
+       或 nvm：curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash && nvm install --lts
+     · 装好后重跑本脚本（会自动探测新的 node 路径）。" ;;
 esac
 
 # ---------------------------------------------------------------- 2. 前置自检

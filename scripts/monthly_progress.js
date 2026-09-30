@@ -51,6 +51,16 @@ const NO_JSON = has('--no-json');
 const JSON_OUT = arg('json') || 'js/progress.json';
 const PUSH = has('--push');
 
+// Node 18+ 才有全局 fetch（实时取数用它直连新浪）。Ubuntu 22.04 用 apt 装到的 nodejs 只有 12.x，
+// 届时报错会是「fetch is not defined」这种看不出所以然的形式 —— 这里提前拦住并给出装法。
+if (!NO_FETCH && typeof fetch !== 'function') {
+  console.error(`  ✗ 实时取数需要 Node 18+（用到全局 fetch），当前是 ${process.version}。`);
+  console.error('     Ubuntu 22.04 的 apt nodejs 是 12.x，请装新版：');
+  console.error('       curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash - && sudo apt install -y nodejs');
+  console.error('     （或 nvm：curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash && nvm install --lts）');
+  process.exit(1);
+}
+
 // ---------------- 加载数据与滚动引擎 ----------------
 const ctx = {};
 vm.createContext(ctx);

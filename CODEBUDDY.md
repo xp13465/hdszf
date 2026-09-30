@@ -180,6 +180,8 @@ investment-advisor/
 **跨平台演化（2026-09-30，为 Ubuntu 云服务器而做）**
 - **时区归一（TZ-GUARD）**：`run_job.js` / `status.js` / `monthly_progress.js` / `monthly_update.js` 启动即
   `process.env.TZ = process.env.HDSZF_TZ || 'Asia/Shanghai'`（必须在任何 `new Date()` 之前；Node 16+ 赋值即时生效，已实测）。
+  ⚠️ **实际运行门槛是 Node ≥ 18**：实时取数用全局 `fetch`（Node 18+ 才有），`monthly_progress.js` 已加前置守卫与装法提示；
+  Ubuntu 22.04 的 `apt install nodejs` 只给 12.x，须用 NodeSource / nvm。
   原因：闸门的「18:00 后 / 周末 / 每月 3 日后」按北京时间判断，而云服务器默认多为 **UTC**，不归一会整体错 8 小时
   （表面成功、数据日期却错）。全仓搜 `TZ-GUARD` 可定位这 4 处，改要一起改。
 - **单实例锁（Linux 必需）**：两个任务共用一把 `_hdszf_logs/automation.lock`。Windows 计划任务默认「已在运行就不再启动新实例」，
