@@ -947,20 +947,46 @@
         padding: [10, 14],
         textStyle: { fontSize: 12, color: '#333' },
         formatter: function(params) {
+          if (!params || !params.length) return '';
           const x = params[0].axisValue;
+          // 提示框底色恒为白纸（见上方 backgroundColor），不随皮肤变 → 把涨跌色变量**收进提示框作用域**，
+          // 让三套皮肤都用「白底可读」的一对红绿（tech 皮肤的 #ff6b6b / #20c997 落在白底上会发虚）。
+          // 仍走 CSS 变量（项目约定），只是把作用域收到这一层。
+          let html = '<div style="--color-rise:#c53030;--color-fall:#1a7d3a;">';
           // 表头 = 当前口径下的横轴含义
-          let html;
           if (isTenure) {
-            html = `<strong>入场后第 ${x + 1} 个月</strong>`;
+            html += `<strong>入场后第 ${x + 1} 个月</strong>`;
           } else {
             const { y, m } = xToYm(x);
-            html = `<strong>${y}年${m}月</strong>`;
+            html += `<strong>${y}年${m}月</strong>`;
           }
           // 该 x 上是否存在「本月至今」点：date 模式看全局末点；tenure 模式各曲线在自己的持有期上收尾
           const liveHere = isTenure
             ? params.some((p) => x === lengths[p.seriesIndex])
             : (liveX !== null && x === liveX);
           html += `<span style="color:#999;">　${params.length} 个起点${liveHere ? ' · 本月至今（MTD）' : ''}</span><br/>`;
+
+          // 环比上月（MoM）= (本月总市值 − 上月总市值) ÷ **固定基准本金 50 万**。
+          // ⚠️ 口径红线：**不是**引擎的 snap.monthReturn（那是 ÷上月末总市值 的复合口径，只有它的一半左右）。
+          //    项目铁律（见 buildLiveRows 的注释，用户指定）：所有分段收益比例一律 ÷ 50 万，
+          //    `-1.04万 ÷ 50万 = -2.07%`（不是 `÷ 上月末 110.58万 = -0.94%`，后者仅作参考对照）。
+          //    这同时保证本列与「累计收益 / 年度收益率」同口径、各段可加：
+          //    由 y = 总市值/50万 − 1 可知 MoM 恰好等于该曲线累计收益率的月度增量（相邻两点 y 之差）。
+          const baseCap = RollingBacktest.CONFIG.totalCapital;
+          const momAt = (p) => {
+            const r = results[p.seriesIndex];
+            if (!r) return null;
+            const snaps = r.monthlySnapshots || [];
+            const j = isTenure ? x : (x - offsets[p.seriesIndex]);   // 该点在**本曲线内**的下标
+            if (j <= 0) return null;                                 // 入场月：没有「上月」
+            if (j < snaps.length) return (snaps[j].totalValue - snaps[j - 1].totalValue) / baseCap;
+            // 本月至今点：相对**最后一个已定稿月**（与滚动汇总表 MTD 行同源）
+            if (j === snaps.length && r.live) {
+              return (r.live.finalValue - snaps[snaps.length - 1].totalValue) / baseCap;
+            }
+            return null;
+          };
+
           params.sort((a, b) => b.value[1] - a.value[1]);
           for (const p of params) {
             // 每行附**另一套口径**的对照：date 模式标持有月数，tenure 模式标对应日历月
@@ -970,9 +996,18 @@
             const isLiveP = isTenure ? (x === lengths[p.seriesIndex]) : (liveX !== null && x === liveX);
             html += `<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${p.color};margin-right:4px;"></span>`;
             html += `${p.seriesName}: <strong>${p.value[1] >= 0 ? '+' : ''}${p.value[1].toFixed(1)}%</strong>`;
+            // 环比上月：涨红跌绿（A 股习惯，走 CSS 变量以适配三套皮肤）
+            const mom = momAt(p);
+            if (mom === null) {
+              html += `<span style="color:#999;">　环比上月 —</span>`;
+            } else {
+              const mp = mom * 100;
+              const mc = mp > 0 ? 'var(--color-rise)' : (mp < 0 ? 'var(--color-fall)' : '#999');
+              html += `<span style="color:#999;">　环比上月 </span><strong style="color:${mc};">${mp >= 0 ? '+' : ''}${mp.toFixed(2)}%</strong>`;
+            }
             html += `<span style="color:#999;">　${other}${isLiveP && isTenure ? '（本月至今）' : ''}</span><br/>`;
           }
-          return html;
+          return html + '</div>';
         }
       },
       legend: {

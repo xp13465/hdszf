@@ -281,7 +281,7 @@ investment-advisor/
 | charts.js | v=17 | index.html |
 | rolling.js | v=19 | index.html |
 | share-image.js | v=6 | index.html |
-| main.js | v=58 | index.html |
+| main.js | v=59 | index.html |
 
 > 查当前值：`grep -o "js/[a-z_-]*\.js?v=[0-9]*\|css/[a-z_-]*\.css?v=[0-9]*" index.html`
 
@@ -713,11 +713,46 @@ const isTenure = equityXMode === 'tenure';
 - `tenure`：起点 x **全为 0**；末点 x = `[133,133,121,...,13]`；`x=0` 处 12 条都有值；`x=132` 处只有最早 2 条（**符合该口径语义**，不是 bug）；刻度 `0 → 入场`、`12 → 第1年`。
 - 来回切换后 `date` 必须**完全复现**（不得残留 tenure 的坐标）。
 
-验证脚本（不进仓库）：`node workspace/_verify_equity_axis.js`（jsdom + 抓 ECharts option + 模拟点击切换，**36 项断言 / 两模式**）、
+验证脚本（不进仓库）：`node workspace/_verify_equity_axis.js`（jsdom + 抓 ECharts option + 模拟点击切换，**60 项断言 / 两模式 + MoM 专项**）、
 `workspace/_shot_xmode.py`（实机点击切换 + 两模式截图 + 读悬停提示）、`workspace/_check_tip_clip.py`（量提示框是否被裁）。
 
 > `.chart-note` 说明行走 `index.html` 内联样式 + `.chart-mode-switch` / `.xmode-btn`，**不涉及 `css/*.css`**
 > （三套皮肤只用到 `--color-text-secondary` / `--color-border-light`，实测三份 css 都有定义）。
+
+#### I. 折线图悬停提示新增「环比上月（MoM）」列（2026-09-30）
+
+**需求**：用户要求在悬停提示里，除「累计收益率」外再看一个「相对上一个月的涨跌」。
+
+**口径（关键，最容易搞错）**：MoM = **（本月总市值 − 上月总市值）÷ 固定基准本金 50 万**。
+⚠️ **不是**引擎的 `snap.monthReturn` —— 那是 `÷上月末总市值` 的复合口径，只有前者的一半左右。
+依据是本仓库既有铁律（见 `main.js#buildLiveRows` 注释，用户指定）：
+`-1.04万 ÷ 50万 = -2.07%`（**不是** `÷上月末 110.58万 = -0.94%`）。
+这样本列才与「累计收益 / 年度收益率」同口径、**各段可加** —— 由 `y = 总市值/50万 − 1` 可知
+MoM 恰好等于「该曲线累计收益率的月度增量」（相邻两点 y 之差），故逐月 MoM 之和 = 末点累计收益率。
+
+**实现**（`main.js#renderRollingEquityChart` → `tooltip.formatter` 内的 `momAt(p)`）：
+- 该点在曲线内的下标 `j = isTenure ? x : (x - offsets[seriesIndex])`（tenure 模式 offset 恒为 0，故两种模式共用一条式子）；
+- `j <= 0` → 入场月，没有「上月」→ 显示 `—`；
+- `0 < j < snaps.length` → `(snaps[j].totalValue − snaps[j−1].totalValue) / 50万`；
+- `j === snaps.length` → 本月至今点 → `(r.live.finalValue − 末个已定稿月 totalValue) / 50万`。
+
+**展示**：每行 = `◉ 起点名: +121.0%　环比上月 +1.23%　入场后第134个月`。
+涨红跌绿走 CSS 变量；但提示框底色**恒为白纸**（`tooltip.backgroundColor` 硬编码，不随皮肤变），
+故把 `--color-rise` / `--color-fall` **收进提示框作用域**
+（外层 `<div style="--color-rise:#c53030;--color-fall:#1a7d3a;">`），
+避免 tech 皮肤的浅红 `#ff6b6b` / 浅青 `#20c997` 落在白底上发虚。
+
+**不变量（改动前必测）**
+- 末点（本月至今）12 条曲线都要有 MoM；最早起点该值应与滚动汇总表 MTD 行的「月收益」比例**一致**（同为 ÷50 万）。
+- `date` 模式 `x=0` 处 2 条（最早两个起点）显示 `—`；`tenure` 模式 `x=0` 处 **12 条全为 `—`**。
+- 口径守卫：显示值必须等于相邻两点「累计收益率之差」；若等于 `÷上月末总市值` 的结果即为**回归错误**。
+
+**已知遗留（未改，待用户拍板）**：完整持仓日志弹窗的「月收益」列（`main.js:1619`）与 CSV 的
+「月收益率」列（`rolling.js:714`）用的仍是 `snap.monthReturn`（÷上月末总市值），
+与本列及滚动汇总表（÷50 万）**不同口径**。改动前需用户确认。
+
+验证：`workspace/_verify_equity_axis.js`（**60 项断言**，含 MoM 专项：数值 / 配色 / `—` 条数 / 口径守卫）、
+`workspace/_pagecheck.py`（实机悬停读真实 DOM：CSS 变量已解析成红绿、tech 与商务风一致、未被祖先裁切）。
 
 ---
 

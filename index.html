@@ -443,8 +443,8 @@
             <button type="button" class="xmode-btn" data-mode="tenure" aria-pressed="false">按持有月数看</button>
           </div>
           <div id="chart-rolling-equity" class="chart-container chart-wide"></div>
-          <div class="chart-note" id="equity-chart-note">横轴为<b>日历时间</b>（自 2015 年 8 月起），因此同一个月份上各个起点都有数值——曲线右端聚拢是正常的：越晚入场的起点，覆盖的时间越短。纵轴为相对固定基准 50 万本金的累计收益率。悬停可看该月各起点的收益与已持有的月数。</div>
-          <div class="chart-note" id="equity-chart-note-tenure" style="display:none;">横轴为<b>入场后时长</b>（各起点自己的第 N 个月），因此曲线左端对齐在同一起点——同一条竖线上是比较「都持有到第 N 个月」各起点的表现，与入场早晚无关。悬停可看该持有月数对应的日历月份。</div>
+          <div class="chart-note" id="equity-chart-note">横轴为<b>日历时间</b>（自 2015 年 8 月起），因此同一个月份上各个起点都有数值——曲线右端聚拢是正常的：越晚入场的起点，覆盖的时间越短。纵轴为相对固定基准 50 万本金的累计收益率。悬停可看该月各起点的累计收益率、<b>环比上月涨跌</b>与已持有的月数。</div>
+          <div class="chart-note" id="equity-chart-note-tenure" style="display:none;">横轴为<b>入场后时长</b>（各起点自己的第 N 个月），因此曲线左端对齐在同一起点——同一条竖线上是比较「都持有到第 N 个月」各起点的表现，与入场早晚无关。悬停可看该持有月数对应的累计收益率、<b>环比上月涨跌</b>与日历月份。</div>
         </div>
       </div>
 
@@ -845,7 +845,7 @@
   <script src="js/charts.js?v=17"></script>
   <script src="js/rolling.js?v=19"></script>
   <script src="js/share-image.js?v=6"></script>
-  <script src="js/main.js?v=58"></script>
+  <script src="js/main.js?v=59"></script>
 
 
   <!-- ===== SEO 静态文本（爬虫可见） ===== -->
