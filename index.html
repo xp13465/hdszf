@@ -224,10 +224,10 @@
     /* 折线图横轴口径切换（按日期看 / 按持有月数看） */
     .chart-mode-switch { display: flex; gap: 0.35rem; margin: -0.1rem 0 0.6rem; }
     .xmode-btn { font-family: inherit; font-size: 0.72rem; line-height: 1.6; padding: 0.2rem 0.62rem; border-radius: 999px;
-      border: 1px solid var(--color-border-light, #e8e5e0); background: transparent;
+      border: 1px solid currentColor; background: transparent;
       color: var(--color-text-secondary, #5f6368); opacity: 0.72; cursor: pointer; transition: opacity 0.15s, border-color 0.15s; }
     .xmode-btn:hover { opacity: 1; }
-    .xmode-btn.is-active { opacity: 1; font-weight: 600; border-color: var(--color-text-secondary, #5f6368);
+    .xmode-btn.is-active { opacity: 1; font-weight: 600; border-color: currentColor;
       background: rgba(128, 128, 128, 0.13); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
