@@ -221,6 +221,14 @@
     body.has-live-estimate .live-note-line { display: block; }
     /* 图表下方口径说明（横轴为日历时间，同一月份各起点都有数值） */
     .chart-note { margin-top: 0.6rem; font-size: 0.72rem; line-height: 1.65; color: var(--color-text-muted, #94989e); }
+    /* 折线图横轴口径切换（按日期看 / 按持有月数看） */
+    .chart-mode-switch { display: flex; gap: 0.35rem; margin: -0.1rem 0 0.6rem; }
+    .xmode-btn { font-family: inherit; font-size: 0.72rem; line-height: 1.6; padding: 0.2rem 0.62rem; border-radius: 999px;
+      border: 1px solid var(--color-border-light, #e8e5e0); background: transparent;
+      color: var(--color-text-secondary, #5f6368); opacity: 0.72; cursor: pointer; transition: opacity 0.15s, border-color 0.15s; }
+    .xmode-btn:hover { opacity: 1; }
+    .xmode-btn.is-active { opacity: 1; font-weight: 600; border-color: var(--color-text-secondary, #5f6368);
+      background: rgba(128, 128, 128, 0.13); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <script src="js/vendor/qrcode.min.js"></script>
@@ -430,8 +438,13 @@
       <div class="charts-row charts-stacked fade-in">
         <div class="chart-card">
           <div class="chart-title">📈 不同起点的累计收益曲线对比</div>
+          <div class="chart-mode-switch" id="equity-x-mode" role="group" aria-label="横轴口径">
+            <button type="button" class="xmode-btn is-active" data-mode="date" aria-pressed="true">按日期看</button>
+            <button type="button" class="xmode-btn" data-mode="tenure" aria-pressed="false">按持有月数看</button>
+          </div>
           <div id="chart-rolling-equity" class="chart-container chart-wide"></div>
-          <div class="chart-note">横轴为<b>日历时间</b>（自 2015 年 8 月起），因此同一个月份上各个起点都有数值——曲线右端聚拢是正常的：越晚入场的起点，覆盖的时间越短。纵轴为相对固定基准 50 万本金的累计收益率。悬停可看该月各起点的收益与已持有的月数。</div>
+          <div class="chart-note" id="equity-chart-note">横轴为<b>日历时间</b>（自 2015 年 8 月起），因此同一个月份上各个起点都有数值——曲线右端聚拢是正常的：越晚入场的起点，覆盖的时间越短。纵轴为相对固定基准 50 万本金的累计收益率。悬停可看该月各起点的收益与已持有的月数。</div>
+          <div class="chart-note" id="equity-chart-note-tenure" style="display:none;">横轴为<b>入场后时长</b>（各起点自己的第 N 个月），因此曲线左端对齐在同一起点——同一条竖线上是比较「都持有到第 N 个月」各起点的表现，与入场早晚无关。悬停可看该持有月数对应的日历月份。</div>
         </div>
       </div>
 
@@ -832,7 +845,7 @@
   <script src="js/charts.js?v=17"></script>
   <script src="js/rolling.js?v=19"></script>
   <script src="js/share-image.js?v=6"></script>
-  <script src="js/main.js?v=57"></script>
+  <script src="js/main.js?v=58"></script>
 
 
   <!-- ===== SEO 静态文本（爬虫可见） ===== -->

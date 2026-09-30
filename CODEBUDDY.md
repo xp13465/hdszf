@@ -281,7 +281,7 @@ investment-advisor/
 | charts.js | v=17 | index.html |
 | rolling.js | v=19 | index.html |
 | share-image.js | v=6 | index.html |
-| main.js | v=57 | index.html |
+| main.js | v=58 | index.html |
 
 > 查当前值：`grep -o "js/[a-z_-]*\.js?v=[0-9]*\|css/[a-z_-]*\.css?v=[0-9]*" index.html`
 
@@ -671,37 +671,53 @@ investment-advisor/
 
 验证脚本（不进仓库）：`C:\Users\23405\.workbuddy\binaries\node\workspace\_check_degraded.js`（jsdom 四场景：正常 / 降级全 null / 降级含伪 0 / 老快照无 degraded 字段）。
 
-#### H. 滚动板块折线图横轴 = **全局日历月序**（2026-09-30 修 —— 用户报「最新月份只有 1 个数值」）
+#### H. 滚动板块折线图横轴 = **两套口径可切换**（2026-09-30 修 —— 用户报「最新月份只有 1 个数值」）
 
 **现象**：悬停到最右侧（如 2026-09）时提示里只有 1~2 条曲线，而同一时刻本该 12 个起点都有值。
 
 **根因**：`renderRollingEquityChart` 用**曲线内局部下标** `j` 当横轴（`data.push([j, ...])`），
 12 条曲线因此全部左对齐到 `x=0`（视觉上像"同一起点出发"）；而刻度年份又按**最早起点**换算
-（`baseYear/baseMonth = results[0].startPoint`）。两套语义打架：看着是一条日历时间轴，
-实际每条的 x 是「入场后第几个月」→ 只有最早起点那条能延伸到最右端。
+（`baseYear/baseMonth = results[0].startPoint`）。两套语义打架：**图是「按持有月数」的形态，刻度却写「日期」**
+→ 只有最早起点那条能延伸到最右端。
 
-**修法**：横轴统一为**全局日历月序**（最早起点月 = 0），`x` 由日历月换算：
+**定案（用户拍板：两套语义都保留、可切换，别替他选）**：`equityXMode` 控制横轴，UI 是图表上方的两个胶囊按钮
+（`index.html#equity-x-mode` 的 `[data-mode]`，`main.js#initRollingBacktest` 绑定点击 → 重渲染 + 切说明行）：
+
+| 模式 | 横轴 | 回答的问题 | 曲线形态 | 刻度 | 提示表头 / 每行对照 |
+|---|---|---|---|---|---|
+| `date`（默认） | `toGlobalX(月份标签)` | 同一天，各起点累计收益差多少 | 右端聚拢（越晚入场覆盖越短） | `xToYm(v).y + '年'` | `2026年9月` / `入场后第 N 个月` |
+| `tenure` | `j`（曲线内第 j 个月） | 都持有到第 N 个月，各起点差多少 | 左端对齐 | `入场` / `第 N 年` | `入场后第 N 个月` / 对应日历月 |
 
 ```js
-const basePoint = results[0].startPoint;                  // 2015-08 → x = 0
+const basePoint = results[0].startPoint;                  // 2015-08 → 全局月序 0
 const toGlobalX = (ym) => { const [y,m] = String(ym).split('-').map(Number);
   return (y - basePoint.year) * 12 + (m - basePoint.month); };
-// 每条曲线：offset = toGlobalX(snapshots[0].month)；点 = [offset + j, 收益率]
-// 本月至今点 = [toGlobalX(r.live.month), ...]（所有曲线共用同一 x）
+const xToYm = (x) => { const t = basePoint.month - 1 + x;
+  return { y: basePoint.year + Math.floor(t / 12), m: (t % 12) + 1 }; };
+const isTenure = equityXMode === 'tenure';
+// offsets[i] = toGlobalX(首月)；lengths[i] = 点数
+// 点   = [isTenure ? j : offsets[i] + j, 收益率]
+// live = [isTenure ? lengths[i] : toGlobalX(r.live.month), 值]   ← date 模式 12 条共用同一 x
 ```
 
-**连带必须同步的三处**（漏一处就自相矛盾）：
+**连带必须同步的五处**（漏一处就自相矛盾）：
 1. `markPoint` 的 `coord` 用 `data[data.length-1][0]` 取实际 x（**不能**再用 `data.length - 1`）；
-2. 刻度 `axisLabel.formatter` 复用同一个 `xToYm()`；旧代码里的硬编码 `v === 131` 已删（`v % 12 === 0` 足够）；
-3. 悬停提示：首行给**日历年月**，每行附「入场后第 N 个月」（`x - offsets[seriesIndex] + 1`）—— 同一日历月上各起点持有期不同，旧文案「第 N 个月」会被误读成持有期。
+2. 刻度 `axisLabel.formatter` 按模式分支，复用同一个 `xToYm()`；旧代码里的硬编码 `v === 131` 已删；
+3. 悬停提示：表头按模式给「日历年月 / 入场后第 N 个月」，每行附**另一套口径**作对照；
+   「本月至今」判定也要分模式 —— `date` 看全局末点 `liveX`，`tenure` 看 `x === lengths[seriesIndex]`；
+4. 两条 `.chart-note` 说明行（`#equity-chart-note` / `#equity-chart-note-tenure`）随模式显隐，否则图注与口径不符；
+5. `offsets[]` / `lengths[]` 两个数组在 `map` 里同步 push，位置与 `seriesIndex` 一一对应（提示里靠它换算）。
 
-**改动后的不变量（改动前必测）**：所有曲线末点 x 相同（= 进行中月）；该 x 处 **12 条曲线都有值**；
-各曲线起点 x = `[0,0,12,24,...,120]`（两个 2015-08 起点 + 每年一个）；`x=0 → 2015年`、`x=132 → 2026年`。
-验证脚本（不进仓库）：`node workspace/_verify_equity_axis.js`（jsdom + 抓 ECharts option，27 项断言）、
-`workspace/_shot_equity_axis.py`（实机截图 + 读悬停提示，最新月份应含 12 个起点）。
+**不变量（改动前必测）**
+- `date`：起点 x = `[0,0,12,24,...,120]`；**12 条末点 x 全相等（= 进行中月）**；该 x 处 **12 条都有值**；`x=0 → 2015年`、`x=132 → 2026年`。
+- `tenure`：起点 x **全为 0**；末点 x = `[133,133,121,...,13]`；`x=0` 处 12 条都有值；`x=132` 处只有最早 2 条（**符合该口径语义**，不是 bug）；刻度 `0 → 入场`、`12 → 第1年`。
+- 来回切换后 `date` 必须**完全复现**（不得残留 tenure 的坐标）。
 
-> 图表下方新增 `.chart-note` 说明行（`index.html` 内联样式，不涉及 `css/*.css`）：
-> 「横轴为日历时间…曲线右端聚拢是正常的」。曲线右端聚拢是**正确**形态，不是数据缺失。
+验证脚本（不进仓库）：`node workspace/_verify_equity_axis.js`（jsdom + 抓 ECharts option + 模拟点击切换，**36 项断言 / 两模式**）、
+`workspace/_shot_xmode.py`（实机点击切换 + 两模式截图 + 读悬停提示）、`workspace/_check_tip_clip.py`（量提示框是否被裁）。
+
+> `.chart-note` 说明行走 `index.html` 内联样式 + `.chart-mode-switch` / `.xmode-btn`，**不涉及 `css/*.css`**
+> （三套皮肤只用到 `--color-text-secondary` / `--color-border-light`，实测三份 css 都有定义）。
 
 ---
 
