@@ -8,8 +8,9 @@
 >   推荐把自动化放在 24 小时在线的服务器上，本机只作替补手动跑。
 > - **Windows 本机** → 第 2 节（双击 `install.cmd`）。
 > - **不想装计划任务** → 第 3 节「方式 B：手动跑」——两条命令，按频率自己跑就行。
+> - **装之前先体检环境** → 第 11 节（`check_env.sh` / `check_env.cmd`，缺依赖可 `--fix` 自动装）。
 >
-> `run_job.js` / `status.js` 是**跨平台**的：Linux 上只是换一个调度器，脚本本身不用改。
+> `run_job.js` / `status.js` / `check_env.js` 是**跨平台**的：Linux 上只是换一个调度器，脚本本身不用改。
 
 ---
 
@@ -33,6 +34,16 @@
 
 ## 2. 方式 A：注册计划任务（一次性，之后全自动）
 
+### 步骤 0：先体检环境（2026-09-30 新增，别跳过）
+
+```
+crontab\check_env.cmd          ← Windows：只体检，不改任何东西
+crontab\check_env.cmd --fix    ← 缺 git / python 时用 winget 装
+```
+
+`install.cmd` 内部**会自动先跑这一遍**，有阻塞项就中止（免得「任务装上了却长期空跑」）。
+体检项、输出含义、`--fix` 能装什么，见 **第 11 节**。
+
 ### 步骤 1：注册
 
 在**你自己的终端**里执行（本机 `schtasks` 被安全策略限制，AI 无法代跑）：
@@ -42,7 +53,7 @@ cd /d C:\Users\23405\WorkBuddy\2026-08-20-17-46-50\hdszf\crontab
 install.cmd
 ```
 
-也可以直接**双击** `install.cmd`。它做的事：
+也可以直接**双击** `install.cmd`。它先体检、再注册这两条：
 
 ```bat
 schtasks /create /tn "hdszf-mtd"      /tr "\"<node.exe>\" \"<仓库>\crontab\run_job.js\" mtd"      /sc HOURLY /mo 1 /st 18:00 /et 23:59 /f
@@ -170,9 +181,15 @@ node scripts\monthly_update.js --strict      ← 取数 → 重算 → 文案 �
 
 ### 4.1 一键体检（推荐）
 
+装好之后看运行情况：
+
 ```
 node crontab\status.js --online
 ```
+
+> 顺带区分一下两个「体检」脚本，别混：
+> **`check_env`**（检查**能不能跑**：依赖 / 权限 / 凭据 / 网络，装之前用，见第 11 节）
+> vs **`status`**（检查**跑得怎么样**：闸门状态 / 任务注册 / 数据截止 / 线上部署，装之后用，就是下面这个）。
 
 输出五段：**① 运行状态 ② 计划任务注册情况 ③ 数据窗口与仓库 ④ 最近日志 ⑤ 线上核对**，
 最后给一句结论（`✅ 一切正常` 或列出 `⚠️` 待处理项）。常用参数：
@@ -332,9 +349,12 @@ crontab\uninstall.cmd
 |---|---|
 | `run_job.js` | 运行器：闸门 + 日志 + 状态账本 + 单实例锁 + 时区归一 + 自愈推送 + 失败回滚（`mtd` / `finalize` 两个任务）。**跨平台** |
 | `status.js` | 健康检查（查看清单），只读。**跨平台**（Windows 查 schtasks，Linux 查 crontab） |
-| `install.cmd` / `uninstall.cmd` | **Windows**：注册 / 删除计划任务 |
+| `check_env.js` | **环境体检（深度层）**：运行时版本 / 仓库 / 工作区 / 推送凭据 / 网络 / 日志目录 / 磁盘 / 调度器条目。**跨平台**，只读。支持 `--json` / `--quiet` / `--no-network` |
+| `check_env.sh` | **Linux 引导层**：系统 / apt 依赖 / cron 服务 / sudo / 时区 / 时钟同步，`--fix` 自动装依赖（见第 11 节），随后调用 `check_env.js` |
+| `check_env.cmd` | **Windows 引导层**：找 node 后调用 `check_env.js`；`--fix` 用 winget 补 git / python |
+| `install.cmd` / `uninstall.cmd` | **Windows**：注册 / 删除计划任务（`install.cmd` 会先跑 `check_env.cmd`） |
 | `status.cmd` | **Windows**：双击即可看健康报告 |
-| `install.sh` / `uninstall.sh` | **Linux**：写入 / 移除 crontab 条目（幂等，保留你其它条目） |
+| `install.sh` / `uninstall.sh` | **Linux**：写入 / 移除 crontab 条目（幂等，保留你其它条目）；`install.sh` 会先跑 `check_env.sh`（`--fix` 可带上 `--fix`；有阻塞项则中止；`--no-check` 跳过） |
 | `status.sh` | **Linux**：健康检查入口（等价于 `node crontab/status.js`） |
 | `README.md` | 本文档 |
 
@@ -360,6 +380,16 @@ crontab\uninstall.cmd
 | 假数据/降级闸门、幂等闸门、回滚、自愈推送 | 完全相同 | 完全相同 |
 
 ### 10.2 前置条件（在服务器上各做一次）
+
+> **不用背这张表**：先跑一遍体检，它会逐项告诉你缺什么、怎么装。
+>
+> ```
+> bash crontab/check_env.sh            # 只体检，什么都不改
+> bash crontab/check_env.sh --fix      # 缺 git / python3 / cron / curl / openssh 时自动 apt 装
+> bash crontab/check_env.sh --fix --fix-node   # node 缺失或低于 18 时，用 NodeSource 装 22.x
+> ```
+>
+> 下表是它检查的项目（也是手工核对时的清单）：
 
 | 项 | 检查 / 命令 | 说明 |
 |---|---|---|
@@ -405,12 +435,20 @@ ssh -T git@github.com
 
 ```bash
 cd /home/ubuntu/code/hdszf
+git pull                              # 先拉最新（check_env.* 是 2026-09-30 才加的）
 
-bash crontab/install.sh --dry-run     # 先看看会写入什么（推荐）
-bash crontab/install.sh               # 正式安装
+bash crontab/check_env.sh             # ① 先体检（只读）：缺什么一目了然
+bash crontab/check_env.sh --fix       # ② 缺 git/python3/cron/curl/openssh 就自动装
+                                      #    node 缺失或过低：加 --fix-node（走 NodeSource）
+
+bash crontab/install.sh --dry-run     # ③ 先看看会写入什么（推荐）
+bash crontab/install.sh               # ④ 正式安装
 ```
 
-它会做：探测 `node` 绝对路径 → 检查 git/python3/git 身份/**推送凭据** → 创建日志目录 →
+> `install.sh` 会**自己先跑一遍 `check_env.sh --no-network`**，有阻塞项就中止（`--fix` 可透传）；
+> 所以第 ① ② 步不是必须的，但单独跑一遍能提前看清环境。要跳过体检用 `--no-check`。
+
+它会做：探测 `node` 绝对路径 → **环境体检（系统 / 依赖 / cron 服务 / 仓库 / 凭据）** → 创建日志目录 →
 把下面这段写进**当前用户**的 crontab（用 BEGIN/END 标记界定，**不动你 crontab 里的其它条目**，重复执行幂等）：
 
 ```cron
@@ -422,7 +460,8 @@ MAILTO=""
 ### <<< hdszf automation <<<
 ```
 
-常用参数：`--node /path/to/node`、`--hours 18-23`（见下）、`--show`（只看当前 crontab）、`--dry-run`。
+常用参数：`--node /path/to/node`、`--hours 18-23`（见下）、`--show`（只看当前 crontab）、`--dry-run`、
+`--fix`（体检时顺带用 apt 补依赖）、`--no-check`（跳过体检，明知故犯时用）。
 
 ### 10.5 时区（**最容易踩的坑，务必读完**）
 
@@ -520,3 +559,115 @@ bash crontab/status.sh --online
 - 运行器的自愈推送已能识别这种情况：远程领先时它**不硬推**，只在日志里明确告警。
 - WorkBuddy 里那两条旧自动化（每周一 / 每月 3 日）同样应停用，理由见 7.6。
 
+
+---
+
+## 11. 环境检测与依赖安装（2026-09-30 新增）
+
+**一句话**：装调度器之前先体检；缺东西能自动装。
+
+```
+bash crontab/check_env.sh              # Linux：只体检，什么都不改
+bash crontab/check_env.sh --fix        # Linux：顺带用 apt 把缺的依赖装齐
+crontab\check_env.cmd                  # Windows：只体检
+crontab\check_env.cmd --fix            # Windows：顺带用 winget 装 git / python
+```
+
+`install.sh` / `install.cmd` 都会**自动先跑这一遍**，有阻塞项就中止 —— 避免「任务装上了、每天按时唤醒、一个月后才发现 node 版本不对」这种最贵的失败。
+（要明知故犯硬装：`bash crontab/install.sh --no-check`。）
+
+### 11.1 三个脚本怎么分工
+
+| 文件 | 角色 | 内容 |
+|---|---|---|
+| `check_env.js` | **深度层（跨平台）** | 运行时版本 / 仓库与工作区 / 推送凭据 / 网络 / 日志目录 / 磁盘 / 调度器条目 |
+| `check_env.sh` | **Linux 引导层** | 系统 / apt 依赖 / cron 服务 / sudo / 时区 / 时钟同步 + **`--fix` 装依赖**，随后调用 `check_env.js` |
+| `check_env.cmd` | **Windows 引导层** | 找 node（找不到就给 winget 命令）→ 调用 `check_env.js`；`--fix` 用 winget 补 git / python |
+
+设计意图：**只做一遍检查**。深度检查写在 node 里（两个平台共用，不会漂移）；`node` 本身缺不缺、`cron` 装没装、`apt` 能装什么，只能在 node **之外**判断，所以放在各自的引导层。
+引导层的阻塞/警告数会通过环境变量带进 `check_env.js`，**最终只出一份合并汇总**。
+
+### 11.2 检查项（两平台对齐）
+
+| # | 检查项 | 阻塞? | Linux 引导层 | Windows 引导层 | 深度层 |
+|---|---|---|---|---|---|
+| 1 | 系统与发行版 / 架构 | — | ✅ | ✅（由 node 报） | |
+| 2 | root 或 sudo 可用（`--fix` 前提） | — | ✅ | — | |
+| 3 | `crontab` 命令存在 | **是** | ✅ | — | |
+| 4 | cron 服务 active | **是** | ✅（systemctl / init.d） | — | |
+| 5 | node 存在且 **≥ 18** | **是** | ✅（含 nvm / NodeSource 路径探测） | ✅ | ✅ |
+| 6 | git 存在 | **是** | ✅ | ✅ | ✅ |
+| 7 | python3 存在（仅 finalize 需要） | 否 | ✅ | ✅ | ✅ |
+| 8 | `ssh` / `ssh-keyscan`（SSH remote 时） | 否（但推送会失败） | ✅ | ✅ | ✅ |
+| 9 | `curl`（NodeSource 安装方式需要） | 否 | ✅ | — | — |
+| 10 | CA 证书 | 否 | ✅ | — | — |
+| 11 | 系统时区与 UTC 偏移 | 否 | ✅ | ✅ | ✅ |
+| 12 | NTP 时钟同步（时间漂移会让闸门误判） | 否 | ✅ | — | — |
+| 13 | 是 git 仓库 / 分支 main | **是** / 否 | | | ✅ |
+| 14 | origin 配置 + 协议（https 会警告） | **是** / 否 | | | ✅ |
+| 15 | git 身份（user.name / user.email） | **是** | | | ✅ |
+| 16 | 工作区干净（finalize 硬闸门） | 否 | | | ✅ |
+| 17 | `run_job.js` 存在 | **是** | | | ✅ |
+| 18 | 私钥 / known_hosts / 远程可达（`ls-remote`） | 私钥/远程**是** | | | ✅ |
+| 19 | 新浪行情接口可达 | **是** | | | ✅ |
+| 20 | GitHub HTTPS 可达（仅供参考，推送走 SSH） | 否 | | | ✅ |
+| 21 | 日志目录在仓库外 + 可写 | **是** | | | ✅ |
+| 22 | 磁盘剩余 ≥ 200MB | 否 | | | ✅ |
+| 23 | 调度器条目已注册（crontab 段 / schtasks） | 否 | | | ✅ |
+
+> **阻塞** = 现在装上去会白跑，退出码 `1`；**否** = 只出 `⚠` 警告，退出码 `0`。
+
+### 11.3 输出怎么读
+
+```
+  ✅ 系统        Ubuntu 22.04.4 LTS · 5.15.0-105-generic · x86_64
+  ⚠  node        v12.22.9 过低（需要 18+）· /usr/bin/node
+      → 时区归一要 16+，实时取数要 18+ → bash crontab/check_env.sh --fix-node
+  ·  系统时区    UTC · UTC+0000
+```
+
+- `✅` 通过；`⚠` 警告（能跑，但建议处理）；`✗` 阻塞；`·` 仅供参考。
+- 末尾一行是**合并汇总**：`✗ 阻塞 N 项 / ⚠ 警告 M 项`，`N > 0` 时退出码 `1`。
+- `⚠ 偏移 UTC+0000 ≠ UTC+0800` 这类**不用管**：运行器有 TZ-GUARD，会强制按北京时间判断，不需要改服务器时区。
+
+### 11.4 `--fix` 能装什么（Linux）
+
+| 缺什么 | 安装方式 | 备注 |
+|---|---|---|
+| git / python3 / cron / curl / ca-certificates / openssh-client | `sudo apt-get install -y <包>` | 自动，幂等 |
+| **node** | **不会**自己走 apt | ⚠️ Ubuntu 22.04 的 apt 只给 **12.x**，装了更糟。要自动装必须显式加 `--fix-node`（走 NodeSource 22.x），否则只打印命令 |
+
+```
+bash crontab/check_env.sh --fix            # 装 apt 那批
+bash crontab/check_env.sh --fix --fix-node # 连 node 22.x 一起装（NodeSource）
+```
+
+Windows 侧 `--fix` 走 winget（`OpenJS.NodeJS.LTS` / `Git.Git` / `Python.Python.3.12`），**装完要重开一个 cmd**（PATH 才更新）。
+没有 winget 就只打印官网链接。本机 `schtasks` 被安全策略限制时，第 7 段（调度器条目）会以警告形式说明，**不代表任务没注册**。
+
+### 11.5 常用参数
+
+| 脚本 | 参数 | 作用 |
+|---|---|---|
+| 两者 | `--no-network` | 跳过联网检查与 `ls-remote`（离线 / 受限网络；`install.sh` 内部就这么调） |
+| 两者 | `--quiet` / `-q` | 只打印 ⚠ 与 ✗ |
+| `check_env.js` | `--json` | 机器可读输出（`{ok, counts, items[]}`），便于接监控 |
+| `check_env.js` | `--no-runtime` | 跳过运行时段（引导层已报过，避免重复） |
+| `check_env.sh` | `--print-node` | 只输出可用 node 的绝对路径（`install.sh` 用它取路径） |
+| `check_env.sh` | `--fix-node` | node 缺失/过低时用 NodeSource 装 22.x（隐含 `--fix`） |
+
+退出码统一：**`0` = 无阻塞项**（可能有警告）；**`1` = 有阻塞项**（先修再装）；`2` = 参数写错。
+
+### 11.6 体检常见问题
+
+| 现象 | 含义 / 处置 |
+|---|---|
+| `✗ node v12.22.9 过低` | 用 apt 装到 12.x 了 → `bash crontab/check_env.sh --fix --fix-node` |
+| `✗ crontab 找不到命令` | 没装 cron：`sudo apt-get install -y cron`（`--fix` 会装） |
+| `✗ cron 服务 状态=inactive` | `sudo systemctl enable --now cron` |
+| `⚠ cron 服务 查不到状态` | 容器环境常见：cron 由宿主机/进程管理器托管，需自行确认在跑（容器里跑自动化不是推荐姿势） |
+| `✗ 私钥 / 远程可达` | 无头服务器必看 10.3（deploy key 要勾 **Allow write access**，并 `ssh-keyscan github.com >> ~/.ssh/known_hosts`） |
+| `⚠ 工作区 有未提交改动` | finalize 会按硬闸门跳过 → 先 `git commit` / `git stash` |
+| `⚠ 偏移 UTC+0000` | **不用处理**，TZ-GUARD 会归一 |
+| `⚠ GitHub HTTPS 超时` | **不用处理**，推送走 SSH 22 端口，以「远程可达」为准 |
+| `--fix` 报 `apt 安装失败` | 软件源索引过期：`sudo apt-get update` 后重跑 |

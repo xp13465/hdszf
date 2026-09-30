@@ -7,6 +7,11 @@ rem  恒市值助手 · 计划任务一键安装（零 AI 依赖，纯脚本自�
 rem
 rem  【唯一需要手工维护的地方】下面这行 node.exe 的绝对路径：
 rem  Node 升级 / 换机器后，把 NODE 改成实际的 node.exe 路径即可。
+rem
+rem  第 0 步会先跑 crontab\check_env.cmd 做环境体检（系统 / 依赖 / 仓库 / 凭据），
+rem  有阻塞项就中止，免得「任务装上了却长期空跑」。体检可单独跑：
+rem      crontab\check_env.cmd            只体检
+rem      crontab\check_env.cmd --fix      缺 git / python 时用 winget 装
 rem ============================================================================
 set "NODE=C:\Users\23405\.workbuddy\binaries\node\versions\22.22.2-2\node.exe"
 
@@ -33,6 +38,32 @@ echo 目标仓库：%ROOT%
 echo node     ：%NODE%
 echo 运行器   ：%RUNNER%
 echo.
+
+rem ============================================================================
+rem  第 0 步：环境体检（独立脚本 crontab\check_env.cmd，也可单独跑）
+rem  有阻塞项就中止 —— 免得「任务装上了却长期空跑」。
+rem ============================================================================
+if not exist "%HERE%check_env.cmd" (
+  echo [提示] 找不到 crontab\check_env.cmd，跳过环境体检（确认仓库完整：git -C "%ROOT%" pull）
+  goto :start_install
+)
+echo 正在做环境体检（crontab\check_env.cmd）...
+echo.
+call "%HERE%check_env.cmd"
+if errorlevel 1 (
+  echo.
+  echo [中止] 环境体检有阻塞项，先修好上面 ✗ 的项再装。
+  echo        一键补依赖：crontab\check_env.cmd --fix
+  echo        体检说明见 crontab\README.md 第 11 节
+  echo.
+  pause
+  exit /b 1
+)
+echo.
+echo 环境体检通过，继续安装。
+echo.
+
+:start_install
 echo 正在注册计划任务（不需要管理员权限，不需要填密码）...
 echo.
 

@@ -10,3 +10,6 @@
 *.sh   text eol=lf
 *.cmd  text eol=crlf
 *.bat  text eol=crlf
+# .js 也锁 LF：crontab/check_env.js 等带 `#!/usr/bin/env node` shebang，
+# 万一 blob 里混进 CR，Linux 上直接 `./check_env.js` 会报 bad interpreter。
+*.js   text eol=lf

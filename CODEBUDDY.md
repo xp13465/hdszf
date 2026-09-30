@@ -50,9 +50,12 @@ investment-advisor/
 ├── crontab/                 # 纯脚本自动化（Windows 计划任务 / Linux cron + 手动，零 AI 依赖）→ 见 §七
 │   ├── run_job.js           #   运行器（跨平台）：闸门 + 单实例锁 + 时区归一 + 日志 + 回滚 + 自愈推送
 │   ├── status.js            #   健康检查（跨平台：Windows 查 schtasks / Linux 查 crontab）
-│   ├── install.cmd / uninstall.cmd / status.cmd   #   Windows 计划任务
-│   ├── install.sh / uninstall.sh / status.sh      #   Linux cron
-│   └── README.md            #   完整用法（含 Ubuntu 云服务器部署章节）
+│   ├── check_env.js         #   环境体检·深度层（跨平台，只读）：运行时/仓库/凭据/网络/目录/磁盘
+│   ├── check_env.sh         #   环境体检·Linux 引导层（apt 依赖 + cron 服务 + --fix 自动装）
+│   ├── check_env.cmd        #   环境体检·Windows 引导层（找 node + winget --fix）
+│   ├── install.cmd / uninstall.cmd / status.cmd   #   Windows 计划任务（install 先跑 check_env）
+│   ├── install.sh / uninstall.sh / status.sh      #   Linux cron（install 先跑 check_env）
+│   └── README.md            #   完整用法（第 10 节云服务器部署 / 第 11 节环境检测与依赖安装）
 ├── sitemap.xml             # 站点地图（提交到 Google/Bing）
 ├── robots.txt              # 爬虫规则
 ├── .gitignore              # 含 .playwright-cli/ 排除
@@ -162,6 +165,24 @@ investment-advisor/
 |---|---|---|---|---|
 | Windows（本机） | `crontab\install.cmd` | 每天 18:00–23:59（mtd）/ 09:00–23:59（finalize）每小时唤醒 | `node crontab/run_job.js <job>` | mtd 每交易日 1 次；finalize 每月 1 次（3 日起） |
 | **Linux/Ubuntu（云服务器，推荐）** | **`bash crontab/install.sh`** | 全天每小时第 7 / 37 分钟唤醒 | 同上 | 同上 |
+
+### 环境体检（2026-09-30 加，装调度器之前必跑）
+
+`install.sh` / `install.cmd` 已**自动先跑一遍**，有阻塞项就中止（`--no-check` 可跳过）——避免「装上了却长期空跑」。
+
+| 文件 | 角色 | 内容 |
+|---|---|---|
+| `crontab/check_env.js` | 深度层（跨平台，只读） | 运行时版本 / 仓库与工作区 / 推送凭据 / 网络 / 日志目录 / 磁盘 / 调度器条目；支持 `--json`、`--no-runtime`、`--no-network` |
+| `crontab/check_env.sh` | Linux 引导层 | 系统 / apt 依赖 / cron 服务 / sudo / 时区 / 时钟同步 + **`--fix` 用 apt 装依赖**（node 必须显式 `--fix-node` 走 NodeSource），随后调 `check_env.js` |
+| `crontab/check_env.cmd` | Windows 引导层 | 找 node（缺失则给 winget 命令）→ 调 `check_env.js`；`--fix` 用 winget 补 git / python |
+
+- 用法：`bash crontab/check_env.sh [--fix] [--fix-node] [--no-network] [--quiet] [--print-node]`；退出码 `0`=无阻塞、`1`=有阻塞、`2`=参数错。
+- **设计要点**：深度检查写在 node 里（两平台共用，不会漂移）；「node 本身缺不缺 / cron 装没装 / apt 能装什么」只能在 node 之外判断 → 放各自引导层。
+  引导层的阻塞/警告数经环境变量 `HDSZF_ENV_UPSTREAM_FAIL/WARN` 带进 `check_env.js`，**最终只出一份合并汇总**。
+- ⚠️ 新增 `check_env.js` 时踩到的两个真坑：①**不能在 CommonJS 里用顶层 `await`**（会直接语法错），所以整个流程包在 `async function main()` 里；
+  ②**Git Bash / MSYS 下 `node` 不认 `/c/…` 形式路径**（会当成 `C:\c\…`）→ 传路径给 node 前先 `cygpath -w` 转原生（Linux 无此问题，`install.sh` 也加了同样处理）。
+- ⚠️ **单文件超长 batch 风险**：`.cmd` 里括号块 + 管道 + `^>` 的组合极易被二次解析吃掉转义。Windows 引导层因此刻意做成**薄启动器**（只找 node + 转调 `.js`），不用大段 batch 做检查逻辑。
+- `.cmd` 必须 CRLF（`.gitattributes` 已锁 `*.cmd eol=crlf`）—— LF-only 的 `.cmd` 在 `goto`/`call` 标签上行为异常。
 
 **关键设计（改动前必读）**
 - 运行器 `crontab/run_job.js` 自带闸门：**当天/当月成功一次后立即跳过**，因此可以高频唤醒（错过就补跑）而不会重复提交、重复部署。

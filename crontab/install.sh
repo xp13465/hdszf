@@ -32,16 +32,20 @@ HOURS="*"      # 默认全天每小时都唤醒，由 run_job.js 的闸门决定
 NODE_BIN=""
 DRY_RUN=0
 SHOW_ONLY=0
+FIX_DEPS=0
+NO_CHECK=0
 
 # ---------------------------------------------------------------- 参数
 while [ $# -gt 0 ]; do
   case "$1" in
-    --node)    NODE_BIN="${2:-}"; shift 2 ;;
-    --node=*)  NODE_BIN="${1#*=}"; shift ;;
-    --hours)   HOURS="${2:-}"; shift 2 ;;
-    --hours=*) HOURS="${1#*=}"; shift ;;
-    --dry-run) DRY_RUN=1; shift ;;
-    --show)    SHOW_ONLY=1; shift ;;
+    --node)     NODE_BIN="${2:-}"; shift 2 ;;
+    --node=*)   NODE_BIN="${1#*=}"; shift ;;
+    --hours)    HOURS="${2:-}"; shift 2 ;;
+    --hours=*)  HOURS="${1#*=}"; shift ;;
+    --dry-run)  DRY_RUN=1; shift ;;
+    --show)     SHOW_ONLY=1; shift ;;
+    --fix)      FIX_DEPS=1; shift ;;
+    --no-check) NO_CHECK=1; shift ;;
     -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "${BASH_SOURCE[0]}"; exit 0 ;;
     *) echo "未知参数：$1（--help 看用法）" >&2; exit 2 ;;
   esac
@@ -58,7 +62,34 @@ if [ "$SHOW_ONLY" = "1" ]; then
   exit 0
 fi
 
+# ---------------------------------------------------------------- 0. 环境体检
+# 独立脚本 crontab/check_env.sh（也可单独跑）。有阻塞项直接中止 ——
+# 否则会出现「cron 装好了、每天空跑、一个月后才发现 node 版本不对」这种最贵的失败。
+# --no-network：联网与推送凭据由下面第 2b 步自己验（那里会打印更具体的修复建议）。
+if [ "$NO_CHECK" = "1" ]; then
+  say "（--no-check：跳过环境体检）"
+elif [ -f "$HERE/check_env.sh" ]; then
+  CHK_ARGS=(--no-network)
+  [ "$FIX_DEPS" = "1" ] && CHK_ARGS+=(--fix)
+  say "— 环境体检（bash crontab/check_env.sh${CHK_ARGS[*]}）—"
+  if ! bash "$HERE/check_env.sh" "${CHK_ARGS[@]}"; then
+    say ""
+    die "环境体检未通过 → 先修上面 ✗ 的项：
+     · 一键补依赖（Debian/Ubuntu，需要 sudo）：bash $HERE/check_env.sh --fix
+     · node 版本过低或缺失：bash $HERE/check_env.sh --fix --fix-node
+     · 修完重跑：bash $HERE/install.sh
+     · 明知故犯要硬装：bash $HERE/install.sh --no-check"
+  fi
+  say ""
+  say "✅ 环境体检通过，继续安装。"
+else
+  warn "找不到 crontab/check_env.sh，跳过环境体检（确认仓库完整：git pull）"
+fi
+
 # ---------------------------------------------------------------- 1. 找 node（必须绝对路径）
+if [ -z "$NODE_BIN" ] && [ -f "$HERE/check_env.sh" ]; then
+  NODE_BIN="$(bash "$HERE/check_env.sh" --print-node 2>/dev/null || true)"
+fi
 if [ -z "$NODE_BIN" ]; then
   if command -v node >/dev/null 2>&1; then
     NODE_BIN="$(command -v node)"
@@ -92,8 +123,18 @@ LOG_DIR="${HDSZF_LOG_DIR:-$ROOT/../_hdszf_logs}"
 # 路径先规范化（去掉 .. 与相对形式）再判断"是否在仓库内"，否则 $ROOT/../x 会被误判为仓库内。
 # 判定交给 node（跨平台分隔符一致），不要在 shell 里用 case 做前缀匹配 —— 反斜杠会被当转义。
 NORM='const p=require("path");process.stdout.write(p.resolve(process.argv[1]))'
+# ⚠ Git Bash / MSYS 下 node 不认 `/c/…` 形式（会当成 `C:\c\…`）→ 先转原生路径再规范化，
+#   否则"是否在仓库内"的判定会失灵。Linux 上 cygpath 不存在，这段不生效。
+LOG_ROOT="$ROOT"
+case "$(uname -s 2>/dev/null || echo unknown)" in
+  MINGW*|MSYS*|CYGWIN*)
+    if command -v cygpath >/dev/null 2>&1; then
+      LOG_ROOT="$(cygpath -w "$LOG_ROOT")"
+      LOG_DIR="$(cygpath -w "$LOG_DIR")"
+    fi ;;
+esac
 LOG_DIR="$("$NODE_BIN" -e "$NORM" "$LOG_DIR")" || die "日志目录无法解析：$LOG_DIR"
-if "$NODE_BIN" -e 'const p=require("path");const r=p.resolve(process.argv[1]),l=p.resolve(process.argv[2]);process.exit(l===r||l.startsWith(r+p.sep)?0:1)' "$ROOT" "$LOG_DIR"; then
+if "$NODE_BIN" -e 'const p=require("path");const r=p.resolve(process.argv[1]),l=p.resolve(process.argv[2]);process.exit(l===r||l.startsWith(r+p.sep)?0:1)' "$LOG_ROOT" "$LOG_DIR"; then
   die "日志目录不能放在仓库里（$LOG_DIR）—— 仓库根是 Cloudflare Assets 的发布目录，日志会被公开上传并污染 git。请换到仓库外，例如 $ROOT/../_hdszf_logs"
 fi
 
@@ -112,18 +153,9 @@ if [ "$(uname -s 2>/dev/null || echo unknown)" != "Linux" ]; then
   warn "本脚本面向 Linux（cron）。当前系统是 $(uname -s 2>/dev/null || echo unknown) —— Windows 请用 crontab\\install.cmd。"
   warn "   继续跑只为语法/逻辑自检，写入的 crontab 在本机不可用。"
 fi
-command -v git >/dev/null 2>&1 || { warn "找不到 git：sudo apt install -y git"; PROBLEMS=1; }
-command -v python3 >/dev/null 2>&1 || warn "找不到 python3：月度定稿（finalize）需要它取数 → sudo apt install -y python3"
-# ⚠ 不要用 `git -C "$ROOT"`：$ROOT 在 Git Bash 下是 /c/… 形式，原生 git.exe 认不出来（Linux 无此问题）。
-#   统一用子 shell cd 进去，两种环境都稳。
-if ! (cd "$ROOT" && git rev-parse --abbrev-ref HEAD >/dev/null 2>&1); then
-  warn "这里不是 git 仓库：$ROOT"
-  PROBLEMS=1
-elif [ -z "$(cd "$ROOT" && git config user.email 2>/dev/null || true)" ]; then
-  warn "git 身份未配置，commit 会被拒："
-  warn "   git config --global user.email \"you@example.com\" && git config --global user.name \"yourname\""
-  PROBLEMS=1
-fi
+# 注意：git / python3 / 仓库 / git 身份 / 日志目录等检查都在第 0 步的 check_env.sh 里，
+# 这里**不再重复**（避免两处逻辑漂移）。下面只补两件跟「装」直接相关的事：
+# ① 直跑本脚本时若跳过了体检（--no-check），至少确认是 git 仓库；② 推送凭据实测。
 
 say ""
 say "目标仓库 ：$ROOT"

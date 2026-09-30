@@ -143,6 +143,9 @@
     **安装命令 / 手动跑法与频率 / 查看清单 / 维护方法 / 故障处置** 全部见 **`crontab/README.md`**
     （Ubuntu 云服务器部署见 README 第 10 节：`bash crontab/install.sh`）。
     不装调度器时手动跑：每交易日 `node crontab/run_job.js mtd --force`、每月 `node crontab/run_job.js finalize --force`。
+    ⚠️ **装之前先体检**（2026-09-30 加，`install.sh` / `install.cmd` 已自动先跑一遍，有阻塞项即中止）：
+    `bash crontab/check_env.sh [--fix] [--fix-node]`（Linux，`--fix` 用 apt 补齐 git/python3/cron/curl/openssh）、
+    `crontab\check_env.cmd [--fix]`（Windows，`--fix` 走 winget）。检查项 / 参数 / 常见问题见 README 第 11 节。
     ⚠️ 运行器日志与状态写在**仓库之外**（Windows `<工作区>\_hdszf_logs\`；Linux `<仓库上级>/_hdszf_logs/`）：
     仓库根是 Assets 发布目录，放进去会被公开上传并污染 git。
     ⚠️ 运行器只决定「何时跑」，不产出任何数值；「月未走完不更新」仍由 `monthly_update.js` 自己把住（未走完 → exit 0）。
