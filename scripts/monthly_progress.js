@@ -15,6 +15,7 @@
  *   node scripts/monthly_progress.js               实时取数 + 输出进度快照（默认打印到 stdout）
  *   node scripts/monthly_progress.js --out 报告.md 同时把报告写入文件
  *   node scripts/monthly_progress.js --no-fetch    不联网（离线/测试），MTD 记为 0，仅展示结构
+ *   node scripts/monthly_progress.js --self-test   只跑内置回归自检（9 项）后退出，不取数、不写文件
  *
  * 降级闸门（重要，2026-09-29 加）：
  *   progress.json 的 MTD 会被前端 live overlay 叠加成全站「本月至今」口径（Hero / 三档卡 / 指标卡 / 滚动汇总表与明细块），
@@ -55,6 +56,47 @@ const PUSH = has('--push');
 // 为什么必须置位：push 失败若只打警告、不影响退出码，运行器会把本次记成「成功」并关掉当天的
 // 重试闸门 —— 数据永远上不了线却毫无告警，是完全静默的卡死（2026-09-30 实测踩到）。
 let PUBLISH_FAILED = false;
+
+// ---------------------------------------------------------------- --self-test（回归守卫）
+// 2026-10-02 的真实 bug：现金 MTD 的**分子用了「今天在日历上的日号」，分母却用「进行中月」的天数**。
+// 数据末月常年落后日历 1 个月（日历 10-02、数据末月 2026-08 → 进行中月 2026-09 已走完），
+// 于是 9 月的现金 MTD 被算成 2/30 → 凭空缩水 ~560 元、组合 MTD 被压低 ~0.11pp。
+// 下面把「跨月窗口内必须恒为满月」钉死，防止回归。
+if (has('--self-test')) {
+  const cases = [];
+  const eq = (name, got, want) => {
+    const ok = (typeof want === 'number' && typeof got === 'number')
+      ? Math.abs(got - want) < 1e-12
+      : JSON.stringify(got) === JSON.stringify(want);
+    cases.push({ name, ok, got, want });
+  };
+  const frac = (mon, day) => cashFraction(mon, new Date(day + 'T18:00:00'));
+
+  eq('月内进行中：9/15 → 15/30', frac('2026-09', '2026-09-15'), 15 / 30);
+  eq('月末最后一天：9/30 → 满月', frac('2026-09', '2026-09-30'), 1);
+  // ↓ 三条是旧 bug 的钉子：进行中月已走完，无论日历走到哪都必须恒为满月
+  eq('跨月：10/01 仍是满月', frac('2026-09', '2026-10-01'), 1);
+  eq('跨月：10/02 仍是满月', frac('2026-09', '2026-10-02'), 1);
+  eq('跨月：10/09 仍是满月', frac('2026-09', '2026-10-09'), 1);
+  eq('新进行中月：10/15 → 15/31', frac('2026-10', '2026-10-15'), 15 / 31);
+  eq('非闰年二月：2/14 → 14/28', frac('2026-02', '2026-02-14'), 14 / 28);
+  eq('闰年二月：2/29 → 满月', frac('2028-02', '2028-02-29'), 1);
+
+  let mono = true, prev = -1;
+  for (const d of ['2026-09-28', '2026-09-29', '2026-09-30', '2026-10-01', '2026-10-02', '2026-10-03']) {
+    const v = frac('2026-09', d);
+    if (v < prev - 1e-12) mono = false;
+    prev = v;
+  }
+  eq('跨月窗口内占比单调不减（不倒退）', mono, true);
+
+  const bad = cases.filter((c) => !c.ok);
+  console.log(`monthly_progress.js --self-test：${cases.length - bad.length}/${cases.length} 通过`);
+  cases.forEach((c) => console.log(`  ${c.ok ? '✅' : '❌'} ${c.name}` +
+    (c.ok ? '' : `  得到 ${JSON.stringify(c.got)}，期望 ${JSON.stringify(c.want)}`)));
+  if (bad.length) console.error('  ✗ 自检未通过 → 检查 cashFraction 的「跨月取满月」保护是否被去掉');
+  process.exit(bad.length ? 1 : 0);
+}
 
 // Node 18+ 才有全局 fetch（实时取数用它直连新浪）。Ubuntu 22.04 用 apt 装到的 nodejs 只有 12.x，
 // 届时报错会是「fetch is not defined」这种看不出所以然的形式 —— 这里提前拦住并给出装法。
@@ -126,13 +168,22 @@ async function fetchMTDForAsset(asset, cfg) {
   return { ok: false, err: lastErr ? String(lastErr.message || lastErr) : 'unknown', asset };
 }
 
-// 现金 MTD：按本月已过天数占比折算（现金月收益 cashMonthly）
-function cashMTD() {
+// 现金 MTD：按「进行中月」已过天数占比折算（现金月收益 cashMonthly）
+// ⚠️ 分子与分母必须**同为进行中月**的进度：分母是该月总天数，分子是「该月已过几天」，
+//    绝不能用「今天在日历上的日号」——数据末月常年落后日历 1 个月
+//    （日历 10-02、数据末月 2026-08 → 进行中月 2026-09 **其实已经走完**），
+//    此时用 today.getDate()=2 会把它算成 2/30，现金凭空缩水约 560 元、组合 MTD 被压低约 0.11pp。
+//    2026-10-02 实测：09-30 显示 -1.39%，10-02 变成 -1.50%，差额 561.61 元。
+//    既然进行中月已经结束 → 直接取满月（这是「该月已全部发生」的正确表达）。
+function cashFraction(inProgressMonth, now = new Date()) {
   const [y, m] = inProgressMonth.split('-').map(Number);
-  const daysInMonth = new Date(y, m, 0).getDate();
-  const today = new Date();
-  const elapsed = Math.min(today.getDate(), daysInMonth);
-  return cashMonthly * (elapsed / daysInMonth);
+  const daysInMonth = new Date(y, m, 0).getDate();   // m 是 1-based → 该月最后一天
+  const endOfMonth = new Date(y, m, 1);              // 该月结束后的第一刻（即下月 1 日）
+  if (now >= endOfMonth) return 1;                   // 进行中月已走完 → 满月
+  return Math.min(now.getDate(), daysInMonth) / daysInMonth;
+}
+function cashMTD() {
+  return cashMonthly * cashFraction(inProgressMonth);
 }
 
 // 现有 js/progress.json 的「身份」是否仍然有效：

@@ -247,13 +247,21 @@ simulateCMV(alloc, {liveOverlay:false}) / RollingBacktest.runAll({liveOverlay:fa
 ### 验证命令
 
 ```bash
-node scripts/smoke_check.js          # 期望退出码 0（含第 5/7/8/9/10/11/12 项，共 72 项断言）
-node scripts/monthly_progress.js     # 刷新 progress.json（--push 才提交）
+node scripts/smoke_check.js                  # 期望退出码 0（86 条断言，13 组守卫）
+node scripts/recompute_derived.js --check    # 期望「✓ 静态已与动态一致」
+node crontab/status.js --self-test           # 期望 9/9 通过（调度器：两平台任务标识映射）
+node scripts/monthly_progress.js --self-test # 期望 9/9 通过（现金 MTD 的跨月边界）
+node scripts/monthly_progress.js             # 刷新 progress.json（--push 才提交）
 ```
 
+> 两个 `--self-test` 只跑内置断言后退出，**不取数、不写文件、不联网**，几毫秒完成 —— 改过对应脚本就先跑它们。
+
 实机核对（本机 Playwright，隔离工作区 `C:\Users\23405\.workbuddy\binaries\node\workspace\`）：
-- 本地改动**未 push** 时才需要起服务：`<python> -m http.server 8123 --bind 127.0.0.1`（**必须用后台任务参数**；
-  命令末尾加 `&` 会「任务报 failed + python 子进程脱管占端口」，换端口重试会累积出多个僵尸服务）。
+- **预览服务一律在脚本进程内起，永不用后台任务**：隔离工作区的共享助手 `_srv.py` 提供 `autoserve()`
+  （内核分配空闲端口 + `atexit` 自动关闭），各核对脚本 `from _srv import autoserve` 拿 URL 即可，
+  **前台跑一条命令就退**，零残留、零面板记录。
+  ⚠️ 别回退成「手动起 `python -m http.server` 常驻」—— 那正是面板里「后台任务 · 已运行 1430m」僵尸记录的**唯一来源**
+  （命令末尾加 `&` 还会「任务报 failed + python 子进程脱管占端口」，换端口重试会累积出多个僵尸服务）。
 - `verify_live.py` → Hero / 指标卡 / 三档数值、悬浮层文本（本月至今 vs 已定稿）、曲线点数、日志表横向溢出、双主题。
 - `_verify_rolling_live.py` → 滚动汇总表 12 行「含本月至今」小标 + 数值、折线图末点（本月点是最后一点）、
   弹窗顶部汇总 5 项含本月至今 + 悬停对照、进行中行（第 134 个月）、`scrollWidth === clientWidth`。
