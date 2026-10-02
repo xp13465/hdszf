@@ -24,7 +24,7 @@ const RollingBacktest = (() => {
     startYear: 2016,
     startMonth: 7,
     endYear: 2026,
-    endMonth: 8
+    endMonth: 9
   };
 
   const ASSETS = ['沪深300', '中证500', '标普500', '纳斯达克100', '黄金', '现金·货币基金'];

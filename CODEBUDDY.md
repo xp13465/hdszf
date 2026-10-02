@@ -1,6 +1,6 @@
 # 恒市值助手 — 项目记忆文件
 
-> 最后更新: 2026-09-30（新增 Ubuntu/Linux 云服务器 cron 部署，运行器跨平台化） | 维护者: CodeBuddy AI + @sugas
+> 最后更新: 2026-10-03（数据刷新至日历 2026-09，133 个月） | 维护者: CodeBuddy AI + @sugas
 
 ---
 
@@ -297,13 +297,13 @@ investment-advisor/
 | style.css | v=19 | index.html `<link id=theme-style>` **+ main.js themeMap.business 必须同步** |
 | modern.css | v=18 | main.js themeMap |
 | tech.css | v=18 | main.js themeMap |
-| data.js | v=21 | index.html |
+| data.js | v=22 | index.html |
 | engine.js | v=24 | index.html |
 | sliders.js | v=9 | index.html |
 | charts.js | v=17 | index.html |
-| rolling.js | v=20 | index.html |
+| rolling.js | v=21 | index.html |
 | share-image.js | v=6 | index.html |
-| main.js | v=61 | index.html |
+| main.js | v=62 | index.html |
 
 > 查当前值：`grep -o "js/[a-z_-]*\.js?v=[0-9]*\|css/[a-z_-]*\.css?v=[0-9]*" index.html`
 
