@@ -1,13 +1,13 @@
 {
-  "generated_at": "2026-10-01 18:07",
+  "generated_at": "2026-10-02 18:07",
   "in_progress": true,
   "in_progress_month": "2026-09",
   "base_month": "2026-08",
   "data_as_of": "2026-09-30",
   "base_capital": 500000,
   "base_total": 1105811.22,
-  "est_total": 1098304,
-  "est_change_amount": -7507.22,
+  "est_total": 1098324.05,
+  "est_change_amount": -7487.17,
   "est_change_pct_base": -1.5,
   "est_change_pct_prev": -0.68,
   "cum_return_pct_base": 119.66,
@@ -66,10 +66,10 @@
     {
       "name": "现金·货币基金",
       "ok": true,
-      "mtd": 0,
-      "mtd_raw": 0.00002765,
+      "mtd": 0.01,
+      "mtd_raw": 0.0000553,
       "base_holding": 725373.72,
-      "est_value": 725393.78,
+      "est_value": 725413.84,
       "last_day": null
     }
   ],
