@@ -386,7 +386,7 @@ if (has('--self-test')) {
       else console.log(`${OK} 线上版本号与本地一致（说明最近一次推送已部署完成）`);
       try {
         const pj = await (await fetch('https://h.sugas.site/js/progress.json?t=' + Date.now(), { cache: 'no-store' })).json();
-        console.log(`线上快照：进行中月 ${pj.in_progress_month}  数据截至 ${pj.data_as_of || '—'}  生成于 ${pj.generated_at}${pj.degraded ? '  ' + C.y + 'degraded' + C.x : ''}`);
+        console.log(`线上快照：进行中月 ${pj.in_progress_month}  数据截至 ${pj.data_as_of || '—'}  生成于 ${pj.generated_at}${pj.degraded ? '  ' + C.y + 'degraded（' + (pj.degraded_reason || '本次无数据') + '）' + C.x : ''}`);
       } catch (e) { console.log(`${C.d}线上 progress.json 读取失败：${String(e.message || e).slice(0, 80)}${C.x}`); }
     } catch (e) {
       console.log(`${BAD} 无法访问站点：${String(e.message || e).slice(0, 120)}`);
