@@ -15,7 +15,7 @@
  *   node scripts/monthly_progress.js               实时取数 + 输出进度快照（默认打印到 stdout）
  *   node scripts/monthly_progress.js --out 报告.md 同时把报告写入文件
  *   node scripts/monthly_progress.js --no-fetch    不联网（离线/测试），MTD 记为 0，仅展示结构
- *   node scripts/monthly_progress.js --self-test   只跑内置回归自检（9 项）后退出，不取数、不写文件
+ *   node scripts/monthly_progress.js --self-test   只跑内置回归自检（18 项）后退出，不取数、不写文件
  *
  * 降级闸门（重要，2026-09-29 加）：
  *   progress.json 的 MTD 会被前端 live overlay 叠加成全站「本月至今」口径（Hero / 三档卡 / 指标卡 / 滚动汇总表与明细块），
@@ -62,6 +62,8 @@ let PUBLISH_FAILED = false;
 // 数据末月常年落后日历 1 个月（日历 10-02、数据末月 2026-08 → 进行中月 2026-09 已走完），
 // 于是 9 月的现金 MTD 被算成 2/30 → 凭空缩水 ~560 元、组合 MTD 被压低 ~0.11pp。
 // 下面把「跨月窗口内必须恒为满月」钉死，防止回归。
+// 2026-10-03 补：同时钉死 computeMTD 的**诊断文案**（长假"无交易日"必须与真故障分开），
+// 起因是国庆首日 5 个资产全报「daily is not iterable」，把真实原因盖成了假故障。
 if (has('--self-test')) {
   const cases = [];
   const eq = (name, got, want) => {
@@ -90,11 +92,30 @@ if (has('--self-test')) {
   }
   eq('跨月窗口内占比单调不减（不倒退）', mono, true);
 
+  // ---- computeMTD 的诊断契约 ----
+  // 2026-10-03（国庆首日）的真实踩坑：5 个资产在日志里全报「daily is not iterable」
+  // （JS TypeError 的文案），看起来像接口坏了，实际只是长假还没有 10 月行情。
+  // 钉死：报错必须说人话，且「休市」与「真故障」要能被区分开。
+  const D = (s) => s.split(',').map((x) => { const p = x.split('='); return { day: p[0], close: p[1] }; });
+  const m1 = computeMTD(D('2026-08-29=4.100,2026-09-30=4.432'), '2026-10', '2026-09');
+  eq('尚无交易日 → 打上 noTradingDay 标记', m1.noTradingDay, true);
+  eq('尚无交易日 → 原因写「尚无交易日」', /尚无交易日/.test(m1.reason || ''), true);
+  eq('尚无交易日 → 不再是 TypeError 文案', /iterable/.test(m1.reason || ''), false);
+  const m2 = computeMTD(D('2026-08-29=4.100,2026-09-30=4.432,2026-10-09=4.500'), '2026-10', '2026-09');
+  eq('正常取数 → ok', m2.ok, true);
+  eq('正常取数 → MTD = 4.5/4.432-1', m2.mtd, 4.5 / 4.432 - 1);
+  eq('正常取数 → lastDay 取本月最后一条', m2.lastDay, '2026-10-09');
+  const m3 = computeMTD(null, '2026-10', '2026-09');
+  eq('接口返回 null → 明说「未返回数组」', /未返回数组/.test(m3.reason || ''), true);
+  eq('接口返回 null → 不算「尚无交易日」', !!m3.noTradingDay, false);
+  const m4 = computeMTD(D('2026-10-09=4.500'), '2026-10', '2026-09');
+  eq('缺基准月收盘 → 报出是哪个基准月', /找不到基准月 2026-09/.test(m4.reason || ''), true);
+
   const bad = cases.filter((c) => !c.ok);
   console.log(`monthly_progress.js --self-test：${cases.length - bad.length}/${cases.length} 通过`);
   cases.forEach((c) => console.log(`  ${c.ok ? '✅' : '❌'} ${c.name}` +
     (c.ok ? '' : `  得到 ${JSON.stringify(c.got)}，期望 ${JSON.stringify(c.want)}`)));
-  if (bad.length) console.error('  ✗ 自检未通过 → 检查 cashFraction 的「跨月取满月」保护是否被去掉');
+  if (bad.length) console.error('  ✗ 自检未通过 → 查 cashFraction 的「跨月取满月」保护、computeMTD 的诊断文案（两者都有回归钉子）');
   process.exit(bad.length ? 1 : 0);
 }
 
@@ -135,23 +156,41 @@ const cashMonthly = rr.cash_monthly || 0.00083;
 const FM = JSON.parse(read('scripts/fund_map.json'));
 const ASSETS = FM.assets; // {资产: {sina, backup, ...}}
 
+// 解析日线数组 → 进行中月 MTD。返回 {ok:true,mtd,lastDay} 或 {ok:false,reason,noTradingDay?}
+// ⚠️ reason 是给人看的诊断信息，**必须把两种完全不同的情况分开**：
+//    ① noTradingDay：进行中月还没有任何交易日（长假/休市）——市场状态，**属正常**，不是故障；
+//    ② 其余：行情拿不到 / 结构不对（接口异常、代码无效、缺基准月）——真故障，要看。
+//    旧实现两者都只抛一句「无 xxx 数据」，而且这句还会被兜底代码的 TypeError 覆盖（见下），
+//    真实原因被彻底埋掉 —— 2026-10-03 国庆首日就只看到 5 行「daily is not iterable」。
 function computeMTD(daily, inProg, prev) {
+  if (!Array.isArray(daily)) {
+    return { ok: false, reason: `行情接口未返回数组（拿到 ${daily === null ? 'null' : typeof daily}，多为此代码在新浪无行情，需带 sh/sz 前缀）` };
+  }
   let prevClose = null;
   let lastProgClose = null;
   let lastDay = null;
+  let latest = null;
   for (const k of daily) {
+    if (!k || typeof k.day !== 'string') continue;
     const ym = k.day.slice(0, 7);
     const c = parseFloat(k.close);
-    if (ym === prev) prevClose = c;       // 升序，后者覆盖 → 上月末收盘
-    else if (ym === inProg) { lastProgClose = c; lastDay = k.day; } // 本月至今最后交易日收盘
+    if (latest === null || k.day > latest) latest = k.day;          // 行情里最新的一天
+    if (ym === prev) prevClose = c;                                 // 升序，后者覆盖 → 上月末收盘
+    else if (ym === inProg) { lastProgClose = c; lastDay = k.day; }  // 本月至今最后交易日收盘
   }
-  if (prevClose == null || lastProgClose == null) return null;
-  return { mtd: lastProgClose / prevClose - 1, lastDay };
+  if (lastProgClose === null) {
+    return { ok: false, noTradingDay: true,
+      reason: `进行中月 ${inProg} 尚无交易日（行情最新 ${latest || '—'}；休市或长假，属正常）` };
+  }
+  if (prevClose === null) {
+    return { ok: false, reason: `行情里找不到基准月 ${prev} 的收盘（行情最新 ${latest || '—'}）` };
+  }
+  return { ok: true, mtd: lastProgClose / prevClose - 1, lastDay };
 }
 
 async function fetchMTDForAsset(asset, cfg) {
   const candidates = [cfg.sina, ...(cfg.backup || [])];
-  let lastErr = null;
+  const tried = [];          // [{sym, err, noTradingDay}] —— 主标的在最前
   for (const sym of candidates) {
     try {
       const url = `https://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol=${sym}&scale=240&ma=no&datalen=900&adj=qfq`;
@@ -159,13 +198,23 @@ async function fetchMTDForAsset(asset, cfg) {
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const daily = await res.json();
       const m = computeMTD(daily, inProgressMonth, prevMonth);
-      if (m == null) throw new Error('无 ' + inProgressMonth + ' 数据');
+      if (!m.ok) { tried.push({ sym, err: m.reason, noTradingDay: !!m.noTradingDay }); continue; }
       return { ok: true, mtd: m.mtd, lastDay: m.lastDay, sym, asset };
     } catch (e) {
-      lastErr = e;
+      tried.push({ sym, err: String((e && e.message) || e) });
     }
   }
-  return { ok: false, err: lastErr ? String(lastErr.message || lastErr) : 'unknown', asset };
+  // ⚠️ 对外只报**主标的**的失败原因（tried[0]）。兜底代码是 fund_map 里的裸 6 位代码
+  //    （如 160706 / 518880），新浪对它们一律返回字面量 null → 报错恒为同一句
+  //    「行情接口未返回数组」，若沿用「最后一个错误胜出」就会把主标的的真实原因盖掉。
+  const errs = tried.map((t) => `${t.sym}: ${t.err}`);
+  return {
+    ok: false,
+    err: tried.length ? tried[0].err : 'unknown',
+    errs,                                                // 全量明细（写进报告/排查用）
+    noTradingDay: tried.some((t) => t.noTradingDay),      // 有任一候选说「本月还没交易日」→ 市场状态
+    asset
+  };
 }
 
 // 现金 MTD：按「进行中月」已过天数占比折算（现金月收益 cashMonthly）
@@ -200,11 +249,23 @@ function existingIdentityValid() {
   } catch (e) { return false; }
 }
 
+// 现有 js/progress.json 本身是否已经是「降级占位」（估算字段全 null）。
+// 占位里没有任何可保护的信息 → 不必像「含真实 MTD 的快照」那样被 keepExisting 挡住，
+// 应当允许刷新（把降级原因/时间戳更新掉），否则 status.js 只能看到干巴巴的 degraded。
+// 2026-10-03 长假首日实测：磁盘上已是 00:37 写下的 null 占位，日志却仍说「保留上一版真实快照」。
+function existingSnapshotIsDegraded() {
+  try {
+    const o = JSON.parse(fs.readFileSync(path.join(ROOT, JSON_OUT), 'utf8'));
+    return !!o.in_progress && o.degraded === true;
+  } catch (e) { return false; }
+}
+
 // ---------------- 主流程 ----------------
 (async () => {
   const mtdMap = {};
   let fetchOk = 0;
   let fetchFail = 0;
+  let holidayOnly = false;   // 降级仅因「进行中月尚无交易日（休市/长假）」—— 措辞要与真故障区分
 
   if (NO_FETCH) {
     for (const asset of Object.keys(ASSETS)) mtdMap[asset] = { ok: true, mtd: 0, sym: '(offline)', asset };
@@ -218,7 +279,16 @@ function existingIdentityValid() {
       if (r.ok) fetchOk++; else { fetchFail++; console.error(`  ✗ ${r.asset} 取数失败: ${r.err}`); }
     }
     if (fetchFail > 0) {
-      console.error(`  ⚠ ${fetchFail} 个风险资产取数失败 → 本快照判为降级（不会写入/推送任何本月至今数据）`);
+      const fails = results.filter((r) => !r.ok);
+      // 全部失败都只是「进行中月还没有交易日」→ 这是市场状态（休市/长假），不是故障。
+      // 例：国庆长假 A 股 10-01~10-08 休市，整个窗口内 MTD 无数据是**正确**的。
+      // 必须与真故障分开措辞，否则每年长假都刷一屏红字，把真故障淹没（告警疲劳）。
+      holidayOnly = fails.length > 0 && fails.every((r) => r.noTradingDay);
+      if (holidayOnly) {
+        console.error(`  · 进行中月 ${inProgressMonth} 尚无交易日（休市/长假）→ 本次不提供本月至今数据；属正常，开市后自动恢复`);
+      } else {
+        console.error(`  ⚠ ${fetchFail} 个风险资产取数失败 → 本快照判为降级（不会写入/推送任何本月至今数据）`);
+      }
       for (const asset of Object.keys(ASSETS)) {
         if (!mtdMap[asset].ok) mtdMap[asset] = { ok: false, mtd: null, lastDay: null, sym: '(失败)', asset };
       }
@@ -227,6 +297,12 @@ function existingIdentityValid() {
   // 降级判定：任一风险资产取数失败（或 --no-fetch 离线）→ 组合 MTD 不完整，
   // 不能作为「本月至今数据」对外展示（宁可不显示，也不给一个由 0 拼出来的假数字）。
   const DEGRADED = NO_FETCH || fetchFail > 0;
+  // 降级原因（人话）——同时写进报告与 progress.json：只写 degraded 会让人分不清
+  // 「长假休市（正常）」和「取数真坏了（要看）」，这正是这套值守最怕的告警疲劳。
+  const degradedReason = !DEGRADED ? null
+    : NO_FETCH ? '离线模式（--no-fetch）：本次不取数'
+      : holidayOnly ? `进行中月 ${inProgressMonth} 尚无交易日（休市/长假），属正常，开市后自动恢复`
+        : `${fetchFail} 个风险资产取数失败（详见 cron 日志）`;
   mtdMap[CASH] = { ok: true, mtd: cashMTD(), lastDay: null, sym: 'cash', asset: CASH };
 
   // 本月至今最新市值：基准持仓 × (1 + MTD)
@@ -266,7 +342,8 @@ function existingIdentityValid() {
   if (DEGRADED) {
     md += `- ⚠️ **本快照已降级：不含任何本月至今数据**（所有 MTD / 最新市值字段为 null）。` +
           `站点会自动回退到「已定稿（${lastCompleteMonth}）」口径，不展示任何当月数字。` +
-          `原因：取数不完整时用 0 填补会伪造出「当月持平」的假收益（项目铁律禁止）。\n\n`;
+          `原因：取数不完整时用 0 填补会伪造出「当月持平」的假收益（项目铁律禁止）。\n`;
+    md += `- 降级原因：${degradedReason}\n\n`;
   } else {
     md += `\n`;
   }
@@ -283,7 +360,9 @@ function existingIdentityValid() {
 
   md += `## 组合最新市值（进行中）\n\n`;
   if (DEGRADED) {
-    md += `- ⚠️ 取数不完整，**本次不提供本月至今数据**（不写入 js/progress.json 的相关字段）。重跑本脚本即可。\n`;
+    md += `- ⚠️ 取数不完整，**本次不提供本月至今数据**（不写入 js/progress.json 的相关字段）。` +
+          (holidayOnly ? `进行中月尚无交易日，开市后下一次运行自动恢复（无需重跑）。\n`
+            : `重跑本脚本即可。\n`);
   } else {
     md += `- 最新市值：**¥${fmtMoney(estTotal)}**（对固定基准 ¥${fmtMoney(CAP)} → 累计 ${sign(cumPctBase)}${cumPctBase.toFixed(2)}%）\n`;
     md += `- 本月至今收益：**${sign(deltaPctBase)}${deltaPctBase.toFixed(2)}%**（${sign(delta)}¥${fmtMoney(Math.abs(delta))} 变更，即 ${sign(delta)}${Math.abs(delta).toFixed(0)} 元）— ÷固定基准50万\n`;
@@ -317,6 +396,7 @@ function existingIdentityValid() {
       cum_return_pct_base: n2(cumPctBase),
       fetch: { ok: fetchOk, fail: fetchFail, offline: NO_FETCH },   // offline=true 表示本次为 --no-fetch 离线结构自检
       degraded: DEGRADED,
+      degraded_reason: degradedReason,   // 供 status.js / 排查用：区分「休市（正常）」与「取数故障」
       assets: rows.map((r) => ({
         name: r.asset,
         ok: DEGRADED ? false : r.mtdKnown,          // 该资产本次是否取到可用 MTD（降级时一律 false）
@@ -342,10 +422,11 @@ function existingIdentityValid() {
         unchanged = (JSON.stringify(prevObj, null, 2) + '\n') === nextBody;
       } catch (_) { unchanged = false; }
     }
-    // 降级 + 现有快照身份仍有效 → 保留上一版「真实」快照，不用一份无估算的占位去覆盖它。
-    const keepExisting = DEGRADED && existingIdentityValid();
+    // 降级 + 现有快照身份仍有效 + 现有快照**含真实数据** → 保留它，不用一份 null 占位去覆盖真数据。
+    // 若现有快照本身就是降级占位（无信息可保护），则放行刷新。
+    const keepExisting = DEGRADED && existingIdentityValid() && !existingSnapshotIsDegraded();
     if (keepExisting) {
-      console.error('[skip] 取数降级且现有快照仍有效 → 保留上一版真实快照（未写入、未推送）');
+      console.error('[skip] 取数降级且现有快照仍有效（含真实 MTD）→ 保留上一版真实快照（未写入、未推送）');
     } else if (unchanged) {
       console.error(`[skip] ${JSON_OUT} 数据无变化，未重写（保留原快照时间）`);
     } else {

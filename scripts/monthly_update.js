@@ -283,7 +283,10 @@ const V = {
   todayCN: `${today.getFullYear()}年${today.getMonth() + 1}月${today.getDate()}日`,
   todayISO: `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 };
-P(`\n  动态基准值：年化 ${V.annual2}% / 终值 ${V.finalWan}万 / 回撤 ${V.dd2}% / 夏普 ${V.sharpe2} / 月胜率 ${V.wr2}%（${V.posMonths}/${V.n}）`);
+// ⚠️ 分母必须是 V.nCum（累计月序 = 收益条数 + 1），因为 B.monthlyWinRate / B.positiveMonths
+//    来自 BacktestEngine.simulateCMV，其 monthlyReturns 含入场月（134 条）。写 V.n 会让
+//    「67.16%（90/133）」这样量与值对不上（90/133 = 67.67%）—— 2026-10-03 定稿日志实测。
+P(`\n  动态基准值：年化 ${V.annual2}% / 终值 ${V.finalWan}万 / 回撤 ${V.dd2}% / 夏普 ${V.sharpe2} / 月胜率 ${V.wr2}%（${V.posMonths}/${V.nCum}）`);
 
 // ---------------- 6. 收口月 ----------------
 P('\n=== 阶段 5 · 滚动表收口月 ===');

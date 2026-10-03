@@ -250,7 +250,7 @@ simulateCMV(alloc, {liveOverlay:false}) / RollingBacktest.runAll({liveOverlay:fa
 node scripts/smoke_check.js                  # 期望退出码 0（86 条断言，13 组守卫）
 node scripts/recompute_derived.js --check    # 期望「✓ 静态已与动态一致」
 node crontab/status.js --self-test           # 期望 9/9 通过（调度器：两平台任务标识映射）
-node scripts/monthly_progress.js --self-test # 期望 9/9 通过（现金 MTD 的跨月边界）
+node scripts/monthly_progress.js --self-test # 期望 18/18 通过（现金 MTD 跨月边界 + MTD 取数诊断契约）
 node scripts/monthly_progress.js             # 刷新 progress.json（--push 才提交）
 ```
 

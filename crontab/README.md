@@ -239,7 +239,7 @@ node crontab\status.js --online
 | **定稿前置：工作区必须干净**（硬闸门） | 定稿内部是 `git add -A`，脏工作区会把人工改动裹进「数据更新」一起上线 → 不干净则**跳过并提示**。`--force` 也不绕过（这是安全约束，不是时机约束） |
 | **失败自动回滚** | 定稿失败时若留下未提交改动，自动 `git checkout -- .` 还原成「什么都没发生」——避免半成品被下次运行继续加工 |
 | **不造数据** | 所有数值都由既有脚本产出；运行器只决定「何时跑、跑了记什么」。铁律「月未走完不更新」由 `monthly_update.js` 自己把住（未走完 → `exit 0`） |
-| **降级不推假数据** | 取数不完整 → 脚本把相关字段全写 `null`（不是 `0`）且不写不推，站点回退「已定稿」口径 |
+| **降级不推假数据** | 取数不完整 → 脚本把相关字段全写 `null`（不是 `0`）且不写不推，站点回退「已定稿」口径。`progress.json` 里同时写 **`degraded_reason`**（人话原因），`status.js` 的「进行中快照」行会打出来 —— 用来区分**长假休市（正常）**与**取数真故障（要看）**：前者是「进行中月尚无交易日」，后者是「N 个风险资产取数失败」 |
 | **日志在仓库外** | 写在 `<工作区>\_hdszf_logs\`。仓库根目录是 Cloudflare Assets 的发布目录，日志放进去会被**公开上传**并污染 git |
 | **改时间不改脚本** | 调整执行时段只改计划任务触发器，运行器自适应 |
 
@@ -252,7 +252,8 @@ node crontab\status.js --online
 | `status.js` 说「运行器从未执行」 | 计划任务没注册，或 task 被禁用 | 跑 `install.cmd`；`schtasks /change /tn hdszf-mtd /enable`；手动模式请加 `--no-tasks` |
 | `status.js` 说「工作区有未提交改动」 | 有手改没提交 | 定稿前先 `git commit` / `git stash`（运行器会跳过定稿，属正常保护） |
 | `status.js` 报「调度未注册 / 没有 hdszf-mtd」，但任务确实在跑 | **旧版 `status.js` 的 bug**（Linux 分支拿 Windows 计划任务名 `hdszf-mtd` 去匹配 crontab 行，永远匹配不上） | 升级到含 2026-10-01 修复的版本；`node crontab\status.js --self-test` 应 `9/9 通过` |
-| 连续几次 `exit=2` | 新浪接口取数失败 / 网络不通 | 手工 `node scripts\monthly_progress.js --no-json` 看具体哪个资产失败；恢复后下次唤醒自动补上 |
+| 连续几次 `exit=2`，日志写「**尚无交易日（休市/长假）**」 | **正常**：进行中月还没有任何交易日（如国庆 10-01~10-08 A 股休市，10-09 才开市）。此时 MTD 本来就该没有 | 不用处理，**开市后下一次运行自动恢复**。站点此期间不展示本月至今数字，自动回退到「已定稿」口径 |
+| 连续几次 `exit=2`，日志写「**N 个风险资产取数失败**」，或报错里出现 `daily is not iterable`（旧版文案） | 新浪接口异常 / 网络不通 / 取数代码失效 | 先 `node crontab\status.js` 看 `degraded_reason`；再 `node scripts\monthly_progress.js --no-json` 定位到具体资产；恢复后下次唤醒自动补上 |
 | `exit=1` 且日志出现「自检失败」「替换规则未命中」 | 展示层或静态文案与替换规则脱节（真问题，不会自动修） | 日志里有具体文件与规则；修好后当天/次日自动重跑即可 |
 | 定稿后页面数字没变 | push 成功但 Cloudflare 还在部署，或 push 失败 | `node crontab\status.js --online` 看线上版本号是否落后 |
 | 远程 tip ≠ 本地 HEAD | push 被拒（远程有新提交） | 一般**无需手工**：运行器下次运行前会自动 `pull --rebase` 拉平并重推（`exit=3` 就是这个信号）。急着看就手工 `git pull --rebase && git push` |

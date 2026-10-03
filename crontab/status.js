@@ -322,7 +322,11 @@ if (has('--self-test')) {
   const pg = readJSON(path.join(ROOT, 'js/progress.json'));
   if (!pg) console.log(`${BAD} 读取 js/progress.json 失败`);
   else {
-    const dg = pg.degraded ? `${C.y}degraded（本次无数据，站点回退已定稿口径）${C.x}` : `${C.g}正常${C.x}`;
+    // 降级时把原因一起打出来（progress.json#degraded_reason）：
+    // 只写 degraded 会让人分不清「长假休市（正常）」与「取数真坏了（要看）」。
+    const dg = pg.degraded
+      ? `${C.y}degraded（${pg.degraded_reason || '本次无数据，站点回退已定稿口径'}）${C.x}`
+      : `${C.g}正常${C.x}`;
     const fc = pg.fetch ? `  取数 ${pg.fetch.ok}成功/${pg.fetch.fail}失败` : '';
     console.log(`进行中快照：${pg.in_progress_month}  基准月 ${pg.base_month}  数据截至 ${pg.data_as_of || '—'}${fc}  ${dg}`);
     console.log(`           生成于 ${pg.generated_at || '—'}`);
