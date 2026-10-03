@@ -633,7 +633,7 @@ investment-advisor/
   故仅在末尾**额外加一行**「🟡 进行中」；官方回测指标以已定稿口径为准。
 - **CSV 导出（日志 CSV / 汇总 CSV）**：仍只导正式月份 —— 屏幕上看得到本月至今，但导出物保持"官方口径"。
 
-#### E. 回归守卫（`scripts/smoke_check.js` 已加，共 72 项断言）
+#### E. 回归守卫（`scripts/smoke_check.js` 已加；**现为 86 项断言 / 13 组**，0 = 通过）
 - 第 5 项：`simulateCMV` 窗口 = 入场月 + 真实收益月（`totalMonths === assetLen + 1`）。
 - 第 8 项：**两引擎口径逐项一致**（一次建仓版 & 分批建仓版）。
 - 第 9 项：**live overlay 与 progress.json 逐位一致**（终值=est_total、月数 +1、累计%=`cum_return_pct_base`、不污染已定稿、非法叠加被拒、clear 后复位）。
@@ -903,7 +903,7 @@ return cashMonthly * (elapsed / daysInMonth);             //   2/30 而应为 30
 
 ---
 
-### M. MTD 取数失败的「诊断契约」：长假休市必须与真故障分开（2026-10-03）
+#### M. MTD 取数失败的「诊断契约」：长假休市必须与真故障分开（2026-10-03）
 
 **现象**：国庆首日（10-03）报告里 5 个风险资产**全报同一句**：
 
