@@ -1,78 +1,78 @@
 {
-  "generated_at": "2026-10-03 22:18",
+  "generated_at": "2026-10-08 18:07",
   "in_progress": true,
   "in_progress_month": "2026-10",
   "base_month": "2026-09",
-  "data_as_of": null,
+  "data_as_of": "2026-10-08",
   "base_capital": 500000,
   "base_total": 1098868.88,
-  "est_total": null,
-  "est_change_amount": null,
-  "est_change_pct_base": null,
-  "est_change_pct_prev": null,
-  "cum_return_pct_base": null,
+  "est_total": 1097403.6,
+  "est_change_amount": -1465.29,
+  "est_change_pct_base": -0.29,
+  "est_change_pct_prev": -0.13,
+  "cum_return_pct_base": 119.48,
   "fetch": {
-    "ok": 0,
-    "fail": 5,
+    "ok": 5,
+    "fail": 0,
     "offline": false
   },
-  "degraded": true,
-  "degraded_reason": "进行中月 2026-10 尚无交易日（休市/长假），属正常，开市后自动恢复",
+  "degraded": false,
+  "degraded_reason": null,
   "assets": [
     {
       "name": "沪深300",
-      "ok": false,
-      "mtd": null,
-      "mtd_raw": null,
+      "ok": true,
+      "mtd": -0.97,
+      "mtd_raw": -0.00970217,
       "base_holding": 71437.78,
-      "est_value": null,
-      "last_day": null
+      "est_value": 70744.68,
+      "last_day": "2026-10-08"
     },
     {
       "name": "中证500",
-      "ok": false,
-      "mtd": null,
-      "mtd_raw": null,
+      "ok": true,
+      "mtd": -2.39,
+      "mtd_raw": -0.02387707,
       "base_holding": 25000,
-      "est_value": null,
-      "last_day": null
+      "est_value": 24403.07,
+      "last_day": "2026-10-08"
     },
     {
       "name": "标普500",
-      "ok": false,
-      "mtd": null,
-      "mtd_raw": null,
+      "ok": true,
+      "mtd": 0.85,
+      "mtd_raw": 0.00848303,
       "base_holding": 73568.28,
-      "est_value": null,
-      "last_day": null
+      "est_value": 74192.36,
+      "last_day": "2026-10-08"
     },
     {
       "name": "纳斯达克100",
-      "ok": false,
-      "mtd": null,
-      "mtd_raw": null,
+      "ok": true,
+      "mtd": 0.94,
+      "mtd_raw": 0.00936864,
       "base_holding": 100000,
-      "est_value": null,
-      "last_day": null
+      "est_value": 100936.86,
+      "last_day": "2026-10-08"
     },
     {
       "name": "黄金",
-      "ok": false,
-      "mtd": null,
-      "mtd_raw": null,
+      "ok": true,
+      "mtd": -1.89,
+      "mtd_raw": -0.01892235,
       "base_holding": 100000,
-      "est_value": null,
-      "last_day": null
+      "est_value": 98107.77,
+      "last_day": "2026-10-08"
     },
     {
       "name": "现金·货币基金",
-      "ok": false,
-      "mtd": null,
-      "mtd_raw": null,
+      "ok": true,
+      "mtd": 0.02,
+      "mtd_raw": 0.00021407,
       "base_holding": 728862.82,
-      "est_value": null,
+      "est_value": 729018.85,
       "last_day": null
     }
   ],
-  "note": "⚠ 降级快照：本月行情取数不完整，本文件不含任何本月至今数据（相关字段为 null）。前端与引擎必须忽略这些字段，站点回退到「已定稿（基准月）」口径；重跑 scripts/monthly_progress.js 即可恢复。"
+  "note": "本月至今（MTD）为真实已发生的每日行情累积，但该月尚未定稿（恒市值法仅在月末调仓），故不计入官方回测；月末收盘后由月度定稿流程写入正式数据。收益比例统一按固定基准 50 万口径。"
 }
