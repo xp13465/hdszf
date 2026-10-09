@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-10-08 18:07",
+  "generated_at": "2026-10-09 18:07",
   "in_progress": true,
   "in_progress_month": "2026-10",
   "base_month": "2026-09",
-  "data_as_of": "2026-10-08",
+  "data_as_of": "2026-10-09",
   "base_capital": 500000,
   "base_total": 1098868.88,
-  "est_total": 1097403.6,
-  "est_change_amount": -1465.29,
-  "est_change_pct_base": -0.29,
-  "est_change_pct_prev": -0.13,
-  "cum_return_pct_base": 119.48,
+  "est_total": 1099995.25,
+  "est_change_amount": 1126.36,
+  "est_change_pct_base": 0.23,
+  "est_change_pct_prev": 0.1,
+  "cum_return_pct_base": 120,
   "fetch": {
     "ok": 5,
     "fail": 0,
@@ -22,55 +22,55 @@
     {
       "name": "沪深300",
       "ok": true,
-      "mtd": -0.97,
-      "mtd_raw": -0.00970217,
+      "mtd": -1.06,
+      "mtd_raw": -0.01060469,
       "base_holding": 71437.78,
-      "est_value": 70744.68,
-      "last_day": "2026-10-08"
+      "est_value": 70680.21,
+      "last_day": "2026-10-09"
     },
     {
       "name": "中证500",
       "ok": true,
-      "mtd": -2.39,
-      "mtd_raw": -0.02387707,
+      "mtd": -2.51,
+      "mtd_raw": -0.0250591,
       "base_holding": 25000,
-      "est_value": 24403.07,
-      "last_day": "2026-10-08"
+      "est_value": 24373.52,
+      "last_day": "2026-10-09"
     },
     {
       "name": "标普500",
       "ok": true,
-      "mtd": 0.85,
-      "mtd_raw": 0.00848303,
+      "mtd": 0.8,
+      "mtd_raw": 0.00798403,
       "base_holding": 73568.28,
-      "est_value": 74192.36,
-      "last_day": "2026-10-08"
+      "est_value": 74155.65,
+      "last_day": "2026-10-09"
     },
     {
       "name": "纳斯达克100",
       "ok": true,
-      "mtd": 0.94,
-      "mtd_raw": 0.00936864,
+      "mtd": 1.96,
+      "mtd_raw": 0.01955193,
       "base_holding": 100000,
-      "est_value": 100936.86,
-      "last_day": "2026-10-08"
+      "est_value": 101955.19,
+      "last_day": "2026-10-09"
     },
     {
       "name": "黄金",
       "ok": true,
-      "mtd": -1.89,
-      "mtd_raw": -0.01892235,
+      "mtd": -0.21,
+      "mtd_raw": -0.00207684,
       "base_holding": 100000,
-      "est_value": 98107.77,
-      "last_day": "2026-10-08"
+      "est_value": 99792.32,
+      "last_day": "2026-10-09"
     },
     {
       "name": "现金·货币基金",
       "ok": true,
       "mtd": 0.02,
-      "mtd_raw": 0.00021407,
+      "mtd_raw": 0.00024083,
       "base_holding": 728862.82,
-      "est_value": 729018.85,
+      "est_value": 729038.35,
       "last_day": null
     }
   ],
