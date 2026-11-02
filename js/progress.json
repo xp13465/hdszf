@@ -1,16 +1,16 @@
 {
-  "generated_at": "2026-11-02 18:07",
+  "generated_at": "2026-11-03 00:37",
   "in_progress": true,
-  "in_progress_month": "2026-10",
-  "base_month": "2026-09",
-  "data_as_of": "2026-10-30",
+  "in_progress_month": "2026-11",
+  "base_month": "2026-10",
+  "data_as_of": "2026-11-02",
   "base_capital": 500000,
-  "base_total": 1098868.88,
-  "est_total": 1078811.07,
-  "est_change_amount": -20057.81,
-  "est_change_pct_base": -4.01,
-  "est_change_pct_prev": -1.83,
-  "cum_return_pct_base": 115.76,
+  "base_total": 1078791.69,
+  "est_total": 1077948.68,
+  "est_change_amount": -843.01,
+  "est_change_pct_base": -0.17,
+  "est_change_pct_prev": -0.08,
+  "cum_return_pct_base": 115.59,
   "fetch": {
     "ok": 5,
     "fail": 0,
@@ -22,55 +22,55 @@
     {
       "name": "沪深300",
       "ok": true,
-      "mtd": -8.28,
-      "mtd_raw": -0.08280686,
-      "base_holding": 71437.78,
-      "est_value": 65522.24,
-      "last_day": "2026-10-30"
+      "mtd": 0.49,
+      "mtd_raw": 0.00492005,
+      "base_holding": 75000,
+      "est_value": 75369,
+      "last_day": "2026-11-02"
     },
     {
       "name": "中证500",
       "ok": true,
-      "mtd": -15.67,
-      "mtd_raw": -0.15673759,
+      "mtd": 2.38,
+      "mtd_raw": 0.02382955,
       "base_holding": 25000,
-      "est_value": 21081.56,
-      "last_day": "2026-10-30"
+      "est_value": 25595.74,
+      "last_day": "2026-11-02"
     },
     {
       "name": "标普500",
       "ok": true,
-      "mtd": -1.1,
-      "mtd_raw": -0.01097804,
-      "base_holding": 73568.28,
-      "est_value": 72760.65,
-      "last_day": "2026-10-30"
+      "mtd": 0.05,
+      "mtd_raw": 0.00050454,
+      "base_holding": 72760.65,
+      "est_value": 72797.36,
+      "last_day": "2026-11-02"
     },
     {
       "name": "纳斯达克100",
       "ok": true,
-      "mtd": -4.03,
-      "mtd_raw": -0.04032587,
-      "base_holding": 100000,
-      "est_value": 95967.41,
-      "last_day": "2026-10-30"
+      "mtd": 0.25,
+      "mtd_raw": 0.00254669,
+      "base_holding": 95967.41,
+      "est_value": 96211.81,
+      "last_day": "2026-11-02"
     },
     {
       "name": "黄金",
       "ok": true,
-      "mtd": -5.99,
-      "mtd_raw": -0.05988231,
+      "mtd": -2.15,
+      "mtd_raw": -0.02147766,
       "base_holding": 100000,
-      "est_value": 94011.77,
-      "last_day": "2026-10-30"
+      "est_value": 97852.23,
+      "last_day": "2026-11-02"
     },
     {
       "name": "现金·货币基金",
       "ok": true,
-      "mtd": 0.08,
-      "mtd_raw": 0.00082954,
-      "base_holding": 728862.82,
-      "est_value": 729467.44,
+      "mtd": 0.01,
+      "mtd_raw": 0.00008295,
+      "base_holding": 710063.63,
+      "est_value": 710122.53,
       "last_day": null
     }
   ],
